@@ -1,0 +1,54 @@
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
+
+# Правила проекта
+
+Локальный ИИ-агент: веб-чат и Telegram говорят с одной моделью и одним хранилищем. Интерфейс и тексты для пользователя — на русском.
+
+## Стек
+
+- Next.js 16 (App Router), React 19, TypeScript `strict`, алиас `@/*` → корень репозитория.
+- Веб: `app/` (страницы и `app/api`), клиентский UI в `components/`. Стили — `app/globals.css`.
+- Telegram: `bot/index.ts` на grammY, запуск через `tsx`, long polling. Это отдельный процесс, не route Next.js.
+- Модель: `lib/openai-agent.ts`, Chat Completions, ключ `API_GPT`.
+- Состояние: `lib/agent-store.ts`. Конфиг — `data/agent.json`, история — `data/chats/<id>.json`.
+- Перед незнакомым API Next.js читай `node_modules/next/dist/docs/` и предупреждения об устаревших методах. Блок `nextjs-agent-rules` выше не удаляй.
+
+Команды: `npm run dev` (веб и бот), `npm run web`, `npm run bot`, `npm run lint`, `npm run build`.
+
+## Как устроен ответ
+
+Бот и `app/api/chat/route.ts` делают одно и то же: читают конфиг и историю, вызывают `askAgent`, дописывают реплики пользователя и ассистента, сохраняют историю. Новый канал подключай через эти функции, а не копией хранилища или запроса к OpenAI.
+
+Конфиг из админки (`/admin` → `POST /api/agent`) действует со следующего сообщения. Рестарт бота для смены промпта или модели не нужен.
+
+Модель — только значение из `MODELS`. Промпт обрезается до 8000 символов. Текст сообщения — до 4000. Ответ в Telegram уходит частями по 4000 символов.
+
+Идентификатор чата — целое число Telegram или `web-<uuid>`. Веб-сессия лежит в `localStorage` под ключом `web-agent-session`.
+
+JSON пиши через временный файл и `rename`. Ошибку пользователю отдавай короткой русской фразой, без стека, ключей и тела ответа провайдера.
+
+## Пролонгирование
+
+Диалог продолжается, пока пользователь сам его не закрыл.
+
+- В системном промпте (`data/agent.json`) после полезного ответа остаётся один конкретный следующий шаг или один уточняющий вопрос: расчёт, адрес, тип уборки, дата, слот или продление действующего договора. Пачку вопросов не задаём. Фразу «если что, пишите» не используем.
+- Если пользователь прощается или просит только один факт, отвечай по сути и останавливайся.
+- Код пролонгирование не хардкодит. Правила диалога живут в промпте. Сохранённый `data/agent.json` не затирай дефолтом из `DEFAULT_CONFIG`.
+- Контекст для модели: текущий system-промпт и последние 20 реплик. Обрезка истории — только `slice(-20)` в `lib/agent-store.ts`, одинаково для веба и Telegram.
+- Сброс истории — команда `/reset` в боте и «Новый диалог» в вебе (`DELETE /api/chat`). Сам по себе новый запрос историю не чистит.
+
+## Обязательное
+
+- `API_GPT` и `TOKEN_TELEGRAM` только в `.env.local`. На клиент, в логи и в git они не попадают. В репозитории не храни `.env*` и `data/chats`.
+- Бот стартует так: `deleteWebhook({ drop_pending_updates: false })`, затем long polling. На webhook не переводи.
+- Интерактивные экраны — клиентские компоненты. Секреты и файлы `data/` остаются на сервере.
+- После правки UI проверь в браузере сценарий целиком: главная (загрузка истории, отправка, ошибка, новый диалог) и `/admin` (загрузка и сохранение). Общее состояние должно совпадать: промпт и модель из админки видны и боту, и вебу.
+- Правь существующие модули точечно. Комментарии добавляй только там, где без них неочевиден инвариант (лимит истории, атомарная запись, polling).
