@@ -17,6 +17,7 @@ type ChatPayload = {
 };
 
 const SESSION_KEY = "web-agent-session";
+const THEME_KEY = "web-agent-theme";
 const SESSION_RE = /^web-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function createSessionId() {
@@ -125,6 +126,12 @@ export default function AgentChat() {
     }
   }
 
+  function toggleTheme() {
+    const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem(THEME_KEY, next);
+  }
+
   return (
     <div className="chat">
       <header className="chat-bar">
@@ -133,6 +140,13 @@ export default function AgentChat() {
           {model ? <span className="chat-model">{model}</span> : null}
         </div>
         <div className="chat-actions">
+          <button type="button" className="theme-toggle" onClick={toggleTheme} aria-label="Переключить светлую и тёмную тему">
+            <span className="theme-toggle-track" aria-hidden="true">
+              <span className="theme-toggle-thumb" />
+            </span>
+            <span className="theme-toggle-to-dark">Тёмная тема</span>
+            <span className="theme-toggle-to-light">Светлая тема</span>
+          </button>
           <button type="button" className="chat-ghost" onClick={clearChat} disabled={!ready || clearing || sending}>
             {clearing ? "Очищаю..." : "Новый диалог"}
           </button>

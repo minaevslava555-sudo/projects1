@@ -2,30 +2,74 @@
   box-sizing: border-box;
 }
 
+:root {
+  color-scheme: light;
+  --bg: #fff;
+  --fg: #111;
+  --muted: #444;
+  --surface: #fff;
+  --page: #f4f4f5;
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --input-border: #ccc;
+  --link: #0b57d0;
+  --user-bg: #111;
+  --user-fg: #fff;
+  --agent-bg: #fff;
+  --pending: #666;
+  --error: #9f1239;
+  --btn-bg: #111;
+  --btn-fg: #fff;
+  --toggle-track: #d4d4d8;
+  --toggle-thumb: #fff;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f0f10;
+  --fg: #f4f4f5;
+  --muted: #a1a1aa;
+  --surface: #18181b;
+  --page: #09090b;
+  --border: #27272a;
+  --border-strong: #3f3f46;
+  --input-border: #3f3f46;
+  --link: #8ab4ff;
+  --user-bg: #e4e4e7;
+  --user-fg: #18181b;
+  --agent-bg: #18181b;
+  --pending: #a1a1aa;
+  --error: #fb7185;
+  --btn-bg: #f4f4f5;
+  --btn-fg: #18181b;
+  --toggle-track: #3f3f46;
+  --toggle-thumb: #f4f4f5;
+}
+
 html,
 body {
   height: 100%;
   margin: 0;
   padding: 0;
-  background: #fff;
-  color: #111;
+  background: var(--bg);
+  color: var(--fg);
   font-family: system-ui, sans-serif;
 }
 
 a {
-  color: #0b57d0;
+  color: var(--link);
 }
 
 .admin {
   max-width: 720px;
   min-height: 100%;
   padding: 1rem;
-  background: #fff;
+  background: var(--surface);
 }
 
 .hint,
 .status {
-  color: #444;
+  color: var(--muted);
   line-height: 1.4;
 }
 
@@ -49,9 +93,10 @@ select,
 textarea {
   width: 100%;
   padding: 0.6rem 0.7rem;
-  border: 1px solid #ccc;
+  border: 1px solid var(--input-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface);
+  color: var(--fg);
 }
 
 button {
@@ -59,8 +104,8 @@ button {
   padding: 0.65rem 1rem;
   border: 0;
   border-radius: 8px;
-  background: #111;
-  color: #fff;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
   cursor: pointer;
 }
 
@@ -74,7 +119,7 @@ button:disabled {
   flex-direction: column;
   height: 100%;
   min-height: 100dvh;
-  background: #f4f4f5;
+  background: var(--page);
 }
 
 .chat-bar {
@@ -84,8 +129,8 @@ button:disabled {
   flex-wrap: wrap;
   gap: 0.75rem 1rem;
   padding: 0.85rem 1.25rem;
-  background: #fff;
-  border-bottom: 1px solid #e4e4e7;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
 .chat-title {
@@ -103,8 +148,8 @@ button:disabled {
 .chat-model {
   padding: 0.15rem 0.5rem;
   border-radius: 999px;
-  background: #f4f4f5;
-  color: #444;
+  background: var(--page);
+  color: var(--muted);
   font-size: 0.8rem;
 }
 
@@ -116,9 +161,55 @@ button:disabled {
 }
 
 .chat-ghost {
-  background: #fff;
-  color: #111;
-  border: 1px solid #d4d4d8;
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--border-strong);
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.7rem 0.4rem 0.4rem;
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--border-strong);
+}
+
+.theme-toggle-track {
+  position: relative;
+  width: 2.1rem;
+  height: 1.2rem;
+  border-radius: 999px;
+  background: var(--toggle-track);
+  flex-shrink: 0;
+}
+
+.theme-toggle-thumb {
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 50%;
+  background: var(--toggle-thumb);
+  transition: left 0.15s ease;
+}
+
+[data-theme="dark"] .theme-toggle-thumb {
+  left: 1.05rem;
+}
+
+.theme-toggle-to-light {
+  display: none;
+}
+
+[data-theme="dark"] .theme-toggle-to-dark {
+  display: none;
+}
+
+[data-theme="dark"] .theme-toggle-to-light {
+  display: inline;
 }
 
 .chat-thread {
@@ -136,12 +227,12 @@ button:disabled {
   margin: 12vh auto 0;
   max-width: 34rem;
   text-align: center;
-  color: #444;
+  color: var(--muted);
 }
 
 .chat-empty h1 {
   margin: 0 0 0.5rem;
-  color: #111;
+  color: var(--fg);
   font-size: 1.75rem;
 }
 
@@ -173,30 +264,30 @@ button:disabled {
 
 .bubble-user {
   margin-left: auto;
-  background: #111;
-  color: #fff;
+  background: var(--user-bg);
+  color: var(--user-fg);
   border-bottom-right-radius: 6px;
 }
 
 .bubble-agent {
-  background: #fff;
-  border: 1px solid #e4e4e7;
+  background: var(--agent-bg);
+  border: 1px solid var(--border);
   border-bottom-left-radius: 6px;
 }
 
 .bubble-pending {
-  color: #666;
+  color: var(--pending);
 }
 
 .chat-error {
   margin: 0.4rem 0 0.8rem;
-  color: #9f1239;
+  color: var(--error);
 }
 
 .chat-composer {
   padding: 0.85rem 1rem 1.1rem;
-  background: #f4f4f5;
-  border-top: 1px solid #e4e4e7;
+  background: var(--page);
+  border-top: 1px solid var(--border);
 }
 
 .chat-compose-row {
