@@ -7,7 +7,7 @@ export async function askAgent(
 ): Promise<string> {
   const apiKey = process.env.API_GPT;
   if (!apiKey) {
-    throw new Error("Не задан API_GPT в .env.local");
+    throw new Error("Не задан API_GPT");
   }
 
   const messages = [

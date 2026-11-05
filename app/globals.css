@@ -85,18 +85,27 @@ label {
 
 select,
 textarea,
+input,
 button {
   font: inherit;
 }
 
 select,
-textarea {
+textarea,
+input {
   width: 100%;
   padding: 0.6rem 0.7rem;
   border: 1px solid var(--input-border);
   border-radius: 8px;
   background: var(--surface);
   color: var(--fg);
+}
+
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
 }
 
 button {

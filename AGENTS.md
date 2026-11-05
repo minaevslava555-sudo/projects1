@@ -16,12 +16,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - Next.js 16 (App Router), React 19, TypeScript `strict`, алиас `@/*` → корень репозитория.
 - Веб: `app/` (страницы и `app/api`), клиентский UI в `components/`. Стили — `app/globals.css`.
-- Telegram: `bot/index.ts` на grammY, запуск через `tsx`, long polling. Это отдельный процесс, не route Next.js.
+- Telegram: обработчики в `bot/telegram.ts`. Локально polling стартует из `instrumentation.ts` вместе с Next.js. На Vercel — webhook `POST /api/telegram`.
 - Модель: `lib/openai-agent.ts`, Chat Completions, ключ `API_GPT`.
 - Состояние: `lib/agent-store.ts`. Конфиг — `data/agent.json`, история — `data/chats/<id>.json`.
 - Перед незнакомым API Next.js читай `node_modules/next/dist/docs/` и предупреждения об устаревших методах. Блок `nextjs-agent-rules` выше не удаляй.
 
-Команды: `npm run dev` (веб и бот), `npm run web`, `npm run bot`, `npm run lint`, `npm run build`.
+Команды: `npm run dev` (веб и локальный polling бота), `npm run web`, `npm run bot`, `npm run lint`, `npm run build`.
 
 ## Как устроен ответ
 
@@ -48,7 +48,7 @@ JSON пиши через временный файл и `rename`. Ошибку �
 ## Обязательное
 
 - `API_GPT` и `TOKEN_TELEGRAM` только в `.env.local`. На клиент, в логи и в git они не попадают. В репозитории не храни `.env*` и `data/chats`.
-- Бот стартует так: `deleteWebhook({ drop_pending_updates: false })`, затем long polling. На webhook не переводи.
+- Локально бот: `deleteWebhook({ drop_pending_updates: false })`, затем long polling внутри процесса Next.js. На Vercel тот же бот принимает webhook на `/api/telegram`.
 - Интерактивные экраны — клиентские компоненты. Секреты и файлы `data/` остаются на сервере.
 - После правки UI проверь в браузере сценарий целиком: главная (загрузка истории, отправка, ошибка, новый диалог) и `/admin` (загрузка и сохранение). Общее состояние должно совпадать: промпт и модель из админки видны и боту, и вебу.
 - Правь существующие модули точечно. Комментарии добавляй только там, где без них неочевиден инвариант (лимит истории, атомарная запись, polling).

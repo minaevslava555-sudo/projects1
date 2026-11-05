@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently -k -n web,bot -c cyan,magenta \"next dev\" \"tsx bot/index.ts\"",
+    "dev": "next dev",
     "web": "next dev",
     "bot": "tsx bot/index.ts",
     "build": "next build",
