@@ -18,7 +18,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Веб: `app/` (страницы и `app/api`), клиентский UI в `components/`. Стили — `app/globals.css`.
 - Telegram: обработчики в `bot/telegram.ts`. Локально polling стартует из `instrumentation.ts` вместе с Next.js. На Vercel — webhook `POST /api/telegram`.
 - Модель: `lib/openai-agent.ts`, Chat Completions, ключ `API_GPT`.
-- Состояние: `lib/agent-store.ts`. Конфиг — `data/agent.json`, история — `data/chats/<id>.json`.
+- Состояние: `lib/agent-store/` (интерфейс + бэкенды file/Redis). Конфиг — `data/agent.json`, история — `data/chats/<id>.json`. Черновик схемы под Supabase — `supabase/schema.sql`; клиент пока не подключаем (см. `ROADMAP.md`).
 - Перед незнакомым API Next.js читай `node_modules/next/dist/docs/` и предупреждения об устаревших методах. Блок `nextjs-agent-rules` выше не удаляй.
 
 Команды: `npm run dev` (веб и локальный polling бота), `npm run web`, `npm run bot`, `npm run lint`, `npm run build`.
