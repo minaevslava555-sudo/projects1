@@ -6,7 +6,8 @@
     "dev": "next dev",
     "web": "next dev",
     "bot": "tsx bot/index.ts",
-    "build": "next build",
+    "build": "node scripts/build-export.mjs",
+    "build:server": "next build",
     "start": "next start",
     "lint": "eslint"
   },
