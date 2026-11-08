@@ -118,7 +118,7 @@ export default function AdminPage() {
       <main className="admin">
         <h1>Вход в админку</h1>
         <p className="hint">
-          <Link href="/">Назад к чату</Link>
+          <Link href="/chat">Назад к чату</Link>
         </p>
         <form onSubmit={onLogin}>
           <label htmlFor="admin-login">Логин</label>
@@ -161,7 +161,7 @@ export default function AdminPage() {
       <p className="hint">
         Промпт и модель хранятся в файле <code>data/agent.json</code>. Веб-чат и
         Telegram используют одни и те же настройки.{" "}
-        <Link href="/">Чат</Link>
+        <Link href="/chat">Чат</Link>
       </p>
       <form onSubmit={onSubmit}>
         <label htmlFor="model">Модель</label>

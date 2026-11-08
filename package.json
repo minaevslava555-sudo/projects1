@@ -12,11 +12,14 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",
+    "@tailwindcss/postcss": "^4.3.5",
     "dotenv": "^17.4.2",
     "grammy": "^1.46.0",
     "next": "^16.4.3",
+    "postcss": "^8.5.32",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "tailwindcss": "^4.3.5"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

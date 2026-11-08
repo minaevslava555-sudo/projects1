@@ -165,6 +165,7 @@ export default function AgentChat() {
               "Новый диалог"
             )}
           </button>
+          <Link href="/">Сайт</Link>
           <Link href="/admin">Настройки</Link>
         </div>
       </header>

@@ -15,7 +15,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Стек
 
 - Next.js 16 (App Router), React 19, TypeScript `strict`, алиас `@/*` → корень репозитория.
-- Веб: `app/` (страницы и `app/api`), клиентский UI в `components/`. Стили — `app/globals.css`.
+- Веб: лендинг HAVENLY — `app/page.tsx` + `app/havenly.css`; чат агента — `/chat`. Стили чата/админки — `app/globals.css`.
 - Telegram: обработчики в `bot/telegram.ts`, редактируемое меню в `bot/menu.ts`. После `/start` одно меню обновляется по inline-кнопкам; ответы агента — временные сообщения и удаляются при клике по меню. Локально polling стартует из `instrumentation.ts`. На Vercel — webhook `POST /api/telegram`.
 - Модель: `lib/openai-agent.ts`, Chat Completions, ключ `API_GPT`.
 - Состояние: `lib/agent-store/` (интерфейс + бэкенды Supabase / Redis / file). При наличии `NEXT_PUBLIC_SUPABASE_URL` и `SUPABASE_SERVICE_ROLE_KEY` используется Supabase (`projects1_agent_config`, `projects1_chat_histories`, `projects1_services`). Иначе Redis, иначе файлы `data/`. Каталог услуг подмешивается в system-промпт. Серверный клиент — `lib/supabase/server.ts`.

@@ -1,9 +1,23 @@
 import type { Metadata } from "next";
+import { Bricolage_Grotesque, Figtree } from "next/font/google";
 import "./globals.css";
 
+const bricolage = Bricolage_Grotesque({
+  subsets: ["latin"],
+  variable: "--font-bricolage",
+  display: "swap",
+});
+
+const figtree = Figtree({
+  subsets: ["latin"],
+  variable: "--font-figtree",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "ИИ-агент",
-  description: "Чат с локальным ИИ-агентом",
+  title: "HAVENLY — Your Home. Our Care.",
+  description:
+    "Professional cleaning, home repairs and wellness services across the Algarve. Trusted local professionals.",
 };
 
 const THEME_BOOTSTRAP = `(function(){try{var t=localStorage.getItem("web-agent-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}})();`;
@@ -14,7 +28,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ru" data-theme="light" suppressHydrationWarning>
+    <html
+      lang="en"
+      data-theme="light"
+      suppressHydrationWarning
+      className={`${bricolage.variable} ${figtree.variable}`}
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
       </head>
