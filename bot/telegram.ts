@@ -7,6 +7,13 @@ import {
   saveChatHistory,
 } from "../lib/agent-store";
 import { askAgent } from "../lib/openai-agent";
+import {
+  clearEphemeralMessages,
+  showAskMenu,
+  showHomeMenu,
+  showServiceMenu,
+  trackEphemeralMessages,
+} from "./menu";
 
 const TELEGRAM_LIMIT = 4000;
 
@@ -31,23 +38,74 @@ export function createTelegramBot(token = process.env.TOKEN_TELEGRAM) {
 
   const bot = new Bot(token);
 
-  async function sendLongMessage(chatId: number, text: string) {
+  async function sendEphemeral(chatId: number, text: string) {
+    const ids: number[] = [];
     for (let i = 0; i < text.length; i += TELEGRAM_LIMIT) {
-      await bot.api.sendMessage(chatId, text.slice(i, i + TELEGRAM_LIMIT));
+      const sent = await bot.api.sendMessage(chatId, text.slice(i, i + TELEGRAM_LIMIT));
+      ids.push(sent.message_id);
     }
+    await trackEphemeralMessages(chatId, ids);
   }
 
   bot.command("start", async (ctx) => {
-    const config = await getAgentConfig();
-    await ctx.reply(
-      `Привет. Я ИИ-агент.\nМодель: ${config.model}\n\nНапиши сообщение — отвечу. /reset сбрасывает историю диалога.`,
-    );
+    if (!ctx.chat) return;
+    await showHomeMenu(bot.api, ctx.chat.id);
   });
 
   bot.command("reset", async (ctx) => {
     if (!ctx.chat) return;
     await clearChatHistory(ctx.chat.id);
-    await ctx.reply("История диалога очищена.");
+    await clearEphemeralMessages(bot.api, ctx.chat.id);
+    await showHomeMenu(bot.api, ctx.chat.id);
+  });
+
+  bot.on("callback_query:data", async (ctx) => {
+    const chatId = ctx.chat?.id;
+    const data = ctx.callbackQuery.data;
+    if (!chatId || !data) {
+      await ctx.answerCallbackQuery();
+      return;
+    }
+
+    try {
+      if (data === "m:home") {
+        await showHomeMenu(bot.api, chatId);
+        await ctx.answerCallbackQuery();
+        return;
+      }
+
+      if (data === "m:reset") {
+        await clearChatHistory(chatId);
+        await showHomeMenu(bot.api, chatId);
+        await ctx.answerCallbackQuery({ text: "Диалог сброшен" });
+        return;
+      }
+
+      if (data === "m:ask") {
+        await showAskMenu(bot.api, chatId);
+        await ctx.answerCallbackQuery();
+        return;
+      }
+
+      if (data.startsWith("m:ask:")) {
+        const slug = data.slice("m:ask:".length);
+        await showAskMenu(bot.api, chatId, slug);
+        await ctx.answerCallbackQuery();
+        return;
+      }
+
+      if (data.startsWith("m:svc:")) {
+        const slug = data.slice("m:svc:".length);
+        await showServiceMenu(bot.api, chatId, slug);
+        await ctx.answerCallbackQuery();
+        return;
+      }
+
+      await ctx.answerCallbackQuery({ text: "Неизвестный пункт" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Ошибка меню";
+      await ctx.answerCallbackQuery({ text: message.slice(0, 180) });
+    }
   });
 
   bot.on("message:text", async (ctx) => {
@@ -68,10 +126,13 @@ export function createTelegramBot(token = process.env.TOKEN_TELEGRAM) {
         { role: "assistant" as const, content: answer },
       ];
       await saveChatHistory(ctx.chat.id, nextHistory);
-      await sendLongMessage(ctx.chat.id, answer);
+      // старые ephemeral-ответы убираем перед новым, чтобы лента не росла
+      await clearEphemeralMessages(bot.api, ctx.chat.id);
+      await sendEphemeral(ctx.chat.id, answer);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Не удалось ответить";
-      await ctx.reply(`Не удалось ответить: ${message}`);
+      await clearEphemeralMessages(bot.api, ctx.chat.id);
+      await sendEphemeral(ctx.chat.id, `Не удалось ответить: ${message}`);
     }
   });
 

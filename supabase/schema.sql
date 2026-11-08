@@ -33,6 +33,19 @@ comment on table projects1_agent_config is 'Единственная строк�
 comment on table projects1_chat_histories is 'История диалога; в messages хранится массив {role, content}, в приложении обрезается до 20';
 comment on table projects1_services is 'Каталог услуг: клининг, мелкий ремонт, массаж';
 
+create table if not exists projects1_bot_ui (
+  chat_id text primary key,
+  menu_message_id bigint,
+  ephemeral_ids jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null default now(),
+  constraint projects1_bot_ui_chat_id_format check (
+    chat_id ~ '^-?[0-9]+$'
+  )
+);
+
+comment on table projects1_bot_ui is 'Telegram: id редактируемого меню и временных сообщений под ним';
+
 grant select, insert, update, delete on table projects1_agent_config to service_role;
 grant select, insert, update, delete on table projects1_chat_histories to service_role;
 grant select, insert, update, delete on table projects1_services to service_role;
+grant select, insert, update, delete on table projects1_bot_ui to service_role;

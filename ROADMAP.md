@@ -26,3 +26,4 @@
 - Интерфейс `AgentStoreBackend` и бэкенды Supabase / Redis / file
 - SQL-схема `projects1_*`, клиент `@supabase/supabase-js`
 - Каталог услуг `projects1_services` (клининг, мелкий ремонт, массаж) в промпте агента
+- Telegram: редактируемое меню после `/start`, ephemeral-ответы под меню
