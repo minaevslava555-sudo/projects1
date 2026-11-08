@@ -72,6 +72,11 @@
   transform: translateY(0);
 }
 
+/* Пока анимация не сработала — контент всё равно кликабелен и читаем */
+.reveal:not(.is-visible) {
+  opacity: 0.01;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-rise,
   .animate-rise-delay,

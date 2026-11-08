@@ -5,6 +5,8 @@ import "./havenly.css";
 import {
   FormEvent,
   useEffect,
+  useId,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -12,6 +14,43 @@ import {
 } from "react";
 
 type ServiceValue = "cleaning" | "repair" | "massage";
+type MassageMinutes = 60 | 90 | 120;
+
+const SERVICE_META: Record<
+  ServiceValue,
+  { title: string; rateLabel: string; cardPrice: string }
+> = {
+  cleaning: {
+    title: "Cleaning",
+    rateLabel: "20€ / hour per cleaner",
+    cardPrice: "from 20€",
+  },
+  repair: {
+    title: "Home Repairs",
+    rateLabel: "20€ / hour per technician",
+    cardPrice: "from 20€",
+  },
+  massage: {
+    title: "Massage",
+    rateLabel: "45€ / hour",
+    cardPrice: "from 45€",
+  },
+};
+
+const MASSAGE_OPTIONS: Array<{ minutes: MassageMinutes; price: number; label: string }> = [
+  { minutes: 60, price: 45, label: "60 min — 45€" },
+  { minutes: 90, price: 67.5, label: "90 min — 67.50€" },
+  { minutes: 120, price: 90, label: "120 min — 90€" },
+];
+
+function formatEuro(value: number) {
+  return new Intl.NumberFormat("en-IE", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: value % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
 
 function Reveal({
   children,
@@ -49,16 +88,114 @@ function Reveal({
   );
 }
 
-export default function Home() {
+function Stepper({
+  id,
+  label,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className="mb-2 block text-sm font-medium text-ink">
+        {label}
+      </label>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          className="inline-flex h-11 w-11 items-center justify-center border border-mist bg-paper text-lg font-semibold text-ink transition hover:border-khaki disabled:opacity-40"
+          aria-label={`Decrease ${label}`}
+          disabled={value <= min}
+          onClick={() => onChange(Math.max(min, value - 1))}
+        >
+          −
+        </button>
+        <input
+          id={id}
+          type="number"
+          min={min}
+          max={max}
+          value={value}
+          onChange={(event) => {
+            const next = Number(event.target.value);
+            if (!Number.isFinite(next)) return;
+            onChange(Math.min(max, Math.max(min, Math.round(next))));
+          }}
+          className="w-full border border-mist bg-paper px-4 py-3 text-center text-ink outline-none transition focus:border-khaki"
+        />
+        <button
+          type="button"
+          className="inline-flex h-11 w-11 items-center justify-center border border-mist bg-paper text-lg font-semibold text-ink transition hover:border-khaki disabled:opacity-40"
+          aria-label={`Increase ${label}`}
+          disabled={value >= max}
+          onClick={() => onChange(Math.min(max, value + 1))}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function OrderModal({
+  open,
+  service,
+  onServiceChange,
+  onClose,
+}: {
+  open: boolean;
+  service: ServiceValue;
+  onServiceChange: (service: ServiceValue) => void;
+  onClose: () => void;
+}) {
+  const titleId = useId();
+  const [hours, setHours] = useState(2);
+  const [workers, setWorkers] = useState(1);
+  const [massageMinutes, setMassageMinutes] = useState<MassageMinutes>(60);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [service, setService] = useState<ServiceValue | "">("");
+  const [date, setDate] = useState("");
   const [success, setSuccess] = useState(false);
 
-  function chooseService(value: ServiceValue) {
-    setService(value);
+  useEffect(() => {
+    if (!open) return;
+    setHours(2);
+    setWorkers(1);
+    setMassageMinutes(60);
+    setName("");
+    setPhone("");
+    setDate("");
     setSuccess(false);
-  }
+  }, [open, service]);
+
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open, onClose]);
+
+  const total = useMemo(() => {
+    if (service === "massage") {
+      return MASSAGE_OPTIONS.find((option) => option.minutes === massageMinutes)?.price ?? 45;
+    }
+    return hours * workers * 20;
+  }, [service, hours, workers, massageMinutes]);
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -68,9 +205,220 @@ export default function Home() {
       return;
     }
     setSuccess(true);
-    setName("");
-    setPhone("");
-    setService("");
+  }
+
+  if (!open) return null;
+
+  const meta = SERVICE_META[service];
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-ink/55 p-0 sm:items-center sm:p-6"
+      role="presentation"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="max-h-[92svh] w-full max-w-lg overflow-y-auto border border-mist bg-paper shadow-2xl sm:max-h-[90svh]"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-mist bg-paper/95 px-5 py-4 backdrop-blur sm:px-6">
+          <div>
+            <p className="text-xs font-medium tracking-[0.18em] text-khaki uppercase">
+              Booking calculator
+            </p>
+            <h2 id={titleId} className="mt-1 font-display text-2xl font-bold text-ink">
+              {meta.title}
+            </h2>
+            <p className="mt-1 text-sm text-muted">{meta.rateLabel}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 w-10 items-center justify-center border border-mist bg-white text-ink transition hover:border-khaki"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        <form className="space-y-6 px-5 py-5 sm:px-6 sm:py-6" noValidate onSubmit={onSubmit}>
+          <div className="grid grid-cols-3 gap-2">
+            {(Object.keys(SERVICE_META) as ServiceValue[]).map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => onServiceChange(value)}
+                className={`px-2 py-2.5 text-xs font-semibold transition sm:text-sm ${
+                  service === value
+                    ? "bg-ink text-white"
+                    : "border border-mist bg-white text-ink hover:border-khaki"
+                }`}
+              >
+                {SERVICE_META[value].title}
+              </button>
+            ))}
+          </div>
+
+          <div className="border border-mist bg-white px-5 py-6 text-center">
+            <p className="text-xs font-medium tracking-[0.18em] text-muted uppercase">Total</p>
+            <p className="mt-2 font-display text-5xl font-bold tracking-tight text-ink sm:text-6xl">
+              {formatEuro(total)}
+            </p>
+          </div>
+
+          {service === "cleaning" ? (
+            <div className="space-y-4">
+              <Stepper
+                id="cleaning-hours"
+                label="Number of hours"
+                value={hours}
+                min={1}
+                max={12}
+                onChange={setHours}
+              />
+              <Stepper
+                id="cleaning-workers"
+                label="Number of cleaners"
+                value={workers}
+                min={1}
+                max={6}
+                onChange={setWorkers}
+              />
+              <p className="text-sm text-muted">
+                {hours} h × {workers} cleaner{workers > 1 ? "s" : ""} × 20€ = {formatEuro(total)}
+              </p>
+            </div>
+          ) : null}
+
+          {service === "repair" ? (
+            <div className="space-y-4">
+              <Stepper
+                id="repair-hours"
+                label="Number of hours"
+                value={hours}
+                min={1}
+                max={12}
+                onChange={setHours}
+              />
+              <Stepper
+                id="repair-workers"
+                label="Number of technicians"
+                value={workers}
+                min={1}
+                max={6}
+                onChange={setWorkers}
+              />
+              <p className="text-sm text-muted">
+                {hours} h × {workers} technician{workers > 1 ? "s" : ""} × 20€ = {formatEuro(total)}
+              </p>
+            </div>
+          ) : null}
+
+          {service === "massage" ? (
+            <div>
+              <p className="mb-2 text-sm font-medium text-ink">Session duration</p>
+              <div className="grid gap-2">
+                {MASSAGE_OPTIONS.map((option) => {
+                  const active = massageMinutes === option.minutes;
+                  return (
+                    <button
+                      key={option.minutes}
+                      type="button"
+                      onClick={() => setMassageMinutes(option.minutes)}
+                      className={`flex items-center justify-between border px-4 py-3 text-left transition ${
+                        active
+                          ? "border-khaki bg-khaki/10 text-ink"
+                          : "border-mist bg-white text-ink hover:border-khaki"
+                      }`}
+                    >
+                      <span className="font-medium">{option.minutes} minutes</span>
+                      <span className="font-display text-lg font-bold">{formatEuro(option.price)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="space-y-4 border-t border-mist pt-6">
+            <div>
+              <label htmlFor="order-name" className="mb-2 block text-sm font-medium text-ink">
+                Name
+              </label>
+              <input
+                id="order-name"
+                name="name"
+                type="text"
+                required
+                autoComplete="name"
+                placeholder="Your name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                className="w-full border border-mist bg-white px-4 py-3 text-ink outline-none transition placeholder:text-muted/60 focus:border-khaki"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="order-phone" className="mb-2 block text-sm font-medium text-ink">
+                Phone
+              </label>
+              <input
+                id="order-phone"
+                name="phone"
+                type="tel"
+                required
+                autoComplete="tel"
+                placeholder="+351 ..."
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+                className="w-full border border-mist bg-white px-4 py-3 text-ink outline-none transition placeholder:text-muted/60 focus:border-khaki"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="order-date" className="mb-2 block text-sm font-medium text-ink">
+                Date
+              </label>
+              <input
+                id="order-date"
+                name="date"
+                type="date"
+                required
+                value={date}
+                onChange={(event) => setDate(event.target.value)}
+                className="w-full border border-mist bg-white px-4 py-3 text-ink outline-none transition focus:border-khaki"
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="w-full bg-khaki px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-khaki-deep sm:text-base"
+          >
+            Confirm order — {formatEuro(total)}
+          </button>
+
+          {success ? (
+            <p className="text-sm font-medium text-khaki" role="status">
+              Request received for {meta.title} ({formatEuro(total)}). We’ll be in touch shortly.
+            </p>
+          ) : null}
+        </form>
+      </div>
+    </div>
+  );
+}
+
+export default function Home() {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [service, setService] = useState<ServiceValue>("cleaning");
+
+  function openOrder(value: ServiceValue) {
+    setService(value);
+    setModalOpen(true);
   }
 
   return (
@@ -100,8 +448,8 @@ export default function Home() {
             alt="Bright, calm living room with soft natural light"
             className="animate-hero-media absolute inset-0 h-full w-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-ink/85 via-ink/50 to-ink/25" />
-          <div className="relative mx-auto flex min-h-[100svh] max-w-6xl flex-col justify-end px-5 pb-16 pt-28 sm:px-8 sm:pb-20 lg:px-10 lg:pb-24">
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/85 via-ink/50 to-ink/25" />
+          <div className="relative z-10 mx-auto flex min-h-[100svh] max-w-6xl flex-col justify-end px-5 pb-16 pt-28 sm:px-8 sm:pb-20 lg:px-10 lg:pb-24">
             <p className="animate-rise font-display text-4xl font-bold tracking-[0.14em] text-white sm:text-5xl md:text-6xl">
               HAVENLY
             </p>
@@ -120,12 +468,13 @@ export default function Home() {
               professionals across the Algarve.
             </p>
             <div className="animate-rise-late mt-8">
-              <a
-                href="#order"
+              <button
+                type="button"
+                onClick={() => openOrder("cleaning")}
                 className="inline-flex items-center bg-khaki px-6 py-3.5 text-sm font-semibold text-white transition duration-300 hover:bg-khaki-deep sm:text-base"
               >
                 Book a Service
-              </a>
+              </button>
             </div>
           </div>
         </section>
@@ -201,14 +550,16 @@ export default function Home() {
                       Full home or apartment cleaning — kitchens, bathrooms, dusting
                       and order, handled with care.
                     </p>
-                    <p className="mt-6 font-display text-2xl font-bold text-ink">from 20€</p>
-                    <a
-                      href="#order"
+                    <p className="mt-6 font-display text-2xl font-bold text-ink">
+                      {SERVICE_META.cleaning.cardPrice}
+                    </p>
+                    <button
+                      type="button"
                       className="mt-5 inline-flex w-full items-center justify-center bg-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-khaki-deep"
-                      onClick={() => chooseService("cleaning")}
+                      onClick={() => openOrder("cleaning")}
                     >
                       Choose
-                    </a>
+                    </button>
                   </div>
                 </article>
               </Reveal>
@@ -234,14 +585,16 @@ export default function Home() {
                       Furniture assembly, shelves, taps and everyday fixes — without
                       the long wait.
                     </p>
-                    <p className="mt-6 font-display text-2xl font-bold text-ink">from 20€</p>
-                    <a
-                      href="#order"
+                    <p className="mt-6 font-display text-2xl font-bold text-ink">
+                      {SERVICE_META.repair.cardPrice}
+                    </p>
+                    <button
+                      type="button"
                       className="mt-5 inline-flex w-full items-center justify-center bg-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-khaki-deep"
-                      onClick={() => chooseService("repair")}
+                      onClick={() => openOrder("repair")}
                     >
                       Choose
-                    </a>
+                    </button>
                   </div>
                 </article>
               </Reveal>
@@ -267,14 +620,16 @@ export default function Home() {
                       Relaxing or therapeutic massage at home — booked around your
                       schedule.
                     </p>
-                    <p className="mt-6 font-display text-2xl font-bold text-ink">from 45€</p>
-                    <a
-                      href="#order"
+                    <p className="mt-6 font-display text-2xl font-bold text-ink">
+                      {SERVICE_META.massage.cardPrice}
+                    </p>
+                    <button
+                      type="button"
                       className="mt-5 inline-flex w-full items-center justify-center bg-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-khaki-deep"
-                      onClick={() => chooseService("massage")}
+                      onClick={() => openOrder("massage")}
                     >
                       Choose
-                    </a>
+                    </button>
                   </div>
                 </article>
               </Reveal>
@@ -302,106 +657,32 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="order" className="relative overflow-hidden py-20 sm:py-24">
+        <section className="relative overflow-hidden py-20 sm:py-24">
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,_#eef1ea_0%,_#f7f5f0_48%,_#e8ebe3_100%)]" />
-          <div className="pointer-events-none absolute -right-24 top-10 h-64 w-64 rounded-full bg-sand/40 blur-3xl" />
-          <div className="relative mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
-            <Reveal className="grid gap-10 lg:grid-cols-[1fr_1.1fr] lg:items-start lg:gap-16">
-              <div>
-                <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
-                  Request a booking
-                </h2>
-                <p className="mt-3 max-w-md text-muted sm:text-lg">
-                  Leave your name and phone — we’ll call back within 15 minutes to
-                  confirm the details.
-                </p>
-                <p className="mt-8 text-sm text-muted">
-                  Or call us now:{" "}
-                  <a
-                    href="tel:+351920024478"
-                    className="font-medium text-khaki underline-offset-4 hover:underline"
-                  >
-                    +351 920 024 478
-                  </a>
-                </p>
-              </div>
-
-              <form
-                id="order-form"
-                className="border border-mist bg-white/80 p-6 backdrop-blur-sm sm:p-8"
-                noValidate
-                onSubmit={onSubmit}
+          <div className="relative mx-auto max-w-6xl px-5 text-center sm:px-8 lg:px-10">
+            <Reveal>
+              <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+                Ready to book?
+              </h2>
+              <p className="mx-auto mt-3 max-w-md text-muted sm:text-lg">
+                Open the calculator, pick a service and confirm your order in a minute.
+              </p>
+              <button
+                type="button"
+                onClick={() => openOrder("cleaning")}
+                className="mt-8 inline-flex items-center bg-khaki px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-khaki-deep sm:text-base"
               >
-                <div className="space-y-5">
-                  <div>
-                    <label htmlFor="name" className="mb-2 block text-sm font-medium text-ink">
-                      Name
-                    </label>
-                    <input
-                      id="name"
-                      name="name"
-                      type="text"
-                      required
-                      autoComplete="name"
-                      placeholder="Your name"
-                      value={name}
-                      onChange={(event) => setName(event.target.value)}
-                      className="w-full border border-mist bg-paper px-4 py-3 text-ink outline-none transition placeholder:text-muted/60 focus:border-khaki"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="phone" className="mb-2 block text-sm font-medium text-ink">
-                      Phone
-                    </label>
-                    <input
-                      id="phone"
-                      name="phone"
-                      type="tel"
-                      required
-                      autoComplete="tel"
-                      placeholder="+351 ..."
-                      value={phone}
-                      onChange={(event) => setPhone(event.target.value)}
-                      className="w-full border border-mist bg-paper px-4 py-3 text-ink outline-none transition placeholder:text-muted/60 focus:border-khaki"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="service" className="mb-2 block text-sm font-medium text-ink">
-                      Service
-                    </label>
-                    <select
-                      id="service"
-                      name="service"
-                      required
-                      value={service}
-                      onChange={(event) => setService(event.target.value as ServiceValue | "")}
-                      className="w-full appearance-none border border-mist bg-paper px-4 py-3 text-ink outline-none transition focus:border-khaki"
-                    >
-                      <option value="" disabled>
-                        Select a service
-                      </option>
-                      <option value="cleaning">Cleaning — from 20€</option>
-                      <option value="repair">Home Repairs — from 20€</option>
-                      <option value="massage">Massage — from 45€</option>
-                    </select>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="mt-7 w-full bg-khaki px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-khaki-deep sm:text-base"
+                Open booking calculator
+              </button>
+              <p className="mt-6 text-sm text-muted">
+                Or call us now:{" "}
+                <a
+                  href="tel:+351920024478"
+                  className="font-medium text-khaki underline-offset-4 hover:underline"
                 >
-                  Submit
-                </button>
-
-                {success ? (
-                  <p className="mt-4 text-sm font-medium text-khaki" role="status">
-                    Request received. We’ll be in touch shortly.
-                  </p>
-                ) : null}
-              </form>
+                  +351 920 024 478
+                </a>
+              </p>
             </Reveal>
           </div>
         </section>
@@ -420,6 +701,13 @@ export default function Home() {
           <p className="text-sm">© 2026 HAVENLY · Central Algarve</p>
         </div>
       </footer>
+
+      <OrderModal
+        open={modalOpen}
+        service={service}
+        onServiceChange={setService}
+        onClose={() => setModalOpen(false)}
+      />
     </div>
   );
 }
