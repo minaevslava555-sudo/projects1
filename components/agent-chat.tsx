@@ -1,5 +1,7 @@
 "use client";
 
+import ServicesAccordion, { type ServiceCard } from "@/components/services-accordion";
+import { ChatThreadSkeleton, Spinner, TypingIndicator } from "@/components/ui/loading";
 import Link from "next/link";
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 
@@ -132,12 +134,18 @@ export default function AgentChat() {
     localStorage.setItem(THEME_KEY, next);
   }
 
+  function pickService(service: ServiceCard) {
+    setDraft(`Интересует услуга «${service.title}». ${service.price_note}.`);
+    inputRef.current?.focus();
+  }
+
   return (
     <div className="chat">
       <header className="chat-bar">
         <div className="chat-title">
           <strong>ИИ-агент</strong>
           {model ? <span className="chat-model">{model}</span> : null}
+          {!ready && !model ? <span className="chat-model chat-model-skeleton" aria-hidden="true" /> : null}
         </div>
         <div className="chat-actions">
           <button type="button" className="theme-toggle" onClick={toggleTheme} aria-label="Переключить светлую и тёмную тему">
@@ -148,7 +156,14 @@ export default function AgentChat() {
             <span className="theme-toggle-to-light">Светлая тема</span>
           </button>
           <button type="button" className="chat-ghost" onClick={clearChat} disabled={!ready || clearing || sending}>
-            {clearing ? "Очищаю..." : "Новый диалог"}
+            {clearing ? (
+              <span className="btn-loading">
+                <Spinner label="Очищаю диалог" />
+                Очищаю...
+              </span>
+            ) : (
+              "Новый диалог"
+            )}
           </button>
           <Link href="/admin">Настройки</Link>
         </div>
@@ -156,11 +171,12 @@ export default function AgentChat() {
 
       <div className="chat-thread" ref={threadRef}>
         <div className="chat-column">
-          {!ready ? <p className="chat-empty">Загрузка диалога...</p> : null}
+          {!ready ? <ChatThreadSkeleton /> : null}
           {ready && messages.length === 0 && !sending ? (
             <div className="chat-empty">
               <h1>Чем могу помочь?</h1>
-              <p>Напишите сообщение. Агент использует модель и системный промпт из настроек.</p>
+              <p>Выберите услугу ниже или напишите сообщение.</p>
+              <ServicesAccordion onPick={pickService} />
             </div>
           ) : null}
           {messages.map((message, index) => (
@@ -175,7 +191,10 @@ export default function AgentChat() {
           {sending ? (
             <article className="bubble bubble-agent bubble-pending" aria-live="polite">
               <span className="bubble-role">Агент</span>
-              <p>Печатает...</p>
+              <div className="bubble-pending-body">
+                <TypingIndicator />
+                <span>Печатает...</span>
+              </div>
             </article>
           ) : null}
           {error ? <p className="chat-error">{error}</p> : null}
@@ -199,7 +218,14 @@ export default function AgentChat() {
             onKeyDown={onKeyDown}
           />
           <button type="submit" disabled={!ready || sending || !draft.trim()}>
-            {sending ? "Жду ответ..." : "Отправить"}
+            {sending ? (
+              <span className="btn-loading">
+                <Spinner label="Жду ответ" />
+                Жду ответ...
+              </span>
+            ) : (
+              "Отправить"
+            )}
           </button>
         </div>
       </form>

@@ -18,7 +18,7 @@ export type ChatMessage = {
   content: string;
 };
 
-/** Единый контракт хранилища: file, Redis сейчас; Supabase — следующий шаг. */
+/** Единый контракт хранилища: Supabase / Redis / файлы. */
 export type AgentStoreBackend = {
   getAgentConfig(): Promise<AgentConfig>;
   saveAgentConfig(input: unknown): Promise<AgentConfig>;

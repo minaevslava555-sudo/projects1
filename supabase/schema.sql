@@ -1,22 +1,38 @@
--- Черновик схемы под текущую модель агента.
--- Не подключать в рантайм, пока не начата интеграция Supabase (см. ROADMAP.md → Дальше).
+-- Таблицы агента с префиксом projects1_
+-- Применять в SQL Editor Supabase или через DATABASE_URL.
 
-create table if not exists agent_config (
+create table if not exists projects1_agent_config (
   id smallint primary key default 1 check (id = 1),
   prompt text not null,
   model text not null,
   updated_at timestamptz not null default now()
 );
 
-create table if not exists chat_histories (
+create table if not exists projects1_chat_histories (
   chat_id text primary key,
   messages jsonb not null default '[]'::jsonb,
   updated_at timestamptz not null default now(),
-  constraint chat_histories_id_format check (
+  constraint projects1_chat_histories_id_format check (
     chat_id ~ '^-?[0-9]+$'
     or chat_id ~* '^web-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
   )
 );
 
-comment on table agent_config is 'Единственная строка: системный промпт и модель';
-comment on table chat_histories is 'История диалога; в messages хранится массив {role, content}, в приложении обрезается до 20';
+create table if not exists projects1_services (
+  id smallint primary key,
+  slug text not null unique,
+  title text not null,
+  description text not null,
+  price_note text not null default 'стоимость уточняется при расчёте',
+  is_active boolean not null default true,
+  sort_order smallint not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+comment on table projects1_agent_config is 'Единственная строка: системный промпт и модель';
+comment on table projects1_chat_histories is 'История диалога; в messages хранится массив {role, content}, в приложении обрезается до 20';
+comment on table projects1_services is 'Каталог услуг: клининг, мелкий ремонт, массаж';
+
+grant select, insert, update, delete on table projects1_agent_config to service_role;
+grant select, insert, update, delete on table projects1_chat_histories to service_role;
+grant select, insert, update, delete on table projects1_services to service_role;

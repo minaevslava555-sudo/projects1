@@ -1,4 +1,5 @@
 import type { AgentConfig, ChatMessage } from "./agent-store";
+import { formatServicesForPrompt, listActiveServices } from "./agent-store/services";
 
 export async function askAgent(
   config: AgentConfig,
@@ -10,8 +11,11 @@ export async function askAgent(
     throw new Error("Не задан API_GPT");
   }
 
+  const catalog = formatServicesForPrompt(await listActiveServices());
+  const systemPrompt = catalog ? `${config.prompt}\n\n${catalog}` : config.prompt;
+
   const messages = [
-    { role: "system", content: config.prompt },
+    { role: "system", content: systemPrompt },
     ...history,
     { role: "user", content: userText },
   ];

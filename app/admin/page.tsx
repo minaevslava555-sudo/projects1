@@ -1,5 +1,6 @@
 "use client";
 
+import { AdminSkeleton, Spinner } from "@/components/ui/loading";
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 
@@ -11,6 +12,7 @@ type AgentPayload = {
 };
 
 export default function AdminPage() {
+  const [booting, setBooting] = useState(true);
   const [authed, setAuthed] = useState(false);
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
@@ -39,9 +41,13 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
-    loadSettings().catch((error: Error) => {
-      setStatus(error.message);
-    });
+    loadSettings()
+      .catch((error: Error) => {
+        setStatus(error.message);
+      })
+      .finally(() => {
+        setBooting(false);
+      });
   }, []);
 
   async function onLogin(event: FormEvent) {
@@ -103,6 +109,10 @@ export default function AdminPage() {
     }
   }
 
+  if (booting) {
+    return <AdminSkeleton />;
+  }
+
   if (!authed) {
     return (
       <main className="admin">
@@ -130,7 +140,14 @@ export default function AdminPage() {
             required
           />
           <button type="submit" disabled={loggingIn}>
-            {loggingIn ? "Вхожу..." : "Войти"}
+            {loggingIn ? (
+              <span className="btn-loading">
+                <Spinner label="Вход" />
+                Вхожу...
+              </span>
+            ) : (
+              "Войти"
+            )}
           </button>
         </form>
         <p className="status">{status}</p>
@@ -173,7 +190,14 @@ export default function AdminPage() {
 
         <div className="admin-actions">
           <button type="submit" disabled={saving}>
-            {saving ? "Сохраняю..." : "Сохранить"}
+            {saving ? (
+              <span className="btn-loading">
+                <Spinner label="Сохранение" />
+                Сохраняю...
+              </span>
+            ) : (
+              "Сохранить"
+            )}
           </button>
           <button type="button" className="chat-ghost" onClick={onLogout}>
             Выйти
