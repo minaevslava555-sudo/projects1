@@ -33,6 +33,25 @@ export function publicAppUrl() {
   return `https://${host.replace(/^https?:\/\//, "")}`;
 }
 
+export function adminChatIdsFromEnv() {
+  const raw = process.env.TELEGRAM_ADMIN_CHAT_ID?.trim() ?? "";
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+}
+
+/** Отправка текста через того же бота (TOKEN_TELEGRAM → bot.api.sendMessage). */
+export async function sendTelegramMessage(chatId: number | string, text: string) {
+  const token = process.env.TOKEN_TELEGRAM?.trim();
+  if (!token) throw new Error("Не задан TOKEN_TELEGRAM");
+  const bot = new Bot(token);
+  await bot.api.sendMessage(chatId, text, {
+    link_preview_options: { is_disabled: true },
+  });
+}
+
 export function createTelegramBot(token = process.env.TOKEN_TELEGRAM) {
   if (!token) throw new Error("Не задан TOKEN_TELEGRAM");
 
@@ -50,6 +69,13 @@ export function createTelegramBot(token = process.env.TOKEN_TELEGRAM) {
   bot.command("start", async (ctx) => {
     if (!ctx.chat) return;
     await showHomeMenu(bot.api, ctx.chat.id);
+  });
+
+  bot.command("myid", async (ctx) => {
+    if (!ctx.chat) return;
+    await ctx.reply(
+      `Ваш chat id: ${ctx.chat.id}\nДобавьте его в TELEGRAM_ADMIN_CHAT_ID для уведомлений о заказах.`,
+    );
   });
 
   bot.command("reset", async (ctx) => {
@@ -126,7 +152,6 @@ export function createTelegramBot(token = process.env.TOKEN_TELEGRAM) {
         { role: "assistant" as const, content: answer },
       ];
       await saveChatHistory(ctx.chat.id, nextHistory);
-      // старые ephemeral-ответы убираем перед новым, чтобы лента не росла
       await clearEphemeralMessages(bot.api, ctx.chat.id);
       await sendEphemeral(ctx.chat.id, answer);
     } catch (error) {

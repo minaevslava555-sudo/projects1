@@ -164,6 +164,8 @@ function OrderModal({
   const [phone, setPhone] = useState("");
   const [date, setDate] = useState("");
   const [success, setSuccess] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -174,6 +176,8 @@ function OrderModal({
     setPhone("");
     setDate("");
     setSuccess(false);
+    setSending(false);
+    setError("");
   }, [open, service]);
 
   useEffect(() => {
@@ -197,14 +201,55 @@ function OrderModal({
     return hours * workers * 20;
   }, [service, hours, workers, massageMinutes]);
 
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
+  function orderDetails() {
+    if (service === "massage") {
+      return `${massageMinutes} min session`;
+    }
+    if (service === "cleaning") {
+      return `${hours} h × ${workers} cleaner${workers > 1 ? "s" : ""} × 20€`;
+    }
+    return `${hours} h × ${workers} technician${workers > 1 ? "s" : ""} × 20€`;
+  }
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     if (!form.checkValidity()) {
       form.reportValidity();
       return;
     }
-    setSuccess(true);
+    if (sending) return;
+
+    setSending(true);
+    setError("");
+    setSuccess(false);
+
+    try {
+      const response = await fetch("/api/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          phone: phone.trim(),
+          service,
+          priceEuro: total,
+          date,
+          details: orderDetails(),
+          hours: service === "massage" ? undefined : hours,
+          workers: service === "massage" ? undefined : workers,
+          massageMinutes: service === "massage" ? massageMinutes : undefined,
+        }),
+      });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(data.error || "Не удалось отправить заказ");
+      }
+      setSuccess(true);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Не удалось отправить заказ");
+    } finally {
+      setSending(false);
+    }
   }
 
   if (!open) return null;
@@ -396,10 +441,17 @@ function OrderModal({
 
           <button
             type="submit"
-            className="w-full bg-khaki px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-khaki-deep sm:text-base"
+            disabled={sending}
+            className="w-full bg-khaki px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-khaki-deep disabled:opacity-60 sm:text-base"
           >
-            Confirm order — {formatEuro(total)}
+            {sending ? "Sending..." : `Confirm order — ${formatEuro(total)}`}
           </button>
+
+          {error ? (
+            <p className="text-sm font-medium text-red-700" role="alert">
+              {error}
+            </p>
+          ) : null}
 
           {success ? (
             <p className="text-sm font-medium text-khaki" role="status">

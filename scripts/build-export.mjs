@@ -49,7 +49,7 @@ try {
     cwd: root,
     stdio: "inherit",
     shell: true,
-    env: process.env,
+    env: { ...process.env, STATIC_EXPORT: "1" },
   });
   exitCode = result.status ?? 1;
 } finally {

@@ -16,7 +16,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - Next.js 16 (App Router), React 19, TypeScript `strict`, алиас `@/*` → корень репозитория.
 - Веб: лендинг HAVENLY — `app/page.tsx` + `app/havenly.css`; чат агента — `/chat`. Стили чата/админки — `app/globals.css`.
-- Telegram: обработчики в `bot/telegram.ts`, редактируемое меню в `bot/menu.ts`. После `/start` одно меню обновляется по inline-кнопкам; ответы агента — временные сообщения и удаляются при клике по меню. Локально polling стартует из `instrumentation.ts`. На Vercel — webhook `POST /api/telegram`.
+- Telegram: обработчики в `bot/telegram.ts`, редактируемое меню в `bot/menu.ts`. После `/start` одно меню обновляется по inline-кнопкам; ответы агента — временные сообщения и удаляются при клике по меню. Локально polling стартует из `instrumentation.ts`. На Vercel — webhook `POST /api/telegram`. Заказы с лендинга: `POST /api/order` → уведомление админу (`TELEGRAM_ADMIN_CHAT_ID`, токен `TOKEN_TELEGRAM`).
 - Модель: `lib/openai-agent.ts`, Chat Completions, ключ `API_GPT`.
 - Состояние: `lib/agent-store/` (интерфейс + бэкенды Supabase / Redis / file). При наличии `NEXT_PUBLIC_SUPABASE_URL` и `SUPABASE_SERVICE_ROLE_KEY` используется Supabase (`projects1_agent_config`, `projects1_chat_histories`, `projects1_services`). Иначе Redis, иначе файлы `data/`. Каталог услуг подмешивается в system-промпт. Серверный клиент — `lib/supabase/server.ts`.
 - Перед незнакомым API Next.js читай `node_modules/next/dist/docs/` и предупреждения об устаревших методах. Блок `nextjs-agent-rules` выше не удаляй.
