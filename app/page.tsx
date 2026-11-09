@@ -240,7 +240,24 @@ function OrderModal({
           massageMinutes: service === "massage" ? massageMinutes : undefined,
         }),
       });
-      const data = (await response.json()) as { error?: string };
+
+      const contentType = response.headers.get("content-type") || "";
+      const rawText = await response.text();
+      let data: { error?: string; ok?: boolean } = {};
+      if (contentType.includes("application/json")) {
+        try {
+          data = JSON.parse(rawText) as { error?: string; ok?: boolean };
+        } catch {
+          throw new Error("Сервер вернул некорректный JSON");
+        }
+      } else if (rawText.trim()) {
+        throw new Error(
+          response.ok
+            ? "Сервер вернул не JSON"
+            : `Ошибка сервера (${response.status}). Проверьте деплой API на Vercel.`,
+        );
+      }
+
       if (!response.ok) {
         throw new Error(data.error || "Не удалось отправить заказ");
       }

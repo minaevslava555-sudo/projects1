@@ -1,5 +1,3 @@
-import { adminChatIdsFromEnv, sendTelegramMessage } from "@/bot/telegram";
-
 export type OrderNotification = {
   name: string;
   phone: string;
@@ -11,6 +9,15 @@ export type OrderNotification = {
   massageMinutes?: number;
   details?: string;
 };
+
+function adminChatIdsFromEnv() {
+  const raw = process.env.TELEGRAM_ADMIN_CHAT_ID?.trim() ?? "";
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+}
 
 function formatPrice(value: number) {
   return new Intl.NumberFormat("ru-RU", {
@@ -42,11 +49,7 @@ function buildOrderMessage(order: OrderNotification) {
     lines.push(`📋 Расчёт: ${order.details}`);
   }
 
-  lines.push(
-    "────────────────",
-    `👤 Имя: ${order.name}`,
-    `📞 Телефон: ${order.phone}`,
-  );
+  lines.push("────────────────", `👤 Имя: ${order.name}`, `📞 Телефон: ${order.phone}`);
   if (order.date) {
     lines.push(`📅 Дата: ${order.date}`);
   }
@@ -54,14 +57,42 @@ function buildOrderMessage(order: OrderNotification) {
   return lines.join("\n");
 }
 
+/** Лёгкая отправка без импорта bot/ — безопаснее для Vercel serverless. */
 export async function notifyAdminAboutOrder(order: OrderNotification) {
+  const token = process.env.TOKEN_TELEGRAM?.trim();
   const chatIds = adminChatIdsFromEnv();
+
+  if (!token) {
+    throw new Error("Не задан TOKEN_TELEGRAM");
+  }
   if (!chatIds.length) {
     throw new Error("Не задан TELEGRAM_ADMIN_CHAT_ID");
   }
 
   const text = buildOrderMessage(order);
+  const url = `https://api.telegram.org/bot${token}/sendMessage`;
+
   for (const chatId of chatIds) {
-    await sendTelegramMessage(chatId, text);
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        disable_web_page_preview: true,
+      }),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      let detail = "";
+      try {
+        const payload = (await response.json()) as { description?: string };
+        detail = payload.description ? `: ${payload.description}` : "";
+      } catch {
+        // ignore non-JSON telegram errors
+      }
+      throw new Error(`Не удалось отправить уведомление${detail}`);
+    }
   }
 }
