@@ -25,7 +25,7 @@ function asPositiveInt(value: unknown, max: number) {
 }
 
 function jsonError(message: string, status: number) {
-  return Response.json({ error: message }, { status });
+  return Response.json({ ok: false, error: message }, { status });
 }
 
 export async function POST(request: Request) {
@@ -55,6 +55,9 @@ export async function POST(request: Request) {
     if (!Number.isFinite(priceEuro) || priceEuro <= 0 || priceEuro > 100_000) {
       return jsonError("Некорректная сумма", 400);
     }
+    if (!date) {
+      return jsonError("Укажите дату", 400);
+    }
 
     if (service === "cleaning") {
       if (!rooms || !hours || !workers) {
@@ -72,12 +75,13 @@ export async function POST(request: Request) {
 
     const orderService = service as "cleaning" | "repair" | "massage";
 
+    // Сначала БД — успех клиенту только после подтверждённого insert.
     const { id } = await saveOrderToSupabase({
       name,
       phone,
       service: orderService,
       priceEuro,
-      date: date ?? undefined,
+      date,
       details: details ?? undefined,
       rooms: rooms ?? undefined,
       hours: hours ?? undefined,
@@ -85,13 +89,14 @@ export async function POST(request: Request) {
       massageMinutes: massageMinutes ?? undefined,
     });
 
+    let telegramOk = true;
     try {
       await notifyAdminAboutOrder({
         name,
         phone,
         service: SERVICE_TITLES[service] ?? service,
         priceEuro,
-        date: date ?? undefined,
+        date,
         details: details ?? undefined,
         rooms: rooms ?? undefined,
         hours: hours ?? undefined,
@@ -99,11 +104,11 @@ export async function POST(request: Request) {
         massageMinutes: massageMinutes ?? undefined,
       });
     } catch (notifyError) {
-      // Заказ уже в БД — не откатываем из‑за Telegram.
+      telegramOk = false;
       console.error("[order] telegram notify failed", notifyError);
     }
 
-    return Response.json({ ok: true, id });
+    return Response.json({ ok: true, id, telegramOk });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Не удалось отправить заказ";
     return jsonError(message, 502);

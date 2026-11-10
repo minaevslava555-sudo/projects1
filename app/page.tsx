@@ -383,10 +383,15 @@ function OrderModal({
 
       const contentType = response.headers.get("content-type") || "";
       const rawText = await response.text();
-      let data: { error?: string; ok?: boolean } = {};
+      let data: { error?: string; ok?: boolean; id?: string; telegramOk?: boolean } = {};
       if (contentType.includes("application/json")) {
         try {
-          data = JSON.parse(rawText) as { error?: string; ok?: boolean };
+          data = JSON.parse(rawText) as {
+            error?: string;
+            ok?: boolean;
+            id?: string;
+            telegramOk?: boolean;
+          };
         } catch {
           throw new Error("Сервер вернул некорректный JSON");
         }
@@ -396,10 +401,12 @@ function OrderModal({
             ? "Сервер вернул не JSON"
             : `Ошибка сервера (${response.status}). Проверьте деплой API на Vercel.`,
         );
+      } else {
+        throw new Error(`Пустой ответ сервера (${response.status})`);
       }
 
-      if (!response.ok) {
-        throw new Error(data.error || "Не удалось отправить заказ");
+      if (!response.ok || !data.ok || !data.id) {
+        throw new Error(data.error || "Не удалось сохранить заказ");
       }
       setSuccess(true);
     } catch (submitError) {
