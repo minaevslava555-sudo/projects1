@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Figtree } from "next/font/google";
+import { Figtree, Newsreader } from "next/font/google";
 import "./globals.css";
 
-const bricolage = Bricolage_Grotesque({
+const newsreader = Newsreader({
   subsets: ["latin"],
-  variable: "--font-bricolage",
+  variable: "--font-newsreader",
   display: "swap",
 });
 
@@ -15,9 +15,9 @@ const figtree = Figtree({
 });
 
 export const metadata: Metadata = {
-  title: "HAVENLY — Your Home. Our Care.",
+  title: "HAVENLY — Premium Home Care in the Algarve",
   description:
-    "Professional cleaning, home repairs and wellness services across the Algarve. Trusted local professionals.",
+    "Elevated cleaning, home repairs and wellness for villas and residences across Central Algarve.",
 };
 
 const THEME_BOOTSTRAP = `(function(){try{var t=localStorage.getItem("web-agent-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}})();`;
@@ -32,7 +32,7 @@ export default function RootLayout({
       lang="en"
       data-theme="light"
       suppressHydrationWarning
-      className={`${bricolage.variable} ${figtree.variable}`}
+      className={`${newsreader.variable} ${figtree.variable}`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />

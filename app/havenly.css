@@ -1,15 +1,99 @@
 @import "tailwindcss";
 
 @theme {
-  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-newsreader), ui-serif, Georgia, serif;
   --font-sans: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
-  --color-ink: #1a1f1c;
-  --color-muted: #5a635c;
-  --color-paper: #f4f5f1;
-  --color-mist: #e3e6dc;
-  --color-khaki: #6e7a4e;
-  --color-khaki-deep: #55613c;
-  --color-sand: #d4cfc4;
+  /* HAVENLY Design System A — Premium Mediterranean */
+  --color-ink: #1b2521;
+  --color-muted: #5c6b63;
+  --color-paper: #f7f5f0;
+  --color-mist: #d9d2c6;
+  --color-sand: #e7ddce;
+  --color-olive: #34483d;
+  --color-olive-deep: #2a3a32;
+  --color-gold: #b59a6b;
+  --color-danger: #8f2f2f;
+}
+
+/*
+  globals.css раньше задавал unlayered `button`/`a`, что сильнее Tailwind @layer
+  и ломало лендинг (особенно при data-theme=dark из localStorage агента).
+  Ниже — страховка для HAVENLY primary CTA и ссылок в hero.
+*/
+.havenly-landing a {
+  color: inherit;
+}
+
+.havenly-landing header a[href^="tel:"] {
+  color: rgb(255 255 255 / 0.9);
+}
+
+.havenly-landing header a[href^="tel:"]:hover {
+  color: #fff;
+}
+
+.havenly-landing header nav button {
+  background: transparent !important;
+  color: rgb(255 255 255 / 0.85) !important;
+}
+
+.havenly-landing header nav button:hover {
+  color: #fff !important;
+}
+
+.havenly-landing #mobile-nav button {
+  background: transparent !important;
+}
+
+.havenly-landing #services button.group,
+.havenly-landing .hero-service-rail button.group {
+  background-color: transparent !important;
+  color: inherit !important;
+  width: 100%;
+  padding: 0;
+  border-radius: 0;
+  border: 0;
+}
+
+.havenly-landing .hero-service-rail button.group {
+  width: auto;
+}
+
+.havenly-landing .hero-service-rail {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.havenly-landing .hero-service-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.havenly-landing button.bg-olive {
+  background-color: var(--color-olive) !important;
+  color: #fff !important;
+}
+
+/* Massage catalog cards — keep premium panels free of global button chrome */
+.havenly-landing section button.group {
+  background-color: transparent !important;
+  color: inherit !important;
+  width: 100%;
+  padding: 0;
+  border-radius: 0;
+}
+
+.havenly-landing button.bg-olive:hover {
+  background-color: var(--color-olive-deep) !important;
+}
+
+.havenly-landing button.bg-olive-deep {
+  background-color: var(--color-olive-deep) !important;
+  color: #fff !important;
+}
+
+.havenly-landing header button.text-white {
+  color: #fff !important;
+  background-color: transparent !important;
 }
 
 @keyframes rise {
@@ -123,14 +207,19 @@
 }
 
 .hotspot-scene-tab:hover {
-  border-color: #93c5fd;
+  border-color: color-mix(in srgb, var(--color-olive) 35%, var(--color-mist));
 }
 
 .hotspot-scene-tab.is-active {
-  background: #2563eb;
-  border-color: #2563eb;
+  background: var(--color-olive);
+  border-color: var(--color-olive);
   color: #fff;
-  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.22);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--color-olive) 28%, transparent);
+}
+
+.hotspot-scene-tab:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
 }
 
 .hotspot-stage {
@@ -140,17 +229,7 @@
   border-radius: 1.25rem;
   background: #fff;
   min-height: 20rem;
-  box-shadow: 0 18px 40px rgba(26, 31, 28, 0.06);
-}
-
-.hotspot-stage-body {
-  display: grid;
-  place-items: center;
-  background:
-    radial-gradient(circle at top, #eef4ff 0%, transparent 55%),
-    linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
-  min-height: 28rem;
-  padding: 1.5rem 1rem 5.5rem;
+  box-shadow: 0 12px 32px rgba(27, 37, 33, 0.08);
 }
 
 .hotspot-image {
@@ -160,13 +239,8 @@
   object-fit: cover;
 }
 
-.hotspot-body-wrap {
-  width: min(16rem, 70%);
-  pointer-events: none;
-}
-
 .hotspot-marker {
-  --hotspot-blue: #2563eb;
+  --hotspot-accent: var(--color-olive);
   position: absolute;
   z-index: 2;
   width: 2.75rem;
@@ -179,6 +253,12 @@
   cursor: pointer;
 }
 
+.hotspot-marker:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 3px;
+  border-radius: 999px;
+}
+
 .hotspot-marker-core {
   position: relative;
   z-index: 1;
@@ -188,14 +268,14 @@
   height: 2rem;
   margin: 0.375rem auto 0;
   border-radius: 999px;
-  background: var(--hotspot-blue);
+  background: var(--hotspot-accent);
   color: #fff;
   font-size: 1.15rem;
   font-weight: 600;
   line-height: 1;
   box-shadow:
     0 0 0 3px rgba(255, 255, 255, 0.95),
-    0 8px 18px rgba(37, 99, 235, 0.35);
+    0 8px 18px color-mix(in srgb, var(--color-olive) 35%, transparent);
   transition:
     transform 0.2s ease,
     background-color 0.2s ease,
@@ -206,30 +286,30 @@
   position: absolute;
   inset: 0.15rem;
   border-radius: 999px;
-  background: rgba(37, 99, 235, 0.35);
+  background: color-mix(in srgb, var(--color-olive) 35%, transparent);
   animation: hotspot-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
 .hotspot-marker:hover .hotspot-marker-core,
 .hotspot-marker.is-active .hotspot-marker-core {
-  background: #1d4ed8;
+  background: var(--color-olive-deep);
   transform: scale(1.06);
   box-shadow:
     0 0 0 3px rgba(255, 255, 255, 0.98),
-    0 10px 22px rgba(37, 99, 235, 0.42);
+    0 10px 22px color-mix(in srgb, var(--color-olive) 42%, transparent);
 }
 
 .hotspot-popup {
   position: absolute;
   z-index: 4;
   width: min(17rem, calc(100% - 1.5rem));
-  border: 1px solid rgba(226, 232, 240, 0.9);
+  border: 1px solid var(--color-mist);
   border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.92);
+  background: color-mix(in srgb, #fff 92%, transparent);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   padding: 1rem 1.05rem 1.05rem;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+  box-shadow: 0 12px 32px rgba(27, 37, 33, 0.12);
   animation: hotspot-pop 0.22s ease both;
 }
 
@@ -246,7 +326,7 @@
   font-size: 1.05rem;
   font-weight: 700;
   letter-spacing: -0.01em;
-  color: #0f172a;
+  color: var(--color-ink);
 }
 
 .hotspot-popup-close {
@@ -255,10 +335,10 @@
   width: 1.75rem;
   height: 1.75rem;
   flex-shrink: 0;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-mist);
   border-radius: 999px;
   background: #fff;
-  color: #64748b;
+  color: var(--color-muted);
   font-size: 1rem;
   line-height: 1;
   transition:
@@ -267,13 +347,18 @@
 }
 
 .hotspot-popup-close:hover {
-  color: #0f172a;
-  border-color: #cbd5e1;
+  color: var(--color-ink);
+  border-color: color-mix(in srgb, var(--color-olive) 30%, var(--color-mist));
+}
+
+.hotspot-popup-close:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
 }
 
 .hotspot-popup-text {
   margin: 0.55rem 0 0;
-  color: #475569;
+  color: var(--color-muted);
   font-size: 0.92rem;
   line-height: 1.55;
 }
@@ -285,14 +370,14 @@
   z-index: 3;
   margin: 0;
   padding: 0.5rem 0.8rem;
-  border: 1px solid rgba(226, 232, 240, 0.95);
+  border: 1px solid var(--color-mist);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.88);
+  background: color-mix(in srgb, #fff 88%, transparent);
   backdrop-filter: blur(8px);
-  color: #64748b;
+  color: var(--color-muted);
   font-size: 0.78rem;
   font-weight: 500;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 8px 18px rgba(27, 37, 33, 0.08);
 }
 
 @keyframes hotspot-ping {

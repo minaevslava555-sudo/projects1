@@ -3,39 +3,6 @@
 import { useEffect, useId, useState, type CSSProperties } from "react";
 import type { HotspotScene, HotspotSpot } from "@/lib/service-hotspots";
 
-function BodySilhouette() {
-  return (
-    <svg
-      viewBox="0 0 200 420"
-      className="hotspot-body-svg mx-auto h-full w-auto max-h-[34rem]"
-      aria-hidden="true"
-    >
-      <ellipse cx="100" cy="42" rx="28" ry="34" fill="currentColor" opacity="0.16" />
-      <path
-        d="M72 78 C72 70 128 70 128 78 L138 150 C142 175 136 190 128 205 L122 250 L130 340 L118 400 L100 400 L82 400 L70 340 L78 250 L72 205 C64 190 58 175 62 150 Z"
-        fill="currentColor"
-        opacity="0.12"
-      />
-      <path
-        d="M62 120 C40 135 34 165 42 190 L58 200"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="18"
-        strokeLinecap="round"
-        opacity="0.12"
-      />
-      <path
-        d="M138 120 C160 135 166 165 158 190 L142 200"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="18"
-        strokeLinecap="round"
-        opacity="0.12"
-      />
-    </svg>
-  );
-}
-
 function SpotMarker({
   spot,
   active,
@@ -122,23 +89,14 @@ export default function HotspotGallery({ scenes }: { scenes: HotspotScene[] }) {
         </div>
       ) : null}
 
-      <div
-        className={`hotspot-stage${scene.kind === "svg-body" ? " hotspot-stage-body" : ""}`}
-        onClick={() => setActiveSpotId(null)}
-      >
-        {scene.kind === "svg-body" ? (
-          <div className="hotspot-body-wrap text-ink">
-            <BodySilhouette />
-          </div>
-        ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={scene.image}
-            alt={scene.label}
-            className="hotspot-image"
-            loading="lazy"
-          />
-        )}
+      <div className="hotspot-stage" onClick={() => setActiveSpotId(null)}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={scene.image}
+          alt={scene.label}
+          className="hotspot-image"
+          loading="lazy"
+        />
 
         {scene.spots.map((spot) => (
           <SpotMarker

@@ -143,23 +143,64 @@ const FAQ_ITEMS = [
   },
 ] as const;
 
-const SPECIALISTS = [
-  {
-    name: "Maria",
-    rating: "4.9/5",
-    detail: "500+ homes served in Algarve, speaks EN/PT",
-  },
-  {
-    name: "João",
-    rating: "4.8/5",
-    detail: "Home repairs specialist across Loulé & Faro",
-  },
-  {
-    name: "Ana",
-    rating: "5.0/5",
-    detail: "Wellness & massage — Vilamoura and Quarteira",
-  },
+/**
+ * Brand landing media — files live in `public/images/`.
+ * Drop future HAVENLY photography over the same filenames; no code change needed.
+ *
+ * Current stand-ins (commercial-safe stock, not HAVENLY staff):
+ * - hero.jpg — Unsplash License (modern villa + pool)
+ * - service-cleaning.jpg — Pexels License
+ * - service-repair.jpg — Pexels License
+ * - service-massage.jpg — Pexels License
+ */
+const LANDING_MEDIA = {
+  hero: "/images/hero.jpg",
+  cleaning: "/images/service-cleaning.jpg",
+  repair: "/images/service-repair.jpg",
+  massage: "/images/service-massage.jpg",
+} as const;
+
+const NAV_LINKS = [
+  { href: "#top", label: "Home" },
+  { href: "#services", label: "Services" },
+  { href: "#included", label: "How It Works" },
+  { href: "#area", label: "Area" },
+  { href: "#faq", label: "FAQ" },
 ] as const;
+
+const HERO_SERVICES: Array<{
+  id: ServiceValue;
+  title: string;
+  blurb: string;
+  image: string;
+  price: string;
+  imageAlt: string;
+}> = [
+  {
+    id: "cleaning",
+    title: "Cleaning",
+    blurb: "Immaculate villas and apartments, prepared with quiet precision.",
+    image: LANDING_MEDIA.cleaning,
+    price: SERVICE_META.cleaning.cardPrice,
+    imageAlt: "Professional cleaning detail in a bright luxury bathroom",
+  },
+  {
+    id: "repair",
+    title: "Home Repairs",
+    blurb: "Discreet handyman care for everyday comfort at home.",
+    image: LANDING_MEDIA.repair,
+    price: SERVICE_META.repair.cardPrice,
+    imageAlt: "Careful finishing work on a clean modern interior wall",
+  },
+  {
+    id: "massage",
+    title: "Massage",
+    blurb: "Professional massage, brought to the comfort of your home.",
+    image: LANDING_MEDIA.massage,
+    price: SERVICE_META.massage.cardPrice,
+    imageAlt: "In-home massage in a bright residential interior",
+  },
+];
 
 function formatEuro(value: number) {
   return new Intl.NumberFormat("en-IE", {
@@ -229,7 +270,7 @@ function Stepper({
       <div className="flex items-center gap-3">
         <button
           type="button"
-          className="inline-flex h-11 w-11 items-center justify-center border border-mist bg-paper text-lg font-semibold text-ink transition hover:border-khaki disabled:opacity-40"
+          className="inline-flex h-11 w-11 items-center justify-center border border-mist bg-paper text-lg font-semibold text-ink transition hover:border-olive disabled:opacity-40"
           aria-label={`Decrease ${label}`}
           disabled={value <= min}
           onClick={() => onChange(Math.max(min, value - 1))}
@@ -247,11 +288,11 @@ function Stepper({
             if (!Number.isFinite(next)) return;
             onChange(Math.min(max, Math.max(min, Math.round(next))));
           }}
-          className="w-full border border-mist bg-paper px-4 py-3 text-center text-ink outline-none transition focus:border-khaki"
+          className="w-full border border-mist bg-paper px-4 py-3 text-center text-ink outline-none transition focus:border-olive"
         />
         <button
           type="button"
-          className="inline-flex h-11 w-11 items-center justify-center border border-mist bg-paper text-lg font-semibold text-ink transition hover:border-khaki disabled:opacity-40"
+          className="inline-flex h-11 w-11 items-center justify-center border border-mist bg-paper text-lg font-semibold text-ink transition hover:border-olive disabled:opacity-40"
           aria-label={`Increase ${label}`}
           disabled={value >= max}
           onClick={() => onChange(Math.min(max, value + 1))}
@@ -269,12 +310,15 @@ function OrderModal({
   onServiceChange,
   onClose,
   lockService = false,
+  massageStyle = "",
 }: {
   open: boolean;
   service: ServiceValue;
   onServiceChange: (service: ServiceValue) => void;
   onClose: () => void;
   lockService?: boolean;
+  /** Optional massage menu label — stored in free-text `details`, not a DB column. */
+  massageStyle?: string;
 }) {
   const titleId = useId();
   const [rooms, setRooms] = useState(2);
@@ -332,7 +376,9 @@ function OrderModal({
 
   function orderDetails() {
     if (service === "massage") {
-      return `${massageMinutes} min session`;
+      const duration = `${massageMinutes} min session`;
+      const style = massageStyle.trim();
+      return style ? `${style} · ${duration}` : duration;
     }
     if (service === "cleaning") {
       return `${rooms} room(s) require ~${cleaningHours} hours and ${cleaningWorkers} cleaner(s)`;
@@ -435,18 +481,21 @@ function OrderModal({
       >
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-mist bg-paper/95 px-5 py-4 backdrop-blur sm:px-6">
           <div>
-            <p className="text-xs font-medium tracking-[0.18em] text-khaki uppercase">
+            <p className="text-xs font-medium tracking-[0.18em] text-gold uppercase">
               Booking calculator
             </p>
-            <h2 id={titleId} className="mt-1 font-display text-2xl font-bold text-ink">
+            <h2 id={titleId} className="mt-1 font-display text-2xl font-medium text-ink">
               {meta.title}
             </h2>
+            {service === "massage" && massageStyle.trim() ? (
+              <p className="mt-1 text-sm font-medium text-olive">{massageStyle.trim()}</p>
+            ) : null}
             <p className="mt-1 text-sm text-muted">{meta.rateLabel}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-10 w-10 items-center justify-center border border-mist bg-white text-ink transition hover:border-khaki"
+            className="inline-flex h-10 w-10 items-center justify-center border border-mist bg-white text-ink transition hover:border-olive"
             aria-label="Close"
           >
             ×
@@ -463,8 +512,8 @@ function OrderModal({
                   onClick={() => onServiceChange(value)}
                   className={`rounded-lg px-2 py-2.5 text-xs font-semibold transition sm:text-sm ${
                     service === value
-                      ? "bg-teal-600 text-white shadow-sm shadow-teal-600/25"
-                      : "border border-mist bg-white text-ink hover:border-teal-500/50"
+                      ? "bg-olive text-white shadow-sm shadow-olive/25"
+                      : "border border-mist bg-white text-ink hover:border-olive/50"
                   }`}
                 >
                   {SERVICE_META[value].title}
@@ -475,7 +524,7 @@ function OrderModal({
 
           <div className="rounded-xl border border-mist bg-white px-5 py-6 text-center">
             <p className="text-xs font-medium tracking-[0.18em] text-muted uppercase">Total</p>
-            <p className="mt-2 font-display text-5xl font-bold tracking-tight text-teal-700 sm:text-6xl">
+            <p className="mt-2 font-display text-5xl font-bold tracking-tight text-olive sm:text-6xl">
               {formatEuro(total)}
             </p>
           </div>
@@ -490,12 +539,12 @@ function OrderModal({
                 max={6}
                 onChange={setRooms}
               />
-              <div className="rounded-xl border border-teal-100 bg-teal-50/70 px-4 py-3 text-sm leading-relaxed text-teal-900">
+              <div className="rounded-xl border border-sand bg-sand/70 px-4 py-3 text-sm leading-relaxed text-ink">
                 <p className="font-medium">
                   {rooms} room(s) require ~{cleaningHours} hours and {cleaningWorkers}{" "}
                   cleaner(s)
                 </p>
-                <p className="mt-1 text-teal-800/80">
+                <p className="mt-1 text-olive/80">
                   {cleaningHours} × {cleaningWorkers} × 20€ = {formatEuro(total)}
                 </p>
               </div>
@@ -539,8 +588,8 @@ function OrderModal({
                       onClick={() => setMassageMinutes(option.minutes)}
                       className={`flex items-center justify-between border px-4 py-3 text-left transition ${
                         active
-                          ? "border-khaki bg-khaki/10 text-ink"
-                          : "border-mist bg-white text-ink hover:border-khaki"
+                          ? "border-olive bg-olive/10 text-ink"
+                          : "border-mist bg-white text-ink hover:border-olive"
                       }`}
                     >
                       <span className="font-medium">{option.minutes} minutes</span>
@@ -566,7 +615,7 @@ function OrderModal({
                 placeholder="Your name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                className="w-full border border-mist bg-white px-4 py-3 text-ink outline-none transition placeholder:text-muted/60 focus:border-khaki"
+                className="w-full border border-mist bg-white px-4 py-3 text-ink outline-none transition placeholder:text-muted/60 focus:border-olive"
               />
             </div>
 
@@ -583,7 +632,7 @@ function OrderModal({
                 placeholder="+351 ..."
                 value={phone}
                 onChange={(event) => setPhone(event.target.value)}
-                className="w-full border border-mist bg-white px-4 py-3 text-ink outline-none transition placeholder:text-muted/60 focus:border-khaki"
+                className="w-full border border-mist bg-white px-4 py-3 text-ink outline-none transition placeholder:text-muted/60 focus:border-olive"
               />
             </div>
 
@@ -598,7 +647,7 @@ function OrderModal({
                 required
                 value={date}
                 onChange={(event) => setDate(event.target.value)}
-                className="w-full border border-mist bg-white px-4 py-3 text-ink outline-none transition focus:border-khaki"
+                className="w-full border border-mist bg-white px-4 py-3 text-ink outline-none transition focus:border-olive"
               />
             </div>
           </div>
@@ -606,19 +655,19 @@ function OrderModal({
           <button
             type="submit"
             disabled={sending}
-            className="w-full bg-khaki px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-khaki-deep disabled:opacity-60 sm:text-base"
+            className="w-full bg-olive px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep disabled:opacity-60 sm:text-base"
           >
             {sending ? "Sending..." : `Confirm order — ${formatEuro(total)}`}
           </button>
 
           {error ? (
-            <p className="text-sm font-medium text-red-700" role="alert">
+            <p className="text-sm font-medium text-danger" role="alert">
               {error}
             </p>
           ) : null}
 
           {success ? (
-            <p className="text-sm font-medium text-khaki" role="status">
+            <p className="text-sm font-medium text-olive" role="status">
               Request received for {meta.title} ({formatEuro(total)}). We’ll be in touch shortly.
             </p>
           ) : null}
@@ -633,45 +682,161 @@ export default function Home() {
   const [service, setService] = useState<ServiceValue>("cleaning");
   const [activeServiceView, setActiveServiceView] = useState<ServiceValue | null>(null);
   const [lockService, setLockService] = useState(false);
+  const [massageStyle, setMassageStyle] = useState("");
   const [includedService, setIncludedService] = useState<ServiceValue>("cleaning");
   const [cleaningTab, setCleaningTab] = useState<CleaningRoomTab>("Kitchen");
   const [massageTab, setMassageTab] = useState<MassageFocusTab>("Back");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [navOpen, setNavOpen] = useState(false);
+
+  // Лендинг не использует dark-тему агента из localStorage (globals.css иначе перебивает CTA/ссылки).
+  useEffect(() => {
+    const root = document.documentElement;
+    const previous = root.getAttribute("data-theme");
+    root.setAttribute("data-theme", "light");
+    return () => {
+      if (previous) root.setAttribute("data-theme", previous);
+      else root.removeAttribute("data-theme");
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setNavOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [navOpen]);
 
   function openServiceView(value: ServiceValue) {
+    setNavOpen(false);
     setService(value);
     setActiveServiceView(value);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function openOrder(value: ServiceValue, locked = false) {
+  function openOrder(value: ServiceValue, locked = false, style = "") {
     setService(value);
     setLockService(locked);
+    setMassageStyle(value === "massage" ? style : "");
     setModalOpen(true);
   }
 
+  function goHome() {
+    setNavOpen(false);
+    setActiveServiceView(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function onNavClick(href: string) {
+    setNavOpen(false);
+    setActiveServiceView(null);
+    if (href === "#top") {
+      window.setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 0);
+      return;
+    }
+    window.setTimeout(() => {
+      document.querySelector(href)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }
+
+  const headerOnHero = !activeServiceView;
+
   return (
-    <div className="min-h-svh bg-paper font-sans text-ink antialiased">
+    <div className="havenly-landing min-h-svh bg-paper font-sans text-ink antialiased">
       <header
-        className={`${
-          activeServiceView ? "relative border-b border-mist bg-ink" : "absolute inset-x-0 top-0"
-        } z-20`}
+        className={`z-30 ${
+          headerOnHero
+            ? "absolute inset-x-0 top-0"
+            : "relative border-b border-mist bg-olive-deep"
+        }`}
       >
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8 lg:px-10">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4 sm:px-8 lg:px-10">
           <button
             type="button"
-            onClick={() => setActiveServiceView(null)}
-            className="font-display text-xl font-bold tracking-[0.12em] text-white sm:text-2xl"
+            onClick={goHome}
+            className="font-display text-xl font-medium tracking-[0.18em] text-white sm:text-2xl"
+            aria-label="HAVENLY home"
           >
             HAVENLY
           </button>
-          <a
-            href="tel:+351920024478"
-            className="text-sm font-medium text-white/90 transition hover:text-white sm:text-base"
-          >
-            +351 920 024 478
-          </a>
+
+          <nav className="hidden items-center gap-7 lg:flex" aria-label="Primary">
+            {NAV_LINKS.map((link) => (
+              <button
+                key={link.href}
+                type="button"
+                onClick={() => onNavClick(link.href)}
+                className="text-sm font-medium text-white/85 transition hover:text-white"
+              >
+                {link.label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="flex items-center gap-3 sm:gap-4">
+            <a
+              href="tel:+351920024478"
+              className="hidden text-sm font-semibold text-white/90 transition hover:text-white md:inline"
+            >
+              +351 920 024 478
+            </a>
+            <button
+              type="button"
+              onClick={() => openOrder("cleaning", true)}
+              className="hidden border border-white/35 bg-white/10 px-3.5 py-2 text-sm font-semibold text-white backdrop-blur-sm transition hover:border-gold/60 hover:bg-white/15 lg:inline-flex"
+            >
+              Book
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-11 w-11 items-center justify-center border border-white/30 text-white lg:hidden"
+              aria-expanded={navOpen}
+              aria-controls="mobile-nav"
+              aria-label={navOpen ? "Close menu" : "Open menu"}
+              onClick={() => setNavOpen((open) => !open)}
+            >
+              <span className="font-display text-lg leading-none">{navOpen ? "×" : "☰"}</span>
+            </button>
+          </div>
         </div>
+
+        {navOpen ? (
+          <div
+            id="mobile-nav"
+            className="border-t border-white/15 bg-olive-deep/95 px-5 py-5 backdrop-blur-md lg:hidden"
+          >
+            <nav className="mx-auto flex max-w-6xl flex-col gap-1" aria-label="Mobile">
+              {NAV_LINKS.map((link) => (
+                <button
+                  key={link.href}
+                  type="button"
+                  onClick={() => onNavClick(link.href)}
+                  className="rounded-lg px-3 py-3 text-left text-base font-medium text-white/90 transition hover:bg-white/10 hover:text-white"
+                >
+                  {link.label}
+                </button>
+              ))}
+              <a
+                href="tel:+351920024478"
+                className="mt-2 rounded-lg px-3 py-3 text-base font-semibold text-gold"
+              >
+                +351 920 024 478
+              </a>
+              <button
+                type="button"
+                onClick={() => {
+                  setNavOpen(false);
+                  openOrder("cleaning", true);
+                }}
+                className="mt-1 rounded-lg bg-olive px-3 py-3 text-left text-base font-semibold text-white"
+              >
+                Book Cleaning
+              </button>
+            </nav>
+          </div>
+        ) : null}
       </header>
 
       <main id="top">
@@ -679,81 +844,139 @@ export default function Home() {
           <ServiceDetailView
             service={activeServiceView}
             onBack={() => setActiveServiceView(null)}
-            onBook={() => openOrder(activeServiceView, true)}
+            onBook={(style) => openOrder(activeServiceView, true, style)}
           />
         ) : (
           <>
             <section className="relative min-h-[100svh] overflow-hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=2000&q=80"
-                alt="Bright, calm living room with soft natural light"
-                className="animate-hero-media absolute inset-0 h-full w-full object-cover"
+                src={LANDING_MEDIA.hero}
+                alt="Sunlit luxury villa with pool terrace"
+                className="animate-hero-media absolute inset-0 h-full w-full object-cover object-[58%_center] sm:object-center"
               />
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/85 via-ink/50 to-ink/25" />
-              <div className="relative z-10 mx-auto flex min-h-[100svh] max-w-6xl flex-col justify-end px-5 pb-16 pt-28 sm:px-8 sm:pb-20 lg:px-10 lg:pb-24">
-                <p className="animate-rise font-display text-4xl font-bold tracking-[0.14em] text-white sm:text-5xl md:text-6xl">
-                  HAVENLY
-                </p>
-                <p className="animate-rise-delay mt-3 text-xs font-medium tracking-[0.28em] text-white/80 uppercase sm:text-sm">
-                  Home · Comfort · Trust
-                </p>
-                <p className="animate-rise-delay mt-2 text-base text-white/85 sm:text-lg">
-                  Your home, taken care of.
-                </p>
-                <h1 className="animate-rise-late mt-8 max-w-3xl font-display text-4xl font-bold leading-[1.05] tracking-tight text-white sm:text-5xl md:text-6xl lg:text-7xl">
-                  Your Home. Our Care.
-                </h1>
-                <p className="animate-rise-late mt-5 max-w-xl text-base leading-relaxed text-white/85 sm:text-lg">
-                  Everything your home needs, in one place. Professional cleaning, home
-                  repairs and wellness services — delivered by trusted local
-                  professionals across the Algarve.
-                </p>
-                <div className="animate-rise-late mt-8">
-                  <button
-                    type="button"
-                    onClick={() => openServiceView("cleaning")}
-                    className="inline-flex items-center bg-khaki px-6 py-3.5 text-sm font-semibold text-white transition duration-300 hover:bg-khaki-deep sm:text-base"
-                  >
-                    Explore Cleaning
-                  </button>
+              {/* Warm Mediterranean wash — amber/sand, not cool blue-grey */}
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(43,32,18,0.28)_0%,rgba(27,37,33,0.35)_42%,rgba(27,37,33,0.88)_100%)]" />
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_20%_80%,rgba(181,154,107,0.22)_0%,transparent_55%)]" />
+
+              <div className="relative z-10 mx-auto flex min-h-[100svh] max-w-6xl flex-col justify-end px-5 pb-7 pt-28 sm:px-8 sm:pb-12 lg:px-10 lg:pb-16">
+                <div className="animate-rise max-w-3xl">
+                  <p className="text-[0.7rem] font-medium tracking-[0.28em] text-sand/90 uppercase sm:text-xs">
+                    Central Algarve
+                  </p>
+                  <h1 className="mt-4 max-w-[14ch] font-display text-[2.35rem] font-medium leading-[1.08] tracking-[-0.01em] text-white sm:mt-5 sm:max-w-[16ch] sm:text-5xl lg:text-[3.55rem] lg:leading-[1.05]">
+                    Elevated home care for life in the Algarve.
+                  </h1>
+                  <p className="mt-4 max-w-md text-[0.98rem] leading-relaxed text-white/82 sm:mt-5 sm:text-lg lg:max-w-lg">
+                    <span className="lg:hidden">
+                      Cleaning, repairs and wellness for villas from Faro to Albufeira.
+                    </span>
+                    <span className="hidden lg:inline">
+                      Cleaning, repairs and wellness — delivered with discretion for villas
+                      and residences from Faro to Albufeira.
+                    </span>
+                  </p>
+                </div>
+
+                <div
+                  id="services"
+                  className="animate-rise-late mt-10 hidden grid-cols-3 gap-5 lg:mt-14 lg:grid"
+                >
+                  {HERO_SERVICES.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => openServiceView(item.id)}
+                      className="group relative aspect-[4/5] overflow-hidden text-left shadow-[0_24px_48px_rgba(27,37,33,0.28)] transition duration-500 hover:-translate-y-1"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={item.image}
+                        alt={item.imageAlt}
+                        className="absolute inset-0 h-full w-full object-cover transition duration-[1.1s] ease-out group-hover:scale-[1.04]"
+                      />
+                      <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_35%,rgba(27,37,33,0.55)_68%,rgba(27,37,33,0.92)_100%)]" />
+                      <div className="relative flex h-full flex-col justify-end p-6">
+                        <p className="font-display text-[1.65rem] font-medium leading-tight text-white">
+                          {item.title}
+                        </p>
+                        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-white/78">
+                          {item.blurb}
+                        </p>
+                        <p className="mt-4 text-xs font-semibold tracking-[0.16em] text-gold uppercase">
+                          {item.price}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                <div
+                  className="animate-rise-late hero-service-rail -mx-5 mt-9 flex snap-x snap-mandatory gap-3.5 overflow-x-auto px-5 pb-2 sm:-mx-8 sm:gap-4 sm:px-8 lg:hidden"
+                  aria-label="Services"
+                >
+                  {HERO_SERVICES.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => openServiceView(item.id)}
+                      className="group relative h-[17rem] w-[78vw] max-w-[20rem] shrink-0 snap-center overflow-hidden text-left shadow-[0_18px_40px_rgba(27,37,33,0.35)] sm:w-[17.5rem]"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={item.image}
+                        alt={item.imageAlt}
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_30%,rgba(27,37,33,0.5)_62%,rgba(27,37,33,0.92)_100%)]" />
+                      <div className="relative flex h-full flex-col justify-end p-5">
+                        <p className="font-display text-2xl font-medium text-white">{item.title}</p>
+                        <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-white/78">
+                          {item.blurb}
+                        </p>
+                        <p className="mt-3.5 text-xs font-semibold tracking-[0.16em] text-gold uppercase">
+                          {item.price}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
                 </div>
               </div>
             </section>
 
             <section className="relative overflow-hidden border-b border-mist py-16 sm:py-20">
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,_#f4f5f1_0%,_#eef0ea_100%)]" />
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,_#f7f5f0_0%,_#e7ddce_100%)]" />
               <div className="relative mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
-                <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
+                <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
                   <Reveal>
-                    <h2 className="font-display text-lg font-bold text-khaki sm:text-xl">
+                    <h2 className="font-display text-xl font-medium text-olive sm:text-2xl">
                       Verified Professionals
                     </h2>
-                    <p className="mt-2 text-sm leading-relaxed text-ink sm:text-base">
+                    <p className="mt-3 text-sm leading-relaxed text-muted sm:text-base">
                       Carefully checked specialists you can trust in your home.
                     </p>
                   </Reveal>
                   <Reveal style={{ transitionDelay: "60ms" }}>
-                    <h2 className="font-display text-lg font-bold text-khaki sm:text-xl">
+                    <h2 className="font-display text-xl font-medium text-olive sm:text-2xl">
                       English-speaking Support
                     </h2>
-                    <p className="mt-2 text-sm leading-relaxed text-ink sm:text-base">
+                    <p className="mt-3 text-sm leading-relaxed text-muted sm:text-base">
                       Clear communication from first message to finished job.
                     </p>
                   </Reveal>
                   <Reveal style={{ transitionDelay: "120ms" }}>
-                    <h2 className="font-display text-lg font-bold text-khaki sm:text-xl">
+                    <h2 className="font-display text-xl font-medium text-olive sm:text-2xl">
                       Transparent Pricing
                     </h2>
-                    <p className="mt-2 text-sm leading-relaxed text-ink sm:text-base">
+                    <p className="mt-3 text-sm leading-relaxed text-muted sm:text-base">
                       Straightforward rates with no hidden extras.
                     </p>
                   </Reveal>
                   <Reveal style={{ transitionDelay: "180ms" }}>
-                    <h2 className="font-display text-lg font-bold text-khaki sm:text-xl">
+                    <h2 className="font-display text-xl font-medium text-olive sm:text-2xl">
                       Secure Booking
                     </h2>
-                    <p className="mt-2 text-sm leading-relaxed text-ink sm:text-base">
+                    <p className="mt-3 text-sm leading-relaxed text-muted sm:text-base">
                       Simple requests and reliable confirmation every time.
                     </p>
                   </Reveal>
@@ -761,262 +984,185 @@ export default function Home() {
               </div>
             </section>
 
-            <section id="services" className="relative overflow-hidden py-20 sm:py-24">
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_#e4e8dc_0%,_transparent_55%),linear-gradient(180deg,_#f4f5f1_0%,_#eef1ea_100%)]" />
-              <div className="relative mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
-                <Reveal className="max-w-xl">
-                  <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
-                    Services for everyday life
-                  </h2>
-                  <p className="mt-3 text-muted sm:text-lg">
-                    Choose a service to explore rooms, repair zones or massage areas.
-                  </p>
-                </Reveal>
-
-                <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-7">
-                  <Reveal className="group flex flex-col overflow-hidden border border-mist bg-white/75 backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:border-khaki/35">
-                    <article className="flex h-full flex-col">
-                      <div className="aspect-[4/3] overflow-hidden">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src="/images/service-cleaning.jpg"
-                          alt="Professional cleaner in a bright living room"
-                          className="h-full w-full object-cover object-center transition duration-700 group-hover:scale-105"
-                        />
-                      </div>
-                      <div className="flex flex-1 flex-col p-6 sm:p-7">
-                        <h3 className="font-display text-xl font-bold text-khaki sm:text-2xl">
-                          Cleaning
-                        </h3>
-                        <p className="mt-3 flex-1 text-sm leading-relaxed text-ink sm:text-base">
-                          Interactive room map with markers for kitchen, bathroom, bedroom
-                          and hallway cleaning.
-                        </p>
-                        <p className="mt-6 font-display text-2xl font-bold text-ink">
-                          {SERVICE_META.cleaning.cardPrice}
-                        </p>
-                        <button
-                          type="button"
-                          className="mt-5 inline-flex w-full items-center justify-center bg-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-khaki-deep"
-                          onClick={() => openServiceView("cleaning")}
-                        >
-                          Choose
-                        </button>
-                      </div>
-                    </article>
-                  </Reveal>
-
-                  <Reveal
-                    className="group flex flex-col overflow-hidden border border-mist bg-white/75 backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:border-khaki/35"
-                    style={{ transitionDelay: "80ms" }}
-                  >
-                    <article className="flex h-full flex-col">
-                      <div className="aspect-[4/3] overflow-hidden">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src="/images/service-repair.jpg"
-                          alt="Handyman in workwear installing a shelf at home"
-                          className="h-full w-full object-cover object-center transition duration-700 group-hover:scale-105"
-                        />
-                      </div>
-                      <div className="flex flex-1 flex-col p-6 sm:p-7">
-                        <h3 className="font-display text-xl font-bold text-khaki sm:text-2xl">
-                          Home Repairs
-                        </h3>
-                        <p className="mt-3 flex-1 text-sm leading-relaxed text-ink sm:text-base">
-                          See furniture, plumbing, electrics and door fixes on interactive
-                          markers.
-                        </p>
-                        <p className="mt-6 font-display text-2xl font-bold text-ink">
-                          {SERVICE_META.repair.cardPrice}
-                        </p>
-                        <button
-                          type="button"
-                          className="mt-5 inline-flex w-full items-center justify-center bg-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-khaki-deep"
-                          onClick={() => openServiceView("repair")}
-                        >
-                          Choose
-                        </button>
-                      </div>
-                    </article>
-                  </Reveal>
-
-                  <Reveal
-                    className="group flex flex-col overflow-hidden border border-mist bg-white/75 backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:border-khaki/35 sm:col-span-2 sm:mx-auto sm:max-w-md lg:col-span-1 lg:mx-0 lg:max-w-none"
-                    style={{ transitionDelay: "160ms" }}
-                  >
-                    <article className="flex h-full flex-col">
-                      <div className="aspect-[4/3] overflow-hidden">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src="/images/service-massage.jpg"
-                          alt="Relaxing warm-toned massage with one client"
-                          className="h-full w-full object-cover object-center transition duration-700 group-hover:scale-105"
-                        />
-                      </div>
-                      <div className="flex flex-1 flex-col p-6 sm:p-7">
-                        <h3 className="font-display text-xl font-bold text-khaki sm:text-2xl">
-                          Massage
-                        </h3>
-                        <p className="mt-3 flex-1 text-sm leading-relaxed text-ink sm:text-base">
-                          Body map with markers for face, back, legs and feet massage
-                          zones.
-                        </p>
-                        <p className="mt-6 font-display text-2xl font-bold text-ink">
-                          {SERVICE_META.massage.cardPrice}
-                        </p>
-                        <button
-                          type="button"
-                          className="mt-5 inline-flex w-full items-center justify-center bg-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-khaki-deep"
-                          onClick={() => openServiceView("massage")}
-                        >
-                          Choose
-                        </button>
-                      </div>
-                    </article>
-                  </Reveal>
-                </div>
-              </div>
-            </section>
-
-            <section id="included" className="relative overflow-hidden border-t border-mist py-20 sm:py-24">
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,_#f7f8f4_0%,_#eef5f3_100%)]" />
+            <section id="included" className="relative overflow-hidden border-t border-mist py-20 sm:py-28">
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(165deg,_#f7f5f0_0%,_#efe8dc_48%,_#e7ddce_100%)]" />
               <div className="relative mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
                 <Reveal className="max-w-2xl">
-                  <p className="text-sm font-medium tracking-[0.22em] text-teal-700 uppercase">
-                    How we work
+                  <p className="text-xs font-medium tracking-[0.26em] text-gold uppercase">
+                    How it works
                   </p>
-                  <h2 className="mt-3 font-display text-3xl font-bold tracking-tight sm:text-4xl">
+                  <h2 className="mt-4 font-display text-3xl font-medium tracking-tight text-ink sm:text-4xl lg:text-[2.75rem]">
                     What&apos;s included in our service
                   </h2>
-                  <p className="mt-3 text-muted sm:text-lg">
+                  <p className="mt-4 max-w-xl text-base leading-relaxed text-muted sm:text-lg">
                     Clear checklists so you know exactly what to expect before booking.
                   </p>
                 </Reveal>
 
-                <div className="mt-8 flex flex-wrap gap-2">
-                  {(Object.keys(SERVICE_META) as ServiceValue[]).map((value) => {
-                    const active = includedService === value;
-                    return (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => setIncludedService(value)}
-                        className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
-                          active
-                            ? "bg-teal-600 text-white shadow-sm shadow-teal-600/20"
-                            : "border border-mist bg-white text-ink hover:border-teal-500/40"
-                        }`}
-                      >
-                        {SERVICE_META[value].title}
-                      </button>
-                    );
-                  })}
+                <div className="mt-12 grid items-start gap-10 lg:mt-14 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:gap-14">
+                  <Reveal className="relative overflow-hidden">
+                    <div className="relative aspect-[4/5] overflow-hidden sm:aspect-[5/6] lg:aspect-[4/5]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        key={includedService}
+                        src={LANDING_MEDIA[includedService]}
+                        alt={
+                          HERO_SERVICES.find((s) => s.id === includedService)?.imageAlt ??
+                          SERVICE_META[includedService].title
+                        }
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-ink/50 via-transparent to-ink/10" />
+                      <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6">
+                        <p className="font-display text-2xl font-medium text-white sm:text-3xl">
+                          {SERVICE_META[includedService].title}
+                        </p>
+                        <p className="mt-1 text-sm text-white/75">
+                          {SERVICE_META[includedService].rateLabel}
+                        </p>
+                      </div>
+                    </div>
+                  </Reveal>
+
+                  <div>
+                    <div className="flex flex-wrap gap-2 border-b border-mist/80 pb-5">
+                      {(Object.keys(SERVICE_META) as ServiceValue[]).map((value) => {
+                        const active = includedService === value;
+                        return (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => setIncludedService(value)}
+                            className={`px-4 py-2.5 text-sm font-semibold tracking-wide transition ${
+                              active
+                                ? "bg-olive text-white"
+                                : "border border-mist bg-white/70 text-ink hover:border-olive/40"
+                            }`}
+                          >
+                            {SERVICE_META[value].title}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {includedService === "cleaning" ? (
+                      <div className="mt-6">
+                        <div className="flex flex-wrap gap-2">
+                          {(Object.keys(CLEANING_CHECKLISTS) as CleaningRoomTab[]).map((tab) => {
+                            const active = cleaningTab === tab;
+                            return (
+                              <button
+                                key={tab}
+                                type="button"
+                                onClick={() => setCleaningTab(tab)}
+                                className={`px-3.5 py-2 text-sm font-medium transition ${
+                                  active
+                                    ? "bg-olive text-white"
+                                    : "text-muted underline-offset-4 hover:text-ink hover:underline"
+                                }`}
+                              >
+                                {tab}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <ul className="mt-6 divide-y divide-mist/70 border-t border-mist/70">
+                          {CLEANING_CHECKLISTS[cleaningTab].map((item) => (
+                            <li
+                              key={item}
+                              className="flex items-start gap-3.5 py-3.5 text-sm leading-relaxed text-ink sm:text-[0.95rem]"
+                            >
+                              <span
+                                className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gold"
+                                aria-hidden="true"
+                              />
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+
+                    {includedService === "massage" ? (
+                      <div className="mt-6">
+                        <div className="flex flex-wrap gap-2">
+                          {(Object.keys(MASSAGE_CHECKLISTS) as MassageFocusTab[]).map((tab) => {
+                            const active = massageTab === tab;
+                            return (
+                              <button
+                                key={tab}
+                                type="button"
+                                onClick={() => setMassageTab(tab)}
+                                className={`px-3.5 py-2 text-sm font-medium transition ${
+                                  active
+                                    ? "bg-olive text-white"
+                                    : "text-muted underline-offset-4 hover:text-ink hover:underline"
+                                }`}
+                              >
+                                {tab}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <ul className="mt-6 divide-y divide-mist/70 border-t border-mist/70">
+                          {MASSAGE_CHECKLISTS[massageTab].map((item) => (
+                            <li
+                              key={item}
+                              className="flex items-start gap-3.5 py-3.5 text-sm leading-relaxed text-ink sm:text-[0.95rem]"
+                            >
+                              <span
+                                className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gold"
+                                aria-hidden="true"
+                              />
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+
+                    {includedService === "repair" ? (
+                      <div className="mt-6">
+                        <p className="text-sm font-semibold tracking-wide text-olive">
+                          Handyman essentials
+                        </p>
+                        <ul className="mt-4 divide-y divide-mist/70 border-t border-mist/70">
+                          {REPAIR_CHECKLIST.map((item) => (
+                            <li
+                              key={item}
+                              className="flex items-start gap-3.5 py-3.5 text-sm leading-relaxed text-ink sm:text-[0.95rem]"
+                            >
+                              <span
+                                className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gold"
+                                aria-hidden="true"
+                              />
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+
+                    <button
+                      type="button"
+                      onClick={() => openServiceView(includedService)}
+                      className="mt-8 inline-flex items-center bg-olive px-5 py-3 text-sm font-semibold text-white transition hover:bg-olive-deep"
+                    >
+                      Explore {SERVICE_META[includedService].title}
+                    </button>
+                  </div>
                 </div>
-
-                {includedService === "cleaning" ? (
-                  <div className="mt-6">
-                    <div className="flex flex-wrap gap-2">
-                      {(Object.keys(CLEANING_CHECKLISTS) as CleaningRoomTab[]).map((tab) => {
-                        const active = cleaningTab === tab;
-                        return (
-                          <button
-                            key={tab}
-                            type="button"
-                            onClick={() => setCleaningTab(tab)}
-                            className={`rounded-lg px-3.5 py-2 text-sm font-medium transition ${
-                              active
-                                ? "bg-teal-700 text-white"
-                                : "border border-mist/80 bg-white/80 text-ink hover:border-teal-500/35"
-                            }`}
-                          >
-                            {tab}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <ul className="mt-6 grid gap-3 sm:grid-cols-2">
-                      {CLEANING_CHECKLISTS[cleaningTab].map((item) => (
-                        <li
-                          key={item}
-                          className="flex items-start gap-3 rounded-xl border border-mist/80 bg-white/90 px-4 py-3.5 text-sm leading-relaxed text-ink shadow-sm shadow-teal-900/5"
-                        >
-                          <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-teal-100 text-xs font-bold text-teal-700">
-                            ✓
-                          </span>
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-
-                {includedService === "massage" ? (
-                  <div className="mt-6">
-                    <div className="flex flex-wrap gap-2">
-                      {(Object.keys(MASSAGE_CHECKLISTS) as MassageFocusTab[]).map((tab) => {
-                        const active = massageTab === tab;
-                        return (
-                          <button
-                            key={tab}
-                            type="button"
-                            onClick={() => setMassageTab(tab)}
-                            className={`rounded-lg px-3.5 py-2 text-sm font-medium transition ${
-                              active
-                                ? "bg-teal-700 text-white"
-                                : "border border-mist/80 bg-white/80 text-ink hover:border-teal-500/35"
-                            }`}
-                          >
-                            {tab}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <ul className="mt-6 grid gap-3 sm:grid-cols-2">
-                      {MASSAGE_CHECKLISTS[massageTab].map((item) => (
-                        <li
-                          key={item}
-                          className="flex items-start gap-3 rounded-xl border border-mist/80 bg-white/90 px-4 py-3.5 text-sm leading-relaxed text-ink shadow-sm shadow-teal-900/5"
-                        >
-                          <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-teal-100 text-xs font-bold text-teal-700">
-                            ✓
-                          </span>
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-
-                {includedService === "repair" ? (
-                  <div className="mt-6">
-                    <p className="text-sm font-semibold text-teal-800">Handyman essentials</p>
-                    <ul className="mt-4 grid gap-3 sm:grid-cols-2">
-                      {REPAIR_CHECKLIST.map((item) => (
-                        <li
-                          key={item}
-                          className="flex items-start gap-3 rounded-xl border border-mist/80 bg-white/90 px-4 py-3.5 text-sm leading-relaxed text-ink shadow-sm shadow-teal-900/5"
-                        >
-                          <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-teal-100 text-xs font-bold text-teal-700">
-                            ✓
-                          </span>
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
               </div>
             </section>
 
             <section id="area" className="relative overflow-hidden border-y border-mist py-20 sm:py-24">
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,_#eef1ea_0%,_#f5f3ee_50%,_#e8ebe3_100%)]" />
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,_#e7ddce_0%,_#f7f5f0_50%,_#e7ddce_100%)]" />
               <div className="relative mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
                 <Reveal className="max-w-3xl">
-                  <p className="text-sm font-medium tracking-[0.22em] text-khaki uppercase">
+                  <p className="text-sm font-medium tracking-[0.22em] text-gold uppercase">
                     Coverage
                   </p>
-                  <h2 className="mt-3 font-display text-3xl font-bold tracking-tight sm:text-4xl">
+                  <h2 className="mt-3 font-display text-3xl font-medium tracking-tight sm:text-4xl lg:text-[2.75rem]">
                     Serving Central Algarve
                   </h2>
                   <p className="mt-5 text-lg leading-relaxed text-ink sm:text-xl">
@@ -1030,27 +1176,27 @@ export default function Home() {
             </section>
 
             <section className="relative overflow-hidden py-20 sm:py-24">
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,_#eef1ea_0%,_#f7f5f0_48%,_#e8ebe3_100%)]" />
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,_#e7ddce_0%,_#f7f5f0_48%,_#e7ddce_100%)]" />
               <div className="relative mx-auto max-w-6xl px-5 text-center sm:px-8 lg:px-10">
                 <Reveal>
-                  <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
-                    Ready to book?
+                  <h2 className="font-display text-3xl font-medium tracking-tight sm:text-4xl lg:text-[2.75rem]">
+                    Ready when your home is.
                   </h2>
                   <p className="mx-auto mt-3 max-w-md text-muted sm:text-lg">
-                    Open a service map, check the details, then confirm your order.
+                    Choose a service, review the details, then confirm your booking.
                   </p>
                   <button
                     type="button"
                     onClick={() => openServiceView("cleaning")}
-                    className="mt-8 inline-flex items-center bg-khaki px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-khaki-deep sm:text-base"
+                    className="mt-8 inline-flex items-center bg-olive px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep sm:text-base"
                   >
-                    Start with Cleaning
+                    Book Cleaning
                   </button>
                   <p className="mt-6 text-sm text-muted">
                     Or call us now:{" "}
                     <a
                       href="tel:+351920024478"
-                      className="font-medium text-teal-700 underline-offset-4 hover:underline"
+                      className="font-medium text-olive underline-offset-4 hover:underline"
                     >
                       +351 920 024 478
                     </a>
@@ -1059,48 +1205,18 @@ export default function Home() {
               </div>
             </section>
 
-            <section id="trust" className="relative overflow-hidden border-t border-mist py-20 sm:py-24">
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_#dff5f1_0%,_transparent_50%),linear-gradient(180deg,_#f7f8f4_0%,_#eef1ea_100%)]" />
+            <section id="faq" className="relative overflow-hidden border-t border-mist py-20 sm:py-24">
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_#e7ddce_0%,_transparent_50%),linear-gradient(180deg,_#f7f5f0_0%,_#e7ddce_100%)]" />
               <div className="relative mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
-                <Reveal className="max-w-2xl">
-                  <p className="text-sm font-medium tracking-[0.22em] text-teal-700 uppercase">
-                    Trust
-                  </p>
-                  <h2 className="mt-3 font-display text-3xl font-bold tracking-tight sm:text-4xl">
-                    Our Verified Specialists
-                  </h2>
-                  <p className="mt-3 text-muted sm:text-lg">
-                    Local professionals with proven ratings across Central Algarve.
-                  </p>
-                </Reveal>
-
-                <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                  {SPECIALISTS.map((person, index) => (
-                    <Reveal
-                      key={person.name}
-                      style={{ transitionDelay: `${index * 70}ms` }}
-                      className="rounded-2xl border border-mist/90 bg-white/90 p-6 shadow-sm shadow-teal-900/5"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-teal-100 font-display text-lg font-bold text-teal-700">
-                          {person.name.slice(0, 1)}
-                        </span>
-                        <div>
-                          <p className="font-display text-xl font-bold text-ink">{person.name}</p>
-                          <p className="text-sm font-semibold text-teal-700">{person.rating} rating</p>
-                        </div>
-                      </div>
-                      <p className="mt-4 text-sm leading-relaxed text-muted">{person.detail}</p>
-                    </Reveal>
-                  ))}
-                </div>
-
-                <Reveal className="mt-16 max-w-3xl">
-                  <h2 id="faq" className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+                <Reveal className="max-w-3xl">
+                  <p className="text-sm font-medium tracking-[0.22em] text-gold uppercase">
                     FAQ
+                  </p>
+                  <h2 className="mt-3 font-display text-3xl font-medium tracking-tight sm:text-4xl lg:text-[2.75rem]">
+                    Questions before you book
                   </h2>
                   <p className="mt-3 text-muted sm:text-lg">
-                    Quick answers before you book.
+                    Straightforward answers about service, payment and care standards.
                   </p>
                   <div className="mt-8 divide-y divide-mist overflow-hidden rounded-2xl border border-mist bg-white/90">
                     {FAQ_ITEMS.map((item, index) => {
@@ -1111,11 +1227,11 @@ export default function Home() {
                             type="button"
                             aria-expanded={open}
                             onClick={() => setOpenFaq(open ? null : index)}
-                            className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-teal-50/50 sm:px-6"
+                            className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-sand/50 sm:px-6"
                           >
                             <span className="font-medium text-ink sm:text-lg">{item.question}</span>
                             <span
-                              className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-100 text-teal-700 transition ${
+                              className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sand text-olive transition ${
                                 open ? "rotate-45" : ""
                               }`}
                               aria-hidden="true"
@@ -1139,16 +1255,16 @@ export default function Home() {
         )}
       </main>
 
-      <footer className="border-t border-mist bg-teal-900 py-12 text-teal-50/75">
+      <footer className="border-t border-mist bg-olive-deep py-12 text-paper/75">
         <div className="mx-auto grid max-w-6xl gap-10 px-5 sm:grid-cols-3 sm:px-8 lg:px-10">
           <div>
-            <p className="font-display text-xl font-bold tracking-[0.12em] text-white">
+            <p className="font-display text-2xl font-medium tracking-[0.16em] text-white">
               HAVENLY
             </p>
-            <p className="mt-2 text-sm tracking-[0.08em] text-teal-100/80">
+            <p className="mt-2 text-sm tracking-[0.08em] text-sand/80">
               Home • Comfort • Trust
             </p>
-            <p className="mt-4 text-sm text-teal-100/60">© 2026 HAVENLY · Central Algarve</p>
+            <p className="mt-4 text-sm text-sand/60">© 2026 HAVENLY · Central Algarve</p>
           </div>
 
           <div>
@@ -1199,12 +1315,12 @@ export default function Home() {
             <p className="text-sm font-semibold tracking-[0.14em] text-white uppercase">
               Coverage Area
             </p>
-            <p className="mt-4 text-sm leading-relaxed text-teal-50/80">
+            <p className="mt-4 text-sm leading-relaxed text-sand/80">
               Faro, Loulé, Quarteira, Vilamoura, Almancil, Albufeira
             </p>
             <a
               href="tel:+351920024478"
-              className="mt-5 inline-flex text-lg font-semibold text-white transition hover:text-teal-100"
+              className="mt-5 inline-flex text-lg font-semibold text-white transition hover:text-sand"
             >
               +351 920 024 478
             </a>
@@ -1216,8 +1332,12 @@ export default function Home() {
         open={modalOpen}
         service={service}
         onServiceChange={setService}
-        onClose={() => setModalOpen(false)}
+        onClose={() => {
+          setModalOpen(false);
+          setMassageStyle("");
+        }}
         lockService={lockService}
+        massageStyle={massageStyle}
       />
     </div>
   );

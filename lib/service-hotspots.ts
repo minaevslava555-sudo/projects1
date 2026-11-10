@@ -11,19 +11,21 @@ export type HotspotSpot = {
 export type HotspotScene = {
   id: string;
   label: string;
-  image?: string;
-  kind?: "image" | "svg-body";
+  image: string;
   spots: HotspotSpot[];
 };
 
+export type HotspotService = Exclude<ServiceValue, "massage">;
+
 export type ServiceHotspotPack = {
-  service: ServiceValue;
+  service: HotspotService;
   title: string;
   subtitle: string;
   scenes: HotspotScene[];
 };
 
-export const SERVICE_HOTSPOTS: Record<ServiceValue, ServiceHotspotPack> = {
+/** Hotspot room tours — Cleaning & Home Repairs only. Massage uses the catalog UI. */
+export const SERVICE_HOTSPOTS: Record<HotspotService, ServiceHotspotPack> = {
   cleaning: {
     service: "cleaning",
     title: "Cleaning",
@@ -254,55 +256,6 @@ export const SERVICE_HOTSPOTS: Record<ServiceValue, ServiceHotspotPack> = {
             y: 52,
             title: "Handles & locks",
             text: "Handle and lock fixes for everyday doors around the home.",
-          },
-        ],
-      },
-    ],
-  },
-  massage: {
-    service: "massage",
-    title: "Massage",
-    subtitle: "Tap a body zone to see where we focus during your session.",
-    scenes: [
-      {
-        id: "body",
-        label: "Body map",
-        kind: "svg-body",
-        spots: [
-          {
-            id: "face",
-            x: 50,
-            y: 10,
-            title: "Face",
-            text: "Gentle facial massage to release tension and refresh circulation.",
-          },
-          {
-            id: "shoulders",
-            x: 50,
-            y: 24,
-            title: "Shoulders & neck",
-            text: "Focused work on neck and shoulders after long desk days.",
-          },
-          {
-            id: "back",
-            x: 50,
-            y: 42,
-            title: "Back",
-            text: "Full-back massage for posture relief and deep relaxation.",
-          },
-          {
-            id: "legs",
-            x: 50,
-            y: 68,
-            title: "Legs",
-            text: "Leg massage to ease tightness after sport or long walks.",
-          },
-          {
-            id: "feet",
-            x: 50,
-            y: 90,
-            title: "Feet",
-            text: "A calming foot massage to finish the session with comfort.",
           },
         ],
       },

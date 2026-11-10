@@ -56,7 +56,9 @@ body {
   font-family: system-ui, sans-serif;
 }
 
-a {
+/* Ссылки агента/админки — не трогаем лендинг HAVENLY */
+.admin a,
+.chat a {
   color: var(--link);
 }
 
@@ -108,7 +110,9 @@ input {
   align-items: center;
 }
 
-button {
+/* Кнопки агента/админки — unlayered, иначе перебивают Tailwind bg-* на лендинге */
+.admin button,
+.chat button {
   width: fit-content;
   padding: 0.65rem 1rem;
   border: 0;
@@ -118,7 +122,8 @@ button {
   cursor: pointer;
 }
 
-button:disabled {
+.admin button:disabled,
+.chat button:disabled {
   opacity: 0.6;
   cursor: default;
 }
