@@ -2,6 +2,8 @@
 
 import "./havenly.css";
 
+import ServiceDetailView from "@/components/service-detail-view";
+import type { ServiceValue } from "@/lib/service-hotspots";
 import {
   FormEvent,
   useEffect,
@@ -13,7 +15,6 @@ import {
   type ReactNode,
 } from "react";
 
-type ServiceValue = "cleaning" | "repair" | "massage";
 type MassageMinutes = 60 | 90 | 120;
 
 const SERVICE_META: Record<
@@ -150,11 +151,13 @@ function OrderModal({
   service,
   onServiceChange,
   onClose,
+  lockService = false,
 }: {
   open: boolean;
   service: ServiceValue;
   onServiceChange: (service: ServiceValue) => void;
   onClose: () => void;
+  lockService?: boolean;
 }) {
   const titleId = useId();
   const [hours, setHours] = useState(2);
@@ -307,22 +310,24 @@ function OrderModal({
         </div>
 
         <form className="space-y-6 px-5 py-5 sm:px-6 sm:py-6" noValidate onSubmit={onSubmit}>
-          <div className="grid grid-cols-3 gap-2">
-            {(Object.keys(SERVICE_META) as ServiceValue[]).map((value) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => onServiceChange(value)}
-                className={`px-2 py-2.5 text-xs font-semibold transition sm:text-sm ${
-                  service === value
-                    ? "bg-ink text-white"
-                    : "border border-mist bg-white text-ink hover:border-khaki"
-                }`}
-              >
-                {SERVICE_META[value].title}
-              </button>
-            ))}
-          </div>
+          {!lockService ? (
+            <div className="grid grid-cols-3 gap-2">
+              {(Object.keys(SERVICE_META) as ServiceValue[]).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => onServiceChange(value)}
+                  className={`px-2 py-2.5 text-xs font-semibold transition sm:text-sm ${
+                    service === value
+                      ? "bg-ink text-white"
+                      : "border border-mist bg-white text-ink hover:border-khaki"
+                  }`}
+                >
+                  {SERVICE_META[value].title}
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           <div className="border border-mist bg-white px-5 py-6 text-center">
             <p className="text-xs font-medium tracking-[0.18em] text-muted uppercase">Total</p>
@@ -484,22 +489,36 @@ function OrderModal({
 export default function Home() {
   const [modalOpen, setModalOpen] = useState(false);
   const [service, setService] = useState<ServiceValue>("cleaning");
+  const [activeServiceView, setActiveServiceView] = useState<ServiceValue | null>(null);
+  const [lockService, setLockService] = useState(false);
 
-  function openOrder(value: ServiceValue) {
+  function openServiceView(value: ServiceValue) {
     setService(value);
+    setActiveServiceView(value);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function openOrder(value: ServiceValue, locked = false) {
+    setService(value);
+    setLockService(locked);
     setModalOpen(true);
   }
 
   return (
     <div className="min-h-svh bg-paper font-sans text-ink antialiased">
-      <header className="absolute inset-x-0 top-0 z-20">
+      <header
+        className={`${
+          activeServiceView ? "relative border-b border-mist bg-ink" : "absolute inset-x-0 top-0"
+        } z-20`}
+      >
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8 lg:px-10">
-          <a
-            href="#top"
+          <button
+            type="button"
+            onClick={() => setActiveServiceView(null)}
             className="font-display text-xl font-bold tracking-[0.12em] text-white sm:text-2xl"
           >
             HAVENLY
-          </a>
+          </button>
           <a
             href="tel:+351920024478"
             className="text-sm font-medium text-white/90 transition hover:text-white sm:text-base"
@@ -510,251 +529,261 @@ export default function Home() {
       </header>
 
       <main id="top">
-        <section className="relative min-h-[100svh] overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=2000&q=80"
-            alt="Bright, calm living room with soft natural light"
-            className="animate-hero-media absolute inset-0 h-full w-full object-cover"
+        {activeServiceView ? (
+          <ServiceDetailView
+            service={activeServiceView}
+            onBack={() => setActiveServiceView(null)}
+            onBook={() => openOrder(activeServiceView, true)}
           />
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/85 via-ink/50 to-ink/25" />
-          <div className="relative z-10 mx-auto flex min-h-[100svh] max-w-6xl flex-col justify-end px-5 pb-16 pt-28 sm:px-8 sm:pb-20 lg:px-10 lg:pb-24">
-            <p className="animate-rise font-display text-4xl font-bold tracking-[0.14em] text-white sm:text-5xl md:text-6xl">
-              HAVENLY
-            </p>
-            <p className="animate-rise-delay mt-3 text-xs font-medium tracking-[0.28em] text-white/80 uppercase sm:text-sm">
-              Home · Comfort · Trust
-            </p>
-            <p className="animate-rise-delay mt-2 text-base text-white/85 sm:text-lg">
-              Your home, taken care of.
-            </p>
-            <h1 className="animate-rise-late mt-8 max-w-3xl font-display text-4xl font-bold leading-[1.05] tracking-tight text-white sm:text-5xl md:text-6xl lg:text-7xl">
-              Your Home. Our Care.
-            </h1>
-            <p className="animate-rise-late mt-5 max-w-xl text-base leading-relaxed text-white/85 sm:text-lg">
-              Everything your home needs, in one place. Professional cleaning, home
-              repairs and wellness services — delivered by trusted local
-              professionals across the Algarve.
-            </p>
-            <div className="animate-rise-late mt-8">
-              <button
-                type="button"
-                onClick={() => openOrder("cleaning")}
-                className="inline-flex items-center bg-khaki px-6 py-3.5 text-sm font-semibold text-white transition duration-300 hover:bg-khaki-deep sm:text-base"
-              >
-                Book a Service
-              </button>
-            </div>
-          </div>
-        </section>
+        ) : (
+          <>
+            <section className="relative min-h-[100svh] overflow-hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=2000&q=80"
+                alt="Bright, calm living room with soft natural light"
+                className="animate-hero-media absolute inset-0 h-full w-full object-cover"
+              />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/85 via-ink/50 to-ink/25" />
+              <div className="relative z-10 mx-auto flex min-h-[100svh] max-w-6xl flex-col justify-end px-5 pb-16 pt-28 sm:px-8 sm:pb-20 lg:px-10 lg:pb-24">
+                <p className="animate-rise font-display text-4xl font-bold tracking-[0.14em] text-white sm:text-5xl md:text-6xl">
+                  HAVENLY
+                </p>
+                <p className="animate-rise-delay mt-3 text-xs font-medium tracking-[0.28em] text-white/80 uppercase sm:text-sm">
+                  Home · Comfort · Trust
+                </p>
+                <p className="animate-rise-delay mt-2 text-base text-white/85 sm:text-lg">
+                  Your home, taken care of.
+                </p>
+                <h1 className="animate-rise-late mt-8 max-w-3xl font-display text-4xl font-bold leading-[1.05] tracking-tight text-white sm:text-5xl md:text-6xl lg:text-7xl">
+                  Your Home. Our Care.
+                </h1>
+                <p className="animate-rise-late mt-5 max-w-xl text-base leading-relaxed text-white/85 sm:text-lg">
+                  Everything your home needs, in one place. Professional cleaning, home
+                  repairs and wellness services — delivered by trusted local
+                  professionals across the Algarve.
+                </p>
+                <div className="animate-rise-late mt-8">
+                  <button
+                    type="button"
+                    onClick={() => openServiceView("cleaning")}
+                    className="inline-flex items-center bg-khaki px-6 py-3.5 text-sm font-semibold text-white transition duration-300 hover:bg-khaki-deep sm:text-base"
+                  >
+                    Explore Cleaning
+                  </button>
+                </div>
+              </div>
+            </section>
 
-        <section className="relative overflow-hidden border-b border-mist py-16 sm:py-20">
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,_#f4f5f1_0%,_#eef0ea_100%)]" />
-          <div className="relative mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
-            <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
-              <Reveal>
-                <h2 className="font-display text-lg font-bold text-khaki sm:text-xl">
-                  Verified Professionals
-                </h2>
-                <p className="mt-2 text-sm leading-relaxed text-ink sm:text-base">
-                  Carefully checked specialists you can trust in your home.
-                </p>
-              </Reveal>
-              <Reveal style={{ transitionDelay: "60ms" }}>
-                <h2 className="font-display text-lg font-bold text-khaki sm:text-xl">
-                  English-speaking Support
-                </h2>
-                <p className="mt-2 text-sm leading-relaxed text-ink sm:text-base">
-                  Clear communication from first message to finished job.
-                </p>
-              </Reveal>
-              <Reveal style={{ transitionDelay: "120ms" }}>
-                <h2 className="font-display text-lg font-bold text-khaki sm:text-xl">
-                  Transparent Pricing
-                </h2>
-                <p className="mt-2 text-sm leading-relaxed text-ink sm:text-base">
-                  Straightforward rates with no hidden extras.
-                </p>
-              </Reveal>
-              <Reveal style={{ transitionDelay: "180ms" }}>
-                <h2 className="font-display text-lg font-bold text-khaki sm:text-xl">
-                  Secure Booking
-                </h2>
-                <p className="mt-2 text-sm leading-relaxed text-ink sm:text-base">
-                  Simple requests and reliable confirmation every time.
-                </p>
-              </Reveal>
-            </div>
-          </div>
-        </section>
-
-        <section id="services" className="relative overflow-hidden py-20 sm:py-24">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_#e4e8dc_0%,_transparent_55%),linear-gradient(180deg,_#f4f5f1_0%,_#eef1ea_100%)]" />
-          <div className="relative mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
-            <Reveal className="max-w-xl">
-              <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
-                Services for everyday life
-              </h2>
-              <p className="mt-3 text-muted sm:text-lg">
-                Choose what you need today — we match you with a local professional.
-              </p>
-            </Reveal>
-
-            <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-7">
-              <Reveal className="group flex flex-col overflow-hidden border border-mist bg-white/75 backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:border-khaki/35">
-                <article className="flex h-full flex-col">
-                  <div className="aspect-[4/3] overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src="/images/service-cleaning.jpg"
-                      alt="Professional cleaner in a bright living room"
-                      className="h-full w-full object-cover object-center transition duration-700 group-hover:scale-105"
-                    />
-                  </div>
-                  <div className="flex flex-1 flex-col p-6 sm:p-7">
-                    <h3 className="font-display text-xl font-bold text-khaki sm:text-2xl">
-                      Cleaning
-                    </h3>
-                    <p className="mt-3 flex-1 text-sm leading-relaxed text-ink sm:text-base">
-                      Full home or apartment cleaning — kitchens, bathrooms, dusting
-                      and order, handled with care.
+            <section className="relative overflow-hidden border-b border-mist py-16 sm:py-20">
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,_#f4f5f1_0%,_#eef0ea_100%)]" />
+              <div className="relative mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
+                <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
+                  <Reveal>
+                    <h2 className="font-display text-lg font-bold text-khaki sm:text-xl">
+                      Verified Professionals
+                    </h2>
+                    <p className="mt-2 text-sm leading-relaxed text-ink sm:text-base">
+                      Carefully checked specialists you can trust in your home.
                     </p>
-                    <p className="mt-6 font-display text-2xl font-bold text-ink">
-                      {SERVICE_META.cleaning.cardPrice}
+                  </Reveal>
+                  <Reveal style={{ transitionDelay: "60ms" }}>
+                    <h2 className="font-display text-lg font-bold text-khaki sm:text-xl">
+                      English-speaking Support
+                    </h2>
+                    <p className="mt-2 text-sm leading-relaxed text-ink sm:text-base">
+                      Clear communication from first message to finished job.
                     </p>
-                    <button
-                      type="button"
-                      className="mt-5 inline-flex w-full items-center justify-center bg-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-khaki-deep"
-                      onClick={() => openOrder("cleaning")}
+                  </Reveal>
+                  <Reveal style={{ transitionDelay: "120ms" }}>
+                    <h2 className="font-display text-lg font-bold text-khaki sm:text-xl">
+                      Transparent Pricing
+                    </h2>
+                    <p className="mt-2 text-sm leading-relaxed text-ink sm:text-base">
+                      Straightforward rates with no hidden extras.
+                    </p>
+                  </Reveal>
+                  <Reveal style={{ transitionDelay: "180ms" }}>
+                    <h2 className="font-display text-lg font-bold text-khaki sm:text-xl">
+                      Secure Booking
+                    </h2>
+                    <p className="mt-2 text-sm leading-relaxed text-ink sm:text-base">
+                      Simple requests and reliable confirmation every time.
+                    </p>
+                  </Reveal>
+                </div>
+              </div>
+            </section>
+
+            <section id="services" className="relative overflow-hidden py-20 sm:py-24">
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_#e4e8dc_0%,_transparent_55%),linear-gradient(180deg,_#f4f5f1_0%,_#eef1ea_100%)]" />
+              <div className="relative mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
+                <Reveal className="max-w-xl">
+                  <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+                    Services for everyday life
+                  </h2>
+                  <p className="mt-3 text-muted sm:text-lg">
+                    Choose a service to explore rooms, repair zones or massage areas.
+                  </p>
+                </Reveal>
+
+                <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-7">
+                  <Reveal className="group flex flex-col overflow-hidden border border-mist bg-white/75 backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:border-khaki/35">
+                    <article className="flex h-full flex-col">
+                      <div className="aspect-[4/3] overflow-hidden">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src="/images/service-cleaning.jpg"
+                          alt="Professional cleaner in a bright living room"
+                          className="h-full w-full object-cover object-center transition duration-700 group-hover:scale-105"
+                        />
+                      </div>
+                      <div className="flex flex-1 flex-col p-6 sm:p-7">
+                        <h3 className="font-display text-xl font-bold text-khaki sm:text-2xl">
+                          Cleaning
+                        </h3>
+                        <p className="mt-3 flex-1 text-sm leading-relaxed text-ink sm:text-base">
+                          Interactive room map with markers for kitchen, bathroom, bedroom
+                          and hallway cleaning.
+                        </p>
+                        <p className="mt-6 font-display text-2xl font-bold text-ink">
+                          {SERVICE_META.cleaning.cardPrice}
+                        </p>
+                        <button
+                          type="button"
+                          className="mt-5 inline-flex w-full items-center justify-center bg-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-khaki-deep"
+                          onClick={() => openServiceView("cleaning")}
+                        >
+                          Choose
+                        </button>
+                      </div>
+                    </article>
+                  </Reveal>
+
+                  <Reveal
+                    className="group flex flex-col overflow-hidden border border-mist bg-white/75 backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:border-khaki/35"
+                    style={{ transitionDelay: "80ms" }}
+                  >
+                    <article className="flex h-full flex-col">
+                      <div className="aspect-[4/3] overflow-hidden">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src="/images/service-repair.jpg"
+                          alt="Handyman in workwear installing a shelf at home"
+                          className="h-full w-full object-cover object-center transition duration-700 group-hover:scale-105"
+                        />
+                      </div>
+                      <div className="flex flex-1 flex-col p-6 sm:p-7">
+                        <h3 className="font-display text-xl font-bold text-khaki sm:text-2xl">
+                          Home Repairs
+                        </h3>
+                        <p className="mt-3 flex-1 text-sm leading-relaxed text-ink sm:text-base">
+                          See furniture, plumbing, electrics and door fixes on interactive
+                          markers.
+                        </p>
+                        <p className="mt-6 font-display text-2xl font-bold text-ink">
+                          {SERVICE_META.repair.cardPrice}
+                        </p>
+                        <button
+                          type="button"
+                          className="mt-5 inline-flex w-full items-center justify-center bg-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-khaki-deep"
+                          onClick={() => openServiceView("repair")}
+                        >
+                          Choose
+                        </button>
+                      </div>
+                    </article>
+                  </Reveal>
+
+                  <Reveal
+                    className="group flex flex-col overflow-hidden border border-mist bg-white/75 backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:border-khaki/35 sm:col-span-2 sm:mx-auto sm:max-w-md lg:col-span-1 lg:mx-0 lg:max-w-none"
+                    style={{ transitionDelay: "160ms" }}
+                  >
+                    <article className="flex h-full flex-col">
+                      <div className="aspect-[4/3] overflow-hidden">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src="/images/service-massage.jpg"
+                          alt="Relaxing warm-toned massage with one client"
+                          className="h-full w-full object-cover object-center transition duration-700 group-hover:scale-105"
+                        />
+                      </div>
+                      <div className="flex flex-1 flex-col p-6 sm:p-7">
+                        <h3 className="font-display text-xl font-bold text-khaki sm:text-2xl">
+                          Massage
+                        </h3>
+                        <p className="mt-3 flex-1 text-sm leading-relaxed text-ink sm:text-base">
+                          Body map with markers for face, back, legs and feet massage
+                          zones.
+                        </p>
+                        <p className="mt-6 font-display text-2xl font-bold text-ink">
+                          {SERVICE_META.massage.cardPrice}
+                        </p>
+                        <button
+                          type="button"
+                          className="mt-5 inline-flex w-full items-center justify-center bg-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-khaki-deep"
+                          onClick={() => openServiceView("massage")}
+                        >
+                          Choose
+                        </button>
+                      </div>
+                    </article>
+                  </Reveal>
+                </div>
+              </div>
+            </section>
+
+            <section id="area" className="relative overflow-hidden border-y border-mist py-20 sm:py-24">
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,_#eef1ea_0%,_#f5f3ee_50%,_#e8ebe3_100%)]" />
+              <div className="relative mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
+                <Reveal className="max-w-3xl">
+                  <p className="text-sm font-medium tracking-[0.22em] text-khaki uppercase">
+                    Coverage
+                  </p>
+                  <h2 className="mt-3 font-display text-3xl font-bold tracking-tight sm:text-4xl">
+                    Serving Central Algarve
+                  </h2>
+                  <p className="mt-5 text-lg leading-relaxed text-ink sm:text-xl">
+                    Faro · Loulé · Quarteira · Vilamoura · Almancil · Albufeira
+                  </p>
+                  <p className="mt-4 max-w-xl text-muted">
+                    Phase one of our service area — more locations coming soon.
+                  </p>
+                </Reveal>
+              </div>
+            </section>
+
+            <section className="relative overflow-hidden py-20 sm:py-24">
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,_#eef1ea_0%,_#f7f5f0_48%,_#e8ebe3_100%)]" />
+              <div className="relative mx-auto max-w-6xl px-5 text-center sm:px-8 lg:px-10">
+                <Reveal>
+                  <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+                    Ready to book?
+                  </h2>
+                  <p className="mx-auto mt-3 max-w-md text-muted sm:text-lg">
+                    Open a service map, check the details, then confirm your order.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => openServiceView("cleaning")}
+                    className="mt-8 inline-flex items-center bg-khaki px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-khaki-deep sm:text-base"
+                  >
+                    Start with Cleaning
+                  </button>
+                  <p className="mt-6 text-sm text-muted">
+                    Or call us now:{" "}
+                    <a
+                      href="tel:+351920024478"
+                      className="font-medium text-khaki underline-offset-4 hover:underline"
                     >
-                      Choose
-                    </button>
-                  </div>
-                </article>
-              </Reveal>
-
-              <Reveal
-                className="group flex flex-col overflow-hidden border border-mist bg-white/75 backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:border-khaki/35"
-                style={{ transitionDelay: "80ms" }}
-              >
-                <article className="flex h-full flex-col">
-                  <div className="aspect-[4/3] overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src="/images/service-repair.jpg"
-                      alt="Handyman in workwear installing a shelf at home"
-                      className="h-full w-full object-cover object-center transition duration-700 group-hover:scale-105"
-                    />
-                  </div>
-                  <div className="flex flex-1 flex-col p-6 sm:p-7">
-                    <h3 className="font-display text-xl font-bold text-khaki sm:text-2xl">
-                      Home Repairs
-                    </h3>
-                    <p className="mt-3 flex-1 text-sm leading-relaxed text-ink sm:text-base">
-                      Furniture assembly, shelves, taps and everyday fixes — without
-                      the long wait.
-                    </p>
-                    <p className="mt-6 font-display text-2xl font-bold text-ink">
-                      {SERVICE_META.repair.cardPrice}
-                    </p>
-                    <button
-                      type="button"
-                      className="mt-5 inline-flex w-full items-center justify-center bg-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-khaki-deep"
-                      onClick={() => openOrder("repair")}
-                    >
-                      Choose
-                    </button>
-                  </div>
-                </article>
-              </Reveal>
-
-              <Reveal
-                className="group flex flex-col overflow-hidden border border-mist bg-white/75 backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:border-khaki/35 sm:col-span-2 sm:mx-auto sm:max-w-md lg:col-span-1 lg:mx-0 lg:max-w-none"
-                style={{ transitionDelay: "160ms" }}
-              >
-                <article className="flex h-full flex-col">
-                  <div className="aspect-[4/3] overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src="/images/service-massage.jpg"
-                      alt="Relaxing warm-toned massage with one client"
-                      className="h-full w-full object-cover object-center transition duration-700 group-hover:scale-105"
-                    />
-                  </div>
-                  <div className="flex flex-1 flex-col p-6 sm:p-7">
-                    <h3 className="font-display text-xl font-bold text-khaki sm:text-2xl">
-                      Massage
-                    </h3>
-                    <p className="mt-3 flex-1 text-sm leading-relaxed text-ink sm:text-base">
-                      Relaxing or therapeutic massage at home — booked around your
-                      schedule.
-                    </p>
-                    <p className="mt-6 font-display text-2xl font-bold text-ink">
-                      {SERVICE_META.massage.cardPrice}
-                    </p>
-                    <button
-                      type="button"
-                      className="mt-5 inline-flex w-full items-center justify-center bg-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-khaki-deep"
-                      onClick={() => openOrder("massage")}
-                    >
-                      Choose
-                    </button>
-                  </div>
-                </article>
-              </Reveal>
-            </div>
-          </div>
-        </section>
-
-        <section id="area" className="relative overflow-hidden border-y border-mist py-20 sm:py-24">
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,_#eef1ea_0%,_#f5f3ee_50%,_#e8ebe3_100%)]" />
-          <div className="relative mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
-            <Reveal className="max-w-3xl">
-              <p className="text-sm font-medium tracking-[0.22em] text-khaki uppercase">
-                Coverage
-              </p>
-              <h2 className="mt-3 font-display text-3xl font-bold tracking-tight sm:text-4xl">
-                Serving Central Algarve
-              </h2>
-              <p className="mt-5 text-lg leading-relaxed text-ink sm:text-xl">
-                Faro · Loulé · Quarteira · Vilamoura · Almancil · Albufeira
-              </p>
-              <p className="mt-4 max-w-xl text-muted">
-                Phase one of our service area — more locations coming soon.
-              </p>
-            </Reveal>
-          </div>
-        </section>
-
-        <section className="relative overflow-hidden py-20 sm:py-24">
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,_#eef1ea_0%,_#f7f5f0_48%,_#e8ebe3_100%)]" />
-          <div className="relative mx-auto max-w-6xl px-5 text-center sm:px-8 lg:px-10">
-            <Reveal>
-              <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
-                Ready to book?
-              </h2>
-              <p className="mx-auto mt-3 max-w-md text-muted sm:text-lg">
-                Open the calculator, pick a service and confirm your order in a minute.
-              </p>
-              <button
-                type="button"
-                onClick={() => openOrder("cleaning")}
-                className="mt-8 inline-flex items-center bg-khaki px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-khaki-deep sm:text-base"
-              >
-                Open booking calculator
-              </button>
-              <p className="mt-6 text-sm text-muted">
-                Or call us now:{" "}
-                <a
-                  href="tel:+351920024478"
-                  className="font-medium text-khaki underline-offset-4 hover:underline"
-                >
-                  +351 920 024 478
-                </a>
-              </p>
-            </Reveal>
-          </div>
-        </section>
+                      +351 920 024 478
+                    </a>
+                  </p>
+                </Reveal>
+              </div>
+            </section>
+          </>
+        )}
       </main>
 
       <footer className="border-t border-mist bg-ink py-8 text-white/70">
@@ -776,6 +805,7 @@ export default function Home() {
         service={service}
         onServiceChange={setService}
         onClose={() => setModalOpen(false)}
+        lockService={lockService}
       />
     </div>
   );

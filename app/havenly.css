@@ -90,4 +90,192 @@
     transform: none;
     transition: none;
   }
+
+  .hotspot-marker-pulse {
+    animation: none;
+  }
+}
+
+.hotspot-gallery {
+  display: grid;
+  gap: 1rem;
+}
+
+.hotspot-scene-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.hotspot-scene-tab {
+  border: 1px solid var(--color-mist);
+  background: #fff;
+  color: var(--color-ink);
+  padding: 0.55rem 0.9rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.hotspot-scene-tab.is-active {
+  background: var(--color-ink);
+  border-color: var(--color-ink);
+  color: #fff;
+}
+
+.hotspot-stage {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--color-mist);
+  background: #fff;
+  min-height: 20rem;
+}
+
+.hotspot-stage-body {
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at top, #eef1ea 0%, transparent 55%),
+    linear-gradient(180deg, #f7f5f0 0%, #eef1ea 100%);
+  min-height: 28rem;
+  padding: 1.5rem 1rem 5.5rem;
+}
+
+.hotspot-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+}
+
+.hotspot-body-wrap {
+  width: min(16rem, 70%);
+  pointer-events: none;
+}
+
+.hotspot-marker {
+  position: absolute;
+  z-index: 2;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+}
+
+.hotspot-marker-core {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  margin: 0.35rem auto 0;
+  border-radius: 999px;
+  background: var(--color-khaki);
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
+}
+
+.hotspot-marker-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-khaki) 45%, transparent);
+  animation: hotspot-pulse 1.8s ease-out infinite;
+}
+
+.hotspot-marker.is-active .hotspot-marker-core {
+  background: var(--color-khaki-deep);
+  transform: scale(1.08);
+}
+
+.hotspot-popup {
+  position: absolute;
+  z-index: 3;
+  left: 1rem;
+  right: 1rem;
+  bottom: 1rem;
+  max-width: 22rem;
+  border: 1px solid var(--color-mist);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+  padding: 0.95rem 1rem;
+  box-shadow: 0 12px 30px rgba(26, 31, 28, 0.12);
+}
+
+@media (min-width: 640px) {
+  .hotspot-popup {
+    left: auto;
+    right: 1.25rem;
+    bottom: 1.25rem;
+  }
+}
+
+.hotspot-popup-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.hotspot-popup-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.hotspot-popup-close {
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid var(--color-mist);
+  background: #fff;
+  color: var(--color-ink);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.hotspot-popup-text {
+  margin: 0.55rem 0 0;
+  color: var(--color-muted);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.hotspot-hint {
+  position: absolute;
+  left: 1rem;
+  bottom: 1rem;
+  margin: 0;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--color-mist);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--color-muted);
+  font-size: 0.8rem;
+}
+
+@keyframes hotspot-pulse {
+  0% {
+    transform: scale(0.55);
+    opacity: 0.7;
+  }
+  70% {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.25);
+    opacity: 0;
+  }
 }
