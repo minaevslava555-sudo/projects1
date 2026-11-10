@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useState, type CSSProperties } from "react";
 import type { HotspotScene, HotspotSpot } from "@/lib/service-hotspots";
 
 function BodySilhouette() {
@@ -10,11 +10,11 @@ function BodySilhouette() {
       className="hotspot-body-svg mx-auto h-full w-auto max-h-[34rem]"
       aria-hidden="true"
     >
-      <ellipse cx="100" cy="42" rx="28" ry="34" fill="currentColor" opacity="0.18" />
+      <ellipse cx="100" cy="42" rx="28" ry="34" fill="currentColor" opacity="0.16" />
       <path
         d="M72 78 C72 70 128 70 128 78 L138 150 C142 175 136 190 128 205 L122 250 L130 340 L118 400 L100 400 L82 400 L70 340 L78 250 L72 205 C64 190 58 175 62 150 Z"
         fill="currentColor"
-        opacity="0.14"
+        opacity="0.12"
       />
       <path
         d="M62 120 C40 135 34 165 42 190 L58 200"
@@ -22,7 +22,7 @@ function BodySilhouette() {
         stroke="currentColor"
         strokeWidth="18"
         strokeLinecap="round"
-        opacity="0.14"
+        opacity="0.12"
       />
       <path
         d="M138 120 C160 135 166 165 158 190 L142 200"
@@ -30,7 +30,7 @@ function BodySilhouette() {
         stroke="currentColor"
         strokeWidth="18"
         strokeLinecap="round"
-        opacity="0.14"
+        opacity="0.12"
       />
     </svg>
   );
@@ -56,13 +56,25 @@ function SpotMarker({
         event.stopPropagation();
         onSelect(spot);
       }}
+      onMouseEnter={() => onSelect(spot)}
     >
-      <span className="hotspot-marker-pulse" aria-hidden="true" />
+      <span className="hotspot-marker-ping" aria-hidden="true" />
       <span className="hotspot-marker-core" aria-hidden="true">
         +
       </span>
     </button>
   );
+}
+
+function popupStyle(spot: HotspotSpot): CSSProperties {
+  const preferLeft = spot.x > 58;
+  const preferTop = spot.y > 62;
+  return {
+    left: preferLeft ? "auto" : `min(calc(${spot.x}% + 1.1rem), calc(100% - 17.5rem))`,
+    right: preferLeft ? `min(calc(${100 - spot.x}% + 1.1rem), calc(100% - 17.5rem))` : "auto",
+    top: preferTop ? "auto" : `min(calc(${spot.y}% + 1.15rem), calc(100% - 8rem))`,
+    bottom: preferTop ? `min(calc(${100 - spot.y}% + 1.15rem), calc(100% - 8rem))` : "auto",
+  };
 }
 
 export default function HotspotGallery({ scenes }: { scenes: HotspotScene[] }) {
@@ -120,7 +132,12 @@ export default function HotspotGallery({ scenes }: { scenes: HotspotScene[] }) {
           </div>
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={scene.image} alt={scene.label} className="hotspot-image" />
+          <img
+            src={scene.image}
+            alt={scene.label}
+            className="hotspot-image"
+            loading="lazy"
+          />
         )}
 
         {scene.spots.map((spot) => (
@@ -128,9 +145,7 @@ export default function HotspotGallery({ scenes }: { scenes: HotspotScene[] }) {
             key={spot.id}
             spot={spot}
             active={activeSpotId === spot.id}
-            onSelect={(next) =>
-              setActiveSpotId((current) => (current === next.id ? null : next.id))
-            }
+            onSelect={(next) => setActiveSpotId(next.id)}
           />
         ))}
 
@@ -140,6 +155,7 @@ export default function HotspotGallery({ scenes }: { scenes: HotspotScene[] }) {
             className="hotspot-popup"
             role="dialog"
             aria-label={activeSpot.title}
+            style={popupStyle(activeSpot)}
             onClick={(event) => event.stopPropagation()}
           >
             <div className="hotspot-popup-head">
@@ -156,7 +172,7 @@ export default function HotspotGallery({ scenes }: { scenes: HotspotScene[] }) {
             <p className="hotspot-popup-text">{activeSpot.text}</p>
           </div>
         ) : (
-          <p className="hotspot-hint">Tap a pulsing marker to learn more</p>
+          <p className="hotspot-hint">Hover or tap + to explore</p>
         )}
       </div>
     </div>
