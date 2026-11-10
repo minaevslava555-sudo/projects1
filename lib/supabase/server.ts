@@ -12,6 +12,11 @@ function jwtRole(token: string): string | null {
   }
 }
 
+function looksLikeJwt(token: string): boolean {
+  const parts = token.split(".");
+  return parts.length === 3 && parts.every((part) => part.length > 0);
+}
+
 export function supabaseEnv() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
@@ -19,7 +24,11 @@ export function supabaseEnv() {
   return { url, serviceKey };
 }
 
-/** Проверка, что service key реально service_role (без вывода секрета). */
+/**
+ * Локальная проверка формата серверного ключа (без вывода секрета).
+ * Поддерживает legacy JWT service_role и новый sb_secret_...
+ * Подлинность ключа подтверждает только ответ Supabase при запросе.
+ */
 export function assertSupabaseServiceKey() {
   const env = supabaseEnv();
   if (!env) {
@@ -37,15 +46,39 @@ export function assertSupabaseServiceKey() {
     throw new Error("Некорректный NEXT_PUBLIC_SUPABASE_URL");
   }
 
-  const role = jwtRole(env.serviceKey);
-  if (role && role !== "service_role") {
+  const key = env.serviceKey;
+
+  if (key.startsWith("sb_publishable_")) {
     throw new Error(
-      "SUPABASE_SERVICE_ROLE_KEY должен быть ключом service_role. Обновите переменную на Vercel",
+      "SUPABASE_SERVICE_ROLE_KEY не должен быть publishable-ключом. Используйте sb_secret_... или legacy service_role",
     );
   }
-  if (!env.serviceKey.includes(".") || env.serviceKey.length < 80) {
+
+  if (key.startsWith("sb_secret_")) {
+    // Только формат. Подлинность проверяет Supabase при запросе.
+    if (key.length < 20 || /\s/.test(key)) {
+      throw new Error(
+        "SUPABASE_SERVICE_ROLE_KEY (sb_secret) имеет неверный формат. Обновите переменную на Vercel",
+      );
+    }
+    return env;
+  }
+
+  if (!looksLikeJwt(key)) {
     throw new Error(
-      "SUPABASE_SERVICE_ROLE_KEY выглядит повреждённым. Обновите переменную на Vercel",
+      "SUPABASE_SERVICE_ROLE_KEY должен быть sb_secret_... или legacy JWT service_role. Обновите переменную на Vercel",
+    );
+  }
+
+  const role = jwtRole(key);
+  if (role === "anon") {
+    throw new Error(
+      "SUPABASE_SERVICE_ROLE_KEY содержит anon-ключ. Нужен service_role или sb_secret_...",
+    );
+  }
+  if (role !== "service_role") {
+    throw new Error(
+      "SUPABASE_SERVICE_ROLE_KEY должен быть JWT с role=service_role или ключом sb_secret_...",
     );
   }
 
@@ -54,7 +87,7 @@ export function assertSupabaseServiceKey() {
 
 let cached: SupabaseClient | null = null;
 
-/** Серверный клиент с service_role. Не импортировать в клиентские компоненты. */
+/** Серверный клиент с service_role / sb_secret. Не импортировать в клиентские компоненты. */
 export function getSupabaseServer(): SupabaseClient {
   const env = assertSupabaseServiceKey();
   if (!cached) {
