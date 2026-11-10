@@ -10,8 +10,14 @@
 ## Дальше
 
 - Auth / защита админки через Supabase (вместо текущего cookie-логина)
-- Аналитика диалогов и статусы заявок на уборку / ремонт / массаж
+- Аналитика диалогов и статусы заявок на уборку / ремонт / массаж (`projects1_orders`)
 - Мультитенантность или несколько ботов на одном проекте
+
+## Заказы (калькулятор → Supabase)
+
+1. В SQL Editor выполнить `supabase/orders.sql` (таблица `projects1_orders`).
+2. Env: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (+ Telegram для уведомлений).
+3. API `POST /api/order` пишет в Supabase, затем шлёт уведомление админу. Нужен серверный деплой (Vercel / Netlify Next runtime), не static Drop.
 
 ## Позже
 

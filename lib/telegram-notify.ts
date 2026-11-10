@@ -4,6 +4,7 @@ export type OrderNotification = {
   service: string;
   priceEuro: number;
   date?: string;
+  rooms?: number;
   hours?: number;
   workers?: number;
   massageMinutes?: number;
@@ -36,6 +37,9 @@ function buildOrderMessage(order: OrderNotification) {
     `💶 Итого: ${formatPrice(order.priceEuro)}`,
   ];
 
+  if (typeof order.rooms === "number") {
+    lines.push(`🏠 Комнаты: ${order.rooms}`);
+  }
   if (typeof order.hours === "number") {
     lines.push(`⏱ Часы: ${order.hours}`);
   }

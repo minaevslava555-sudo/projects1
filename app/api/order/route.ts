@@ -1,3 +1,4 @@
+import { saveOrderToSupabase } from "@/lib/orders";
 import { notifyAdminAboutOrder } from "@/lib/telegram-notify";
 
 export const runtime = "nodejs";
@@ -43,6 +44,7 @@ export async function POST(request: Request) {
     const date = asTrimmedString(raw.date, 40);
     const details = asTrimmedString(raw.details, 200);
     const priceEuro = typeof raw.priceEuro === "number" ? raw.priceEuro : Number(raw.priceEuro);
+    const rooms = asPositiveInt(raw.rooms, 6);
     const hours = asPositiveInt(raw.hours, 24);
     const workers = asPositiveInt(raw.workers, 12);
     const massageMinutes = asPositiveInt(raw.massageMinutes, 240);
@@ -54,7 +56,12 @@ export async function POST(request: Request) {
       return jsonError("Некорректная сумма", 400);
     }
 
-    if (service === "cleaning" || service === "repair") {
+    if (service === "cleaning") {
+      if (!rooms || !hours || !workers) {
+        return jsonError("Укажите комнаты, часы и число клинеров", 400);
+      }
+    }
+    if (service === "repair") {
       if (!hours || !workers) {
         return jsonError("Укажите часы и число специалистов", 400);
       }
@@ -63,19 +70,40 @@ export async function POST(request: Request) {
       return jsonError("Укажите длительность сеанса", 400);
     }
 
-    await notifyAdminAboutOrder({
+    const orderService = service as "cleaning" | "repair" | "massage";
+
+    const { id } = await saveOrderToSupabase({
       name,
       phone,
-      service: SERVICE_TITLES[service] ?? service,
+      service: orderService,
       priceEuro,
       date: date ?? undefined,
       details: details ?? undefined,
+      rooms: rooms ?? undefined,
       hours: hours ?? undefined,
       workers: workers ?? undefined,
       massageMinutes: massageMinutes ?? undefined,
     });
 
-    return Response.json({ ok: true });
+    try {
+      await notifyAdminAboutOrder({
+        name,
+        phone,
+        service: SERVICE_TITLES[service] ?? service,
+        priceEuro,
+        date: date ?? undefined,
+        details: details ?? undefined,
+        rooms: rooms ?? undefined,
+        hours: hours ?? undefined,
+        workers: workers ?? undefined,
+        massageMinutes: massageMinutes ?? undefined,
+      });
+    } catch (notifyError) {
+      // Заказ уже в БД — не откатываем из‑за Telegram.
+      console.error("[order] telegram notify failed", notifyError);
+    }
+
+    return Response.json({ ok: true, id });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Не удалось отправить заказ";
     return jsonError(message, 502);

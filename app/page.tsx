@@ -45,11 +45,20 @@ const MASSAGE_OPTIONS: Array<{ minutes: MassageMinutes; price: number; label: st
 ];
 
 function cleaningPlan(rooms: number): { hours: number; workers: number } {
-  if (rooms <= 1) return { hours: 2, workers: 1 };
-  if (rooms === 2) return { hours: 3, workers: 1 };
-  if (rooms === 3) return { hours: 4, workers: 2 };
-  if (rooms === 4) return { hours: 5, workers: 2 };
-  return { hours: 6, workers: 3 };
+  switch (Math.min(6, Math.max(1, rooms))) {
+    case 1:
+      return { hours: 2, workers: 1 };
+    case 2:
+      return { hours: 3, workers: 1 };
+    case 3:
+      return { hours: 4, workers: 2 };
+    case 4:
+      return { hours: 5, workers: 2 };
+    case 5:
+    case 6:
+    default:
+      return { hours: 6, workers: 3 };
+  }
 }
 
 type CleaningRoomTab = "Kitchen" | "Rooms" | "Bathroom" | "Hallway";
@@ -326,7 +335,7 @@ function OrderModal({
       return `${massageMinutes} min session`;
     }
     if (service === "cleaning") {
-      return `${rooms} room${rooms > 1 ? "s" : ""} · ~${cleaningHours} h · ${cleaningWorkers} cleaner${cleaningWorkers > 1 ? "s" : ""} × 20€`;
+      return `${rooms} room(s) require ~${cleaningHours} hours and ${cleaningWorkers} cleaner(s)`;
     }
     return `${hours} h × ${workers} technician${workers > 1 ? "s" : ""} × 20€`;
   }
@@ -355,6 +364,7 @@ function OrderModal({
           priceEuro: total,
           date,
           details: orderDetails(),
+          rooms: service === "cleaning" ? rooms : undefined,
           hours:
             service === "massage"
               ? undefined
@@ -475,13 +485,11 @@ function OrderModal({
               />
               <div className="rounded-xl border border-teal-100 bg-teal-50/70 px-4 py-3 text-sm leading-relaxed text-teal-900">
                 <p className="font-medium">
-                  {rooms} room{rooms > 1 ? "s" : ""} require ~{cleaningHours} hour
-                  {cleaningHours > 1 ? "s" : ""} and {cleaningWorkers} cleaner
-                  {cleaningWorkers > 1 ? "s" : ""}
+                  {rooms} room(s) require ~{cleaningHours} hours and {cleaningWorkers}{" "}
+                  cleaner(s)
                 </p>
                 <p className="mt-1 text-teal-800/80">
-                  {cleaningHours} h × {cleaningWorkers} cleaner
-                  {cleaningWorkers > 1 ? "s" : ""} × 20€ = {formatEuro(total)}
+                  {cleaningHours} × {cleaningWorkers} × 20€ = {formatEuro(total)}
                 </p>
               </div>
             </div>
