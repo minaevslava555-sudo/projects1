@@ -44,6 +44,114 @@ const MASSAGE_OPTIONS: Array<{ minutes: MassageMinutes; price: number; label: st
   { minutes: 120, price: 90, label: "120 min — 90€" },
 ];
 
+function cleaningPlan(rooms: number): { hours: number; workers: number } {
+  if (rooms <= 1) return { hours: 2, workers: 1 };
+  if (rooms === 2) return { hours: 3, workers: 1 };
+  if (rooms === 3) return { hours: 4, workers: 2 };
+  if (rooms === 4) return { hours: 5, workers: 2 };
+  return { hours: 6, workers: 3 };
+}
+
+type CleaningRoomTab = "Kitchen" | "Rooms" | "Bathroom" | "Hallway";
+type MassageFocusTab = "Back" | "Legs" | "Face";
+
+const CLEANING_CHECKLISTS: Record<CleaningRoomTab, string[]> = {
+  Kitchen: [
+    "Wash dishes and load/unload dishwasher",
+    "Clean stovetop and hob",
+    "Wipe countertops and cabinet fronts",
+    "Empty trash and tidy surfaces",
+  ],
+  Rooms: [
+    "Dust furniture and accessible shelves",
+    "Make beds and straighten bedding",
+    "Vacuum under and around furniture",
+    "Wipe switches, handles and mirrors",
+  ],
+  Bathroom: [
+    "Sanitize toilet and seat",
+    "Scrub tub, shower and tiles",
+    "Polish mirrors and chrome fittings",
+    "Mop floor and restock basics if provided",
+  ],
+  Hallway: [
+    "Vacuum and mop entry floors",
+    "Dust console tables and frames",
+    "Wipe door handles and light switches",
+    "Tidy shoes and coat area",
+  ],
+};
+
+const MASSAGE_CHECKLISTS: Record<MassageFocusTab, string[]> = {
+  Back: [
+    "Full-back tension release",
+    "Shoulder and neck focus",
+    "Posture-friendly pressure",
+    "Deep relaxation finish",
+  ],
+  Legs: [
+    "Thigh and calf massage",
+    "Circulation-friendly strokes",
+    "Sport recovery support",
+    "Gentle stretch cues",
+  ],
+  Face: [
+    "Soft facial massage",
+    "Temple and jaw ease",
+    "Lymphatic-style light work",
+    "Calming close of session",
+  ],
+};
+
+const REPAIR_CHECKLIST = [
+  "Furniture assembly and shelf mounting",
+  "Minor plumbing adjustments",
+  "Socket and switch replacements",
+  "Door hinge, handle and lock fixes",
+  "Light fixture installation",
+];
+
+const FAQ_ITEMS = [
+  {
+    question: "What if something gets damaged or missing?",
+    answer:
+      "We fully vet our local specialists and carry comprehensive insurance coverage.",
+  },
+  {
+    question: "Do I need to provide cleaning supplies?",
+    answer:
+      "No, our professionals bring high-quality eco-friendly products and standard equipment.",
+  },
+  {
+    question: "How do I pay for the service?",
+    answer:
+      "Pay securely after the job is completed and inspected — via Cash, Card, or Revolut.",
+  },
+  {
+    question: "Can I book a recurring plan?",
+    answer:
+      "Yes, we offer regular subscription plans that save you up to 20% on home care.",
+  },
+] as const;
+
+const SPECIALISTS = [
+  {
+    name: "Maria",
+    rating: "4.9/5",
+    detail: "500+ homes served in Algarve, speaks EN/PT",
+  },
+  {
+    name: "João",
+    rating: "4.8/5",
+    detail: "Home repairs specialist across Loulé & Faro",
+  },
+  {
+    name: "Ana",
+    rating: "5.0/5",
+    detail: "Wellness & massage — Vilamoura and Quarteira",
+  },
+] as const;
+
 function formatEuro(value: number) {
   return new Intl.NumberFormat("en-IE", {
     style: "currency",
@@ -160,6 +268,7 @@ function OrderModal({
   lockService?: boolean;
 }) {
   const titleId = useId();
+  const [rooms, setRooms] = useState(2);
   const [hours, setHours] = useState(2);
   const [workers, setWorkers] = useState(1);
   const [massageMinutes, setMassageMinutes] = useState<MassageMinutes>(60);
@@ -170,8 +279,13 @@ function OrderModal({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
 
+  const cleaning = useMemo(() => cleaningPlan(rooms), [rooms]);
+  const cleaningHours = cleaning.hours;
+  const cleaningWorkers = cleaning.workers;
+
   useEffect(() => {
     if (!open) return;
+    setRooms(2);
     setHours(2);
     setWorkers(1);
     setMassageMinutes(60);
@@ -201,15 +315,18 @@ function OrderModal({
     if (service === "massage") {
       return MASSAGE_OPTIONS.find((option) => option.minutes === massageMinutes)?.price ?? 45;
     }
+    if (service === "cleaning") {
+      return cleaningHours * cleaningWorkers * 20;
+    }
     return hours * workers * 20;
-  }, [service, hours, workers, massageMinutes]);
+  }, [service, hours, workers, massageMinutes, cleaningHours, cleaningWorkers]);
 
   function orderDetails() {
     if (service === "massage") {
       return `${massageMinutes} min session`;
     }
     if (service === "cleaning") {
-      return `${hours} h × ${workers} cleaner${workers > 1 ? "s" : ""} × 20€`;
+      return `${rooms} room${rooms > 1 ? "s" : ""} · ~${cleaningHours} h · ${cleaningWorkers} cleaner${cleaningWorkers > 1 ? "s" : ""} × 20€`;
     }
     return `${hours} h × ${workers} technician${workers > 1 ? "s" : ""} × 20€`;
   }
@@ -238,8 +355,18 @@ function OrderModal({
           priceEuro: total,
           date,
           details: orderDetails(),
-          hours: service === "massage" ? undefined : hours,
-          workers: service === "massage" ? undefined : workers,
+          hours:
+            service === "massage"
+              ? undefined
+              : service === "cleaning"
+                ? cleaningHours
+                : hours,
+          workers:
+            service === "massage"
+              ? undefined
+              : service === "cleaning"
+                ? cleaningWorkers
+                : workers,
           massageMinutes: service === "massage" ? massageMinutes : undefined,
         }),
       });
@@ -317,10 +444,10 @@ function OrderModal({
                   key={value}
                   type="button"
                   onClick={() => onServiceChange(value)}
-                  className={`px-2 py-2.5 text-xs font-semibold transition sm:text-sm ${
+                  className={`rounded-lg px-2 py-2.5 text-xs font-semibold transition sm:text-sm ${
                     service === value
-                      ? "bg-ink text-white"
-                      : "border border-mist bg-white text-ink hover:border-khaki"
+                      ? "bg-teal-600 text-white shadow-sm shadow-teal-600/25"
+                      : "border border-mist bg-white text-ink hover:border-teal-500/50"
                   }`}
                 >
                   {SERVICE_META[value].title}
@@ -329,9 +456,9 @@ function OrderModal({
             </div>
           ) : null}
 
-          <div className="border border-mist bg-white px-5 py-6 text-center">
+          <div className="rounded-xl border border-mist bg-white px-5 py-6 text-center">
             <p className="text-xs font-medium tracking-[0.18em] text-muted uppercase">Total</p>
-            <p className="mt-2 font-display text-5xl font-bold tracking-tight text-ink sm:text-6xl">
+            <p className="mt-2 font-display text-5xl font-bold tracking-tight text-teal-700 sm:text-6xl">
               {formatEuro(total)}
             </p>
           </div>
@@ -339,24 +466,24 @@ function OrderModal({
           {service === "cleaning" ? (
             <div className="space-y-4">
               <Stepper
-                id="cleaning-hours"
-                label="Number of hours"
-                value={hours}
-                min={1}
-                max={12}
-                onChange={setHours}
-              />
-              <Stepper
-                id="cleaning-workers"
-                label="Number of cleaners"
-                value={workers}
+                id="cleaning-rooms"
+                label="Number of rooms"
+                value={rooms}
                 min={1}
                 max={6}
-                onChange={setWorkers}
+                onChange={setRooms}
               />
-              <p className="text-sm text-muted">
-                {hours} h × {workers} cleaner{workers > 1 ? "s" : ""} × 20€ = {formatEuro(total)}
-              </p>
+              <div className="rounded-xl border border-teal-100 bg-teal-50/70 px-4 py-3 text-sm leading-relaxed text-teal-900">
+                <p className="font-medium">
+                  {rooms} room{rooms > 1 ? "s" : ""} require ~{cleaningHours} hour
+                  {cleaningHours > 1 ? "s" : ""} and {cleaningWorkers} cleaner
+                  {cleaningWorkers > 1 ? "s" : ""}
+                </p>
+                <p className="mt-1 text-teal-800/80">
+                  {cleaningHours} h × {cleaningWorkers} cleaner
+                  {cleaningWorkers > 1 ? "s" : ""} × 20€ = {formatEuro(total)}
+                </p>
+              </div>
             </div>
           ) : null}
 
@@ -491,6 +618,10 @@ export default function Home() {
   const [service, setService] = useState<ServiceValue>("cleaning");
   const [activeServiceView, setActiveServiceView] = useState<ServiceValue | null>(null);
   const [lockService, setLockService] = useState(false);
+  const [includedService, setIncludedService] = useState<ServiceValue>("cleaning");
+  const [cleaningTab, setCleaningTab] = useState<CleaningRoomTab>("Kitchen");
+  const [massageTab, setMassageTab] = useState<MassageFocusTab>("Back");
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   function openServiceView(value: ServiceValue) {
     setService(value);
@@ -733,6 +864,136 @@ export default function Home() {
               </div>
             </section>
 
+            <section id="included" className="relative overflow-hidden border-t border-mist py-20 sm:py-24">
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,_#f7f8f4_0%,_#eef5f3_100%)]" />
+              <div className="relative mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
+                <Reveal className="max-w-2xl">
+                  <p className="text-sm font-medium tracking-[0.22em] text-teal-700 uppercase">
+                    How we work
+                  </p>
+                  <h2 className="mt-3 font-display text-3xl font-bold tracking-tight sm:text-4xl">
+                    What&apos;s included in our service
+                  </h2>
+                  <p className="mt-3 text-muted sm:text-lg">
+                    Clear checklists so you know exactly what to expect before booking.
+                  </p>
+                </Reveal>
+
+                <div className="mt-8 flex flex-wrap gap-2">
+                  {(Object.keys(SERVICE_META) as ServiceValue[]).map((value) => {
+                    const active = includedService === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setIncludedService(value)}
+                        className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                          active
+                            ? "bg-teal-600 text-white shadow-sm shadow-teal-600/20"
+                            : "border border-mist bg-white text-ink hover:border-teal-500/40"
+                        }`}
+                      >
+                        {SERVICE_META[value].title}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {includedService === "cleaning" ? (
+                  <div className="mt-6">
+                    <div className="flex flex-wrap gap-2">
+                      {(Object.keys(CLEANING_CHECKLISTS) as CleaningRoomTab[]).map((tab) => {
+                        const active = cleaningTab === tab;
+                        return (
+                          <button
+                            key={tab}
+                            type="button"
+                            onClick={() => setCleaningTab(tab)}
+                            className={`rounded-lg px-3.5 py-2 text-sm font-medium transition ${
+                              active
+                                ? "bg-teal-700 text-white"
+                                : "border border-mist/80 bg-white/80 text-ink hover:border-teal-500/35"
+                            }`}
+                          >
+                            {tab}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <ul className="mt-6 grid gap-3 sm:grid-cols-2">
+                      {CLEANING_CHECKLISTS[cleaningTab].map((item) => (
+                        <li
+                          key={item}
+                          className="flex items-start gap-3 rounded-xl border border-mist/80 bg-white/90 px-4 py-3.5 text-sm leading-relaxed text-ink shadow-sm shadow-teal-900/5"
+                        >
+                          <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-teal-100 text-xs font-bold text-teal-700">
+                            ✓
+                          </span>
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {includedService === "massage" ? (
+                  <div className="mt-6">
+                    <div className="flex flex-wrap gap-2">
+                      {(Object.keys(MASSAGE_CHECKLISTS) as MassageFocusTab[]).map((tab) => {
+                        const active = massageTab === tab;
+                        return (
+                          <button
+                            key={tab}
+                            type="button"
+                            onClick={() => setMassageTab(tab)}
+                            className={`rounded-lg px-3.5 py-2 text-sm font-medium transition ${
+                              active
+                                ? "bg-teal-700 text-white"
+                                : "border border-mist/80 bg-white/80 text-ink hover:border-teal-500/35"
+                            }`}
+                          >
+                            {tab}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <ul className="mt-6 grid gap-3 sm:grid-cols-2">
+                      {MASSAGE_CHECKLISTS[massageTab].map((item) => (
+                        <li
+                          key={item}
+                          className="flex items-start gap-3 rounded-xl border border-mist/80 bg-white/90 px-4 py-3.5 text-sm leading-relaxed text-ink shadow-sm shadow-teal-900/5"
+                        >
+                          <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-teal-100 text-xs font-bold text-teal-700">
+                            ✓
+                          </span>
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {includedService === "repair" ? (
+                  <div className="mt-6">
+                    <p className="text-sm font-semibold text-teal-800">Handyman essentials</p>
+                    <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+                      {REPAIR_CHECKLIST.map((item) => (
+                        <li
+                          key={item}
+                          className="flex items-start gap-3 rounded-xl border border-mist/80 bg-white/90 px-4 py-3.5 text-sm leading-relaxed text-ink shadow-sm shadow-teal-900/5"
+                        >
+                          <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-teal-100 text-xs font-bold text-teal-700">
+                            ✓
+                          </span>
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+            </section>
+
             <section id="area" className="relative overflow-hidden border-y border-mist py-20 sm:py-24">
               <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,_#eef1ea_0%,_#f5f3ee_50%,_#e8ebe3_100%)]" />
               <div className="relative mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
@@ -774,7 +1035,7 @@ export default function Home() {
                     Or call us now:{" "}
                     <a
                       href="tel:+351920024478"
-                      className="font-medium text-khaki underline-offset-4 hover:underline"
+                      className="font-medium text-teal-700 underline-offset-4 hover:underline"
                     >
                       +351 920 024 478
                     </a>
@@ -782,21 +1043,157 @@ export default function Home() {
                 </Reveal>
               </div>
             </section>
+
+            <section id="trust" className="relative overflow-hidden border-t border-mist py-20 sm:py-24">
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_#dff5f1_0%,_transparent_50%),linear-gradient(180deg,_#f7f8f4_0%,_#eef1ea_100%)]" />
+              <div className="relative mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
+                <Reveal className="max-w-2xl">
+                  <p className="text-sm font-medium tracking-[0.22em] text-teal-700 uppercase">
+                    Trust
+                  </p>
+                  <h2 className="mt-3 font-display text-3xl font-bold tracking-tight sm:text-4xl">
+                    Our Verified Specialists
+                  </h2>
+                  <p className="mt-3 text-muted sm:text-lg">
+                    Local professionals with proven ratings across Central Algarve.
+                  </p>
+                </Reveal>
+
+                <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  {SPECIALISTS.map((person, index) => (
+                    <Reveal
+                      key={person.name}
+                      style={{ transitionDelay: `${index * 70}ms` }}
+                      className="rounded-2xl border border-mist/90 bg-white/90 p-6 shadow-sm shadow-teal-900/5"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-teal-100 font-display text-lg font-bold text-teal-700">
+                          {person.name.slice(0, 1)}
+                        </span>
+                        <div>
+                          <p className="font-display text-xl font-bold text-ink">{person.name}</p>
+                          <p className="text-sm font-semibold text-teal-700">{person.rating} rating</p>
+                        </div>
+                      </div>
+                      <p className="mt-4 text-sm leading-relaxed text-muted">{person.detail}</p>
+                    </Reveal>
+                  ))}
+                </div>
+
+                <Reveal className="mt-16 max-w-3xl">
+                  <h2 id="faq" className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+                    FAQ
+                  </h2>
+                  <p className="mt-3 text-muted sm:text-lg">
+                    Quick answers before you book.
+                  </p>
+                  <div className="mt-8 divide-y divide-mist overflow-hidden rounded-2xl border border-mist bg-white/90">
+                    {FAQ_ITEMS.map((item, index) => {
+                      const open = openFaq === index;
+                      return (
+                        <div key={item.question}>
+                          <button
+                            type="button"
+                            aria-expanded={open}
+                            onClick={() => setOpenFaq(open ? null : index)}
+                            className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-teal-50/50 sm:px-6"
+                          >
+                            <span className="font-medium text-ink sm:text-lg">{item.question}</span>
+                            <span
+                              className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-100 text-teal-700 transition ${
+                                open ? "rotate-45" : ""
+                              }`}
+                              aria-hidden="true"
+                            >
+                              +
+                            </span>
+                          </button>
+                          {open ? (
+                            <p className="px-5 pb-5 text-sm leading-relaxed text-muted sm:px-6 sm:text-base">
+                              {item.answer}
+                            </p>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Reveal>
+              </div>
+            </section>
           </>
         )}
       </main>
 
-      <footer className="border-t border-mist bg-ink py-8 text-white/70">
-        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-5 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
+      <footer className="border-t border-mist bg-teal-900 py-12 text-teal-50/75">
+        <div className="mx-auto grid max-w-6xl gap-10 px-5 sm:grid-cols-3 sm:px-8 lg:px-10">
           <div>
-            <p className="font-display text-lg font-bold tracking-[0.12em] text-white">
+            <p className="font-display text-xl font-bold tracking-[0.12em] text-white">
               HAVENLY
             </p>
-            <p className="mt-1 text-xs tracking-[0.18em] text-white/55 uppercase">
-              Home · Comfort · Trust
+            <p className="mt-2 text-sm tracking-[0.08em] text-teal-100/80">
+              Home • Comfort • Trust
             </p>
+            <p className="mt-4 text-sm text-teal-100/60">© 2026 HAVENLY · Central Algarve</p>
           </div>
-          <p className="text-sm">© 2026 HAVENLY · Central Algarve</p>
+
+          <div>
+            <p className="text-sm font-semibold tracking-[0.14em] text-white uppercase">
+              Quick Links
+            </p>
+            <ul className="mt-4 space-y-2.5 text-sm">
+              <li>
+                <button
+                  type="button"
+                  onClick={() => openServiceView("cleaning")}
+                  className="transition hover:text-white"
+                >
+                  Cleaning
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => openServiceView("repair")}
+                  className="transition hover:text-white"
+                >
+                  Repairs
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => openServiceView("massage")}
+                  className="transition hover:text-white"
+                >
+                  Massage
+                </button>
+              </li>
+              <li>
+                <a
+                  href="#faq"
+                  className="transition hover:text-white"
+                  onClick={() => setActiveServiceView(null)}
+                >
+                  FAQ
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <p className="text-sm font-semibold tracking-[0.14em] text-white uppercase">
+              Coverage Area
+            </p>
+            <p className="mt-4 text-sm leading-relaxed text-teal-50/80">
+              Faro, Loulé, Quarteira, Vilamoura, Almancil, Albufeira
+            </p>
+            <a
+              href="tel:+351920024478"
+              className="mt-5 inline-flex text-lg font-semibold text-white transition hover:text-teal-100"
+            >
+              +351 920 024 478
+            </a>
+          </div>
         </div>
       </footer>
 
