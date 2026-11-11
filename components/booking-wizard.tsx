@@ -51,6 +51,30 @@ const TIME_SLOTS = buildTimeSlots();
 
 type StepId = "configure" | "schedule" | "address" | "contact" | "review";
 
+type RepairPhotoStatus = "uploading" | "uploaded" | "failed";
+
+type RepairPhotoItem = {
+  id: string;
+  fileName: string;
+  status: RepairPhotoStatus;
+  path?: string;
+  error?: string;
+  file?: File;
+};
+
+async function waitForTurnstileToken(
+  getToken: () => string | null,
+  timeoutMs = 90000,
+) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const token = getToken();
+    if (token) return token;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  throw new Error("Complete the security check to continue uploading");
+}
+
 const STEPS: StepId[] = ["configure", "schedule", "address", "contact", "review"];
 
 function Stepper({
@@ -151,8 +175,8 @@ export default function BookingWizard({
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileKey, setTurnstileKey] = useState(0);
-  const [repairPhotoPaths, setRepairPhotoPaths] = useState<string[]>([]);
-  const [uploading, setUploading] = useState(false);
+  const [repairPhotos, setRepairPhotos] = useState<RepairPhotoItem[]>([]);
+  const [allowWithoutPhotos, setAllowWithoutPhotos] = useState(false);
   const [date, setDate] = useState("");
   const [preferredTime, setPreferredTime] = useState("10:00");
   const [streetAddress, setStreetAddress] = useState("");
@@ -165,6 +189,7 @@ export default function BookingWizard({
   const [error, setError] = useState("");
   const [successRef, setSuccessRef] = useState<string | null>(null);
   const bookingContextRef = useRef({ service, massageCategoryId });
+  const turnstileTokenRef = useRef<string | null>(null);
 
   const step = STEPS[stepIndex] ?? "configure";
   const cleaning = useMemo(() => cleaningPlan(rooms), [rooms]);
@@ -172,11 +197,26 @@ export default function BookingWizard({
     ? getMassageCategory(massageCategoryId)
     : null;
 
+  const repairPhotoPaths = useMemo(
+    () =>
+      repairPhotos
+        .filter((item) => item.status === "uploaded" && item.path)
+        .map((item) => item.path as string),
+    [repairPhotos],
+  );
+  const hasUploadingPhotos = repairPhotos.some((item) => item.status === "uploading");
+  const hasFailedPhotos = repairPhotos.some((item) => item.status === "failed");
+  const uploadedPhotoCount = repairPhotoPaths.length;
+
   const total = useMemo(() => {
     if (service === "massage") return massagePriceEuro(massageMinutes) ?? 45;
     if (service === "cleaning") return cleaningPriceEuro(rooms);
     return null;
   }, [service, massageMinutes, rooms]);
+
+  useEffect(() => {
+    turnstileTokenRef.current = turnstileToken;
+  }, [turnstileToken]);
 
   function resetWizardFields() {
     setStepIndex(0);
@@ -188,8 +228,8 @@ export default function BookingWizard({
     setIdempotencyKey(crypto.randomUUID());
     setTurnstileToken(null);
     setTurnstileKey((value) => value + 1);
-    setRepairPhotoPaths([]);
-    setUploading(false);
+    setRepairPhotos([]);
+    setAllowWithoutPhotos(false);
     setDate("");
     setPreferredTime("10:00");
     setStreetAddress("");
@@ -201,6 +241,18 @@ export default function BookingWizard({
     setSending(false);
     setError("");
     setSuccessRef(null);
+  }
+
+  function updateRepairPhoto(id: string, patch: Partial<RepairPhotoItem>) {
+    setRepairPhotos((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+    );
+  }
+
+  function refreshTurnstile() {
+    turnstileTokenRef.current = null;
+    setTurnstileToken(null);
+    setTurnstileKey((value) => value + 1);
   }
 
   async function ensureDraft() {
@@ -313,53 +365,87 @@ export default function BookingWizard({
     setStepIndex((value) => Math.max(0, value - 1));
   }
 
+  async function uploadOneRepairPhoto(itemId: string, file: File) {
+    updateRepairPhoto(itemId, {
+      status: "uploading",
+      error: undefined,
+      file,
+    });
+    try {
+      const token = await waitForTurnstileToken(() => turnstileTokenRef.current);
+      const draft = await ensureDraft();
+      const body = new FormData();
+      body.set("draftToken", draft.draftToken);
+      body.set("turnstileToken", token);
+      body.set("file", file);
+      const response = await fetch("/api/order/photos", {
+        method: "POST",
+        body,
+      });
+      const data = (await response.json()) as {
+        ok?: boolean;
+        path?: string;
+        error?: string;
+      };
+      if (!response.ok || !data.ok || !data.path) {
+        throw new Error(data.error || "Photo upload failed");
+      }
+      updateRepairPhoto(itemId, {
+        status: "uploaded",
+        path: data.path,
+        error: undefined,
+        file: undefined,
+      });
+      setAllowWithoutPhotos(false);
+      // Turnstile tokens are typically single-use
+      refreshTurnstile();
+    } catch (uploadError) {
+      updateRepairPhoto(itemId, {
+        status: "failed",
+        error:
+          uploadError instanceof Error ? uploadError.message : "Photo upload failed",
+        file,
+      });
+      refreshTurnstile();
+    }
+  }
+
   async function onUploadPhotos(fileList: FileList | null) {
     if (!fileList?.length) return;
-    const remaining = 5 - repairPhotoPaths.length;
+    const remaining = 5 - uploadedPhotoCount;
     if (remaining <= 0) {
       setError("Maximum 5 photos");
       return;
     }
-    if (!turnstileToken) {
-      setError("Complete the security check before uploading photos");
+
+    setError("");
+    const files = Array.from(fileList).slice(0, remaining);
+    const items: RepairPhotoItem[] = files.map((file) => ({
+      id: crypto.randomUUID(),
+      fileName: file.name || "photo",
+      status: "uploading" as const,
+      file,
+    }));
+    setRepairPhotos((prev) => [...prev, ...items]);
+
+    for (const item of items) {
+      if (!item.file) continue;
+      await uploadOneRepairPhoto(item.id, item.file);
+    }
+  }
+
+  async function retryRepairPhoto(item: RepairPhotoItem) {
+    if (!item.file) {
+      setError("Choose the photo again to retry upload");
       return;
     }
-
-    setUploading(true);
     setError("");
-    try {
-      const draft = await ensureDraft();
-      const files = Array.from(fileList).slice(0, remaining);
-      const uploaded: string[] = [];
-      for (const file of files) {
-        const body = new FormData();
-        body.set("draftToken", draft.draftToken);
-        body.set("turnstileToken", turnstileToken);
-        body.set("file", file);
-        const response = await fetch("/api/order/photos", {
-          method: "POST",
-          body,
-        });
-        const data = (await response.json()) as { ok?: boolean; path?: string; error?: string };
-        if (!response.ok || !data.ok || !data.path) {
-          throw new Error(data.error || "Photo upload failed");
-        }
-        uploaded.push(data.path);
-      }
-      setRepairPhotoPaths((prev) => [...prev, ...uploaded]);
-      // Refresh Turnstile after upload — tokens are typically single-use
-      setTurnstileToken(null);
-      setTurnstileKey((value) => value + 1);
-    } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : "Photo upload failed");
-    } finally {
-      setUploading(false);
-    }
+    await uploadOneRepairPhoto(item.id, item.file);
   }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (sending || successRef) return;
+    if (sending || successRef || hasUploadingPhotos) return;
 
     for (const id of STEPS) {
       const message = validateStep(id);
@@ -368,6 +454,17 @@ export default function BookingWizard({
         setStepIndex(STEPS.indexOf(id));
         return;
       }
+    }
+
+    if (service === "repair" && hasFailedPhotos) {
+      setError("Fix failed photo uploads or remove them before submitting");
+      setStepIndex(STEPS.indexOf("configure"));
+      return;
+    }
+
+    if (service === "repair" && uploadedPhotoCount === 0 && !allowWithoutPhotos) {
+      setError("Upload photos or confirm sending the quote request without photos");
+      return;
     }
 
     if (!turnstileToken) {
@@ -650,27 +747,65 @@ export default function BookingWizard({
                 </Field>
                 <div>
                   <p className="mb-2 text-sm font-medium text-ink">
-                    Photos (optional, up to 5)
+                    Photos (up to 5)
+                  </p>
+                  <p className="mb-2 text-xs text-muted">
+                    Complete the security check below, then choose photos. Each
+                    file shows Uploading / Uploaded / Failed.
                   </p>
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
                     multiple
-                    disabled={uploading || repairPhotoPaths.length >= 5}
+                    disabled={hasUploadingPhotos || uploadedPhotoCount >= 5}
                     onChange={(event) => {
                       void onUploadPhotos(event.target.files);
                       event.target.value = "";
                     }}
                     className="block w-full text-sm text-muted file:mr-3 file:border file:border-mist file:bg-white file:px-3 file:py-2 file:text-sm file:font-semibold file:text-ink"
                   />
-                  {uploading ? (
-                    <p className="mt-2 text-sm text-muted">Uploading…</p>
+                  {repairPhotos.length ? (
+                    <ul className="mt-3 space-y-2">
+                      {repairPhotos.map((item) => (
+                        <li
+                          key={item.id}
+                          className="flex items-start justify-between gap-3 border border-mist bg-white px-3 py-2 text-sm"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-ink">{item.fileName}</p>
+                            <p
+                              className={
+                                item.status === "uploaded"
+                                  ? "text-olive"
+                                  : item.status === "failed"
+                                    ? "text-danger"
+                                    : "text-muted"
+                              }
+                            >
+                              {item.status === "uploading"
+                                ? "Uploading"
+                                : item.status === "uploaded"
+                                  ? "Uploaded"
+                                  : `Failed${item.error ? `: ${item.error}` : ""}`}
+                            </p>
+                          </div>
+                          {item.status === "failed" ? (
+                            <button
+                              type="button"
+                              onClick={() => void retryRepairPhoto(item)}
+                              disabled={hasUploadingPhotos}
+                              className="shrink-0 border border-mist px-2 py-1 text-xs font-semibold text-ink transition hover:border-olive disabled:opacity-50"
+                            >
+                              Retry
+                            </button>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
                   ) : null}
-                  {repairPhotoPaths.length ? (
-                    <p className="mt-2 text-sm text-olive">
-                      {repairPhotoPaths.length} photo(s) attached
-                    </p>
-                  ) : null}
+                  <p className="mt-2 text-sm text-olive">
+                    Successfully uploaded: {uploadedPhotoCount}
+                  </p>
                 </div>
               </div>
             ) : null}
@@ -821,9 +956,33 @@ export default function BookingWizard({
                     </p>
                   ) : null}
                   {service === "repair" ? (
-                    <p className="mt-2">
-                      Quote request · {repairPhotoPaths.length} photo(s)
-                    </p>
+                    <div className="mt-2 space-y-2">
+                      <p>
+                        Quote request · Successfully uploaded: {uploadedPhotoCount}{" "}
+                        photo(s)
+                      </p>
+                      {hasFailedPhotos ? (
+                        <p className="text-danger">
+                          {repairPhotos.filter((item) => item.status === "failed").length}{" "}
+                          photo(s) failed — go back and retry before submitting.
+                        </p>
+                      ) : null}
+                      {uploadedPhotoCount === 0 ? (
+                        <label className="flex items-start gap-2 text-ink">
+                          <input
+                            type="checkbox"
+                            className="mt-1"
+                            checked={allowWithoutPhotos}
+                            onChange={(event) =>
+                              setAllowWithoutPhotos(event.target.checked)
+                            }
+                          />
+                          <span>
+                            Send this quote request without photos
+                          </span>
+                        </label>
+                      ) : null}
+                    </div>
                   ) : null}
                   <p className="mt-2">
                     {date} at {preferredTime}
@@ -866,14 +1025,22 @@ export default function BookingWizard({
                   <button
                     type="button"
                     onClick={goNext}
-                    className="flex-1 bg-olive px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep"
+                    disabled={hasUploadingPhotos}
+                    className="flex-1 bg-olive px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep disabled:opacity-60"
                   >
                     Continue
                   </button>
                 ) : (
                   <button
                     type="submit"
-                    disabled={sending || uploading}
+                    disabled={
+                      sending ||
+                      hasUploadingPhotos ||
+                      (service === "repair" && hasFailedPhotos) ||
+                      (service === "repair" &&
+                        uploadedPhotoCount === 0 &&
+                        !allowWithoutPhotos)
+                    }
                     className="flex-1 bg-olive px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep disabled:opacity-60"
                   >
                     {sending

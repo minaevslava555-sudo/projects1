@@ -162,6 +162,9 @@ export async function POST(request: Request) {
       return jsonError(photos.error, 400);
     }
     const repairPhotoPaths = photos.paths;
+    if (serviceRaw === "repair") {
+      console.info("[order] repair_photo_count", repairPhotoPaths.length);
+    }
 
     if (!name || !phone || !serviceRaw || !SERVICES.has(serviceRaw as BookingService)) {
       return jsonError("Заполните имя, телефон и услугу", 400);
