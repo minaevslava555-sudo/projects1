@@ -27,7 +27,7 @@
 - Заказы в Supabase через `service_role`.
 - Telegram notify (после обновления токена на Vercel).
 - Home Repairs: после save заказа админу уходит текст + до 5 фото из private `repair-order-photos` через Bot API (`sendMediaGroup`, без публичных URL).
-- Repair photo UX: per-file Uploading/Uploaded/Failed + Retry; Confirm без фото только с явной галочкой; лог `[order] repair_photo_count` без paths/PII.
+- Repair photo UX: thumbnails + Remove/Replace; Uploaded только после server OK; Turnstile только на Review (security verification); photo upload без Turnstile (draft + rate limit); Confirm без фото только с галочкой.
 
 ## Пока только локально (wizard + security)
 

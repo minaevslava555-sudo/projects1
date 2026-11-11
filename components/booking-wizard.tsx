@@ -60,19 +60,26 @@ type RepairPhotoItem = {
   path?: string;
   error?: string;
   file?: File;
+  previewUrl: string;
 };
 
-async function waitForTurnstileToken(
-  getToken: () => string | null,
-  timeoutMs = 90000,
-) {
-  const started = Date.now();
-  while (Date.now() - started < timeoutMs) {
-    const token = getToken();
-    if (token) return token;
-    await new Promise((resolve) => setTimeout(resolve, 200));
-  }
-  throw new Error("Complete the security check to continue uploading");
+const ACCEPTED_PHOTO_TYPES = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+]);
+
+const PHOTO_ACCEPT =
+  "image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp";
+
+function isAcceptedPhotoFile(file: File) {
+  if (ACCEPTED_PHOTO_TYPES.has(file.type)) return true;
+  return /\.(jpe?g|png|webp)$/i.test(file.name);
+}
+
+function revokePreview(url: string | undefined) {
+  if (url?.startsWith("blob:")) URL.revokeObjectURL(url);
 }
 
 const STEPS: StepId[] = ["configure", "schedule", "address", "contact", "review"];
@@ -189,7 +196,9 @@ export default function BookingWizard({
   const [error, setError] = useState("");
   const [successRef, setSuccessRef] = useState<string | null>(null);
   const bookingContextRef = useRef({ service, massageCategoryId });
-  const turnstileTokenRef = useRef<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const replaceTargetIdRef = useRef<string | null>(null);
+  const [replaceTargetId, setReplaceTargetId] = useState<string | null>(null);
 
   const step = STEPS[stepIndex] ?? "configure";
   const cleaning = useMemo(() => cleaningPlan(rooms), [rooms]);
@@ -207,6 +216,7 @@ export default function BookingWizard({
   const hasUploadingPhotos = repairPhotos.some((item) => item.status === "uploading");
   const hasFailedPhotos = repairPhotos.some((item) => item.status === "failed");
   const uploadedPhotoCount = repairPhotoPaths.length;
+  const occupiedPhotoSlots = repairPhotos.length;
 
   const total = useMemo(() => {
     if (service === "massage") return massagePriceEuro(massageMinutes) ?? 45;
@@ -214,9 +224,12 @@ export default function BookingWizard({
     return null;
   }, [service, massageMinutes, rooms]);
 
-  useEffect(() => {
-    turnstileTokenRef.current = turnstileToken;
-  }, [turnstileToken]);
+  function clearRepairPhotos() {
+    setRepairPhotos((prev) => {
+      for (const item of prev) revokePreview(item.previewUrl);
+      return [];
+    });
+  }
 
   function resetWizardFields() {
     setStepIndex(0);
@@ -228,7 +241,7 @@ export default function BookingWizard({
     setIdempotencyKey(crypto.randomUUID());
     setTurnstileToken(null);
     setTurnstileKey((value) => value + 1);
-    setRepairPhotos([]);
+    clearRepairPhotos();
     setAllowWithoutPhotos(false);
     setDate("");
     setPreferredTime("10:00");
@@ -249,10 +262,12 @@ export default function BookingWizard({
     );
   }
 
-  function refreshTurnstile() {
-    turnstileTokenRef.current = null;
-    setTurnstileToken(null);
-    setTurnstileKey((value) => value + 1);
+  function removeRepairPhoto(id: string) {
+    setRepairPhotos((prev) => {
+      const target = prev.find((item) => item.id === id);
+      if (target) revokePreview(target.previewUrl);
+      return prev.filter((item) => item.id !== id);
+    });
   }
 
   async function ensureDraft() {
@@ -370,13 +385,12 @@ export default function BookingWizard({
       status: "uploading",
       error: undefined,
       file,
+      path: undefined,
     });
     try {
-      const token = await waitForTurnstileToken(() => turnstileTokenRef.current);
       const draft = await ensureDraft();
       const body = new FormData();
       body.set("draftToken", draft.draftToken);
-      body.set("turnstileToken", token);
       body.set("file", file);
       const response = await fetch("/api/order/photos", {
         method: "POST",
@@ -397,34 +411,90 @@ export default function BookingWizard({
         file: undefined,
       });
       setAllowWithoutPhotos(false);
-      // Turnstile tokens are typically single-use
-      refreshTurnstile();
     } catch (uploadError) {
       updateRepairPhoto(itemId, {
         status: "failed",
         error:
           uploadError instanceof Error ? uploadError.message : "Photo upload failed",
         file,
+        path: undefined,
       });
-      refreshTurnstile();
     }
   }
 
   async function onUploadPhotos(fileList: FileList | null) {
-    if (!fileList?.length) return;
-    const remaining = 5 - uploadedPhotoCount;
+    if (!fileList?.length) {
+      setError("No photo selected. Please choose JPG, PNG or WEBP files.");
+      return;
+    }
+
+    const replaceId = replaceTargetIdRef.current;
+    replaceTargetIdRef.current = null;
+    setReplaceTargetId(null);
+
+    if (replaceId) {
+      const file = fileList[0];
+      if (!file) {
+        setError("No photo selected for replace.");
+        return;
+      }
+      if (!isAcceptedPhotoFile(file)) {
+        setError("Only JPG, JPEG, PNG and WEBP images are allowed.");
+        return;
+      }
+      if (file.size <= 0 || file.size > 5 * 1024 * 1024) {
+        setError("Each photo must be up to 5 MB.");
+        return;
+      }
+      setError("");
+      const previewUrl = URL.createObjectURL(file);
+      setRepairPhotos((prev) => {
+        const existing = prev.find((item) => item.id === replaceId);
+        if (existing) revokePreview(existing.previewUrl);
+        return prev.map((item) =>
+          item.id === replaceId
+            ? {
+                id: replaceId,
+                fileName: file.name || "photo",
+                status: "uploading" as const,
+                file,
+                previewUrl,
+              }
+            : item,
+        );
+      });
+      await uploadOneRepairPhoto(replaceId, file);
+      return;
+    }
+
+    const remaining = 5 - occupiedPhotoSlots;
     if (remaining <= 0) {
       setError("Maximum 5 photos");
       return;
     }
 
     setError("");
-    const files = Array.from(fileList).slice(0, remaining);
-    const items: RepairPhotoItem[] = files.map((file) => ({
+    const selected = Array.from(fileList).slice(0, remaining);
+    const accepted: File[] = [];
+    for (const file of selected) {
+      if (!isAcceptedPhotoFile(file)) {
+        setError("Only JPG, JPEG, PNG and WEBP images are allowed.");
+        continue;
+      }
+      if (file.size <= 0 || file.size > 5 * 1024 * 1024) {
+        setError("Each photo must be up to 5 MB.");
+        continue;
+      }
+      accepted.push(file);
+    }
+    if (!accepted.length) return;
+
+    const items: RepairPhotoItem[] = accepted.map((file) => ({
       id: crypto.randomUUID(),
       fileName: file.name || "photo",
       status: "uploading" as const,
       file,
+      previewUrl: URL.createObjectURL(file),
     }));
     setRepairPhotos((prev) => [...prev, ...items]);
 
@@ -441,6 +511,14 @@ export default function BookingWizard({
     }
     setError("");
     await uploadOneRepairPhoto(item.id, item.file);
+  }
+
+  function openPhotoPicker(replaceId?: string) {
+    const next = replaceId ?? null;
+    replaceTargetIdRef.current = next;
+    setReplaceTargetId(next);
+    // Allow React to apply `multiple`/disabled before the OS picker opens.
+    queueMicrotask(() => fileInputRef.current?.click());
   }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -750,61 +828,107 @@ export default function BookingWizard({
                     Photos (up to 5)
                   </p>
                   <p className="mb-2 text-xs text-muted">
-                    Complete the security check below, then choose photos. Each
-                    file shows Uploading / Uploaded / Failed.
+                    JPG, JPEG, PNG or WEBP. Thumbnails appear right after you
+                    choose files. “Uploaded” only after the server confirms.
                   </p>
                   <input
+                    ref={fileInputRef}
                     type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    multiple
-                    disabled={hasUploadingPhotos || uploadedPhotoCount >= 5}
+                    accept={PHOTO_ACCEPT}
+                    multiple={!replaceTargetId}
+                    disabled={
+                      hasUploadingPhotos ||
+                      (occupiedPhotoSlots >= 5 && !replaceTargetId)
+                    }
                     onChange={(event) => {
                       void onUploadPhotos(event.target.files);
+                      // Clear native value so Android/desktop can re-select the same files.
+                      // Selected photos are shown via thumbnails below, not via this label.
                       event.target.value = "";
                     }}
-                    className="block w-full text-sm text-muted file:mr-3 file:border file:border-mist file:bg-white file:px-3 file:py-2 file:text-sm file:font-semibold file:text-ink"
+                    className="sr-only"
+                    aria-label="Choose repair photos"
                   />
+                  <button
+                    type="button"
+                    disabled={hasUploadingPhotos || occupiedPhotoSlots >= 5}
+                    onClick={() => openPhotoPicker()}
+                    className="inline-flex items-center border border-mist bg-white px-4 py-3 text-sm font-semibold text-ink transition hover:border-olive disabled:opacity-50"
+                  >
+                    {occupiedPhotoSlots > 0 ? "Add more photos" : "Choose photos"}
+                  </button>
                   {repairPhotos.length ? (
-                    <ul className="mt-3 space-y-2">
+                    <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
                       {repairPhotos.map((item) => (
                         <li
                           key={item.id}
-                          className="flex items-start justify-between gap-3 border border-mist bg-white px-3 py-2 text-sm"
+                          className="overflow-hidden border border-mist bg-white"
                         >
-                          <div className="min-w-0">
-                            <p className="truncate font-medium text-ink">{item.fileName}</p>
-                            <p
-                              className={
+                          <div className="relative aspect-square bg-mist/40">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={item.previewUrl}
+                              alt={item.fileName}
+                              className="h-full w-full object-cover"
+                            />
+                            <span
+                              className={`absolute bottom-0 left-0 right-0 px-2 py-1 text-[11px] font-semibold ${
                                 item.status === "uploaded"
-                                  ? "text-olive"
+                                  ? "bg-olive text-white"
                                   : item.status === "failed"
-                                    ? "text-danger"
-                                    : "text-muted"
-                              }
+                                    ? "bg-danger text-white"
+                                    : "bg-ink/70 text-white"
+                              }`}
                             >
                               {item.status === "uploading"
-                                ? "Uploading"
+                                ? "Uploading…"
                                 : item.status === "uploaded"
                                   ? "Uploaded"
-                                  : `Failed${item.error ? `: ${item.error}` : ""}`}
-                            </p>
+                                  : "Failed"}
+                            </span>
                           </div>
-                          {item.status === "failed" ? (
-                            <button
-                              type="button"
-                              onClick={() => void retryRepairPhoto(item)}
-                              disabled={hasUploadingPhotos}
-                              className="shrink-0 border border-mist px-2 py-1 text-xs font-semibold text-ink transition hover:border-olive disabled:opacity-50"
-                            >
-                              Retry
-                            </button>
-                          ) : null}
+                          <div className="space-y-1 p-2">
+                            <p className="truncate text-xs text-ink">{item.fileName}</p>
+                            {item.status === "failed" && item.error ? (
+                              <p className="text-xs text-danger">{item.error}</p>
+                            ) : null}
+                            <div className="flex flex-wrap gap-1">
+                              {item.status === "failed" ? (
+                                <button
+                                  type="button"
+                                  onClick={() => void retryRepairPhoto(item)}
+                                  disabled={hasUploadingPhotos}
+                                  className="border border-mist px-2 py-1 text-[11px] font-semibold text-ink disabled:opacity-50"
+                                >
+                                  Retry
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                onClick={() => openPhotoPicker(item.id)}
+                                disabled={hasUploadingPhotos}
+                                className="border border-mist px-2 py-1 text-[11px] font-semibold text-ink disabled:opacity-50"
+                              >
+                                Replace
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removeRepairPhoto(item.id)}
+                                disabled={hasUploadingPhotos}
+                                className="border border-mist px-2 py-1 text-[11px] font-semibold text-ink disabled:opacity-50"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
                         </li>
                       ))}
                     </ul>
-                  ) : null}
+                  ) : (
+                    <p className="mt-2 text-sm text-muted">No photos selected yet.</p>
+                  )}
                   <p className="mt-2 text-sm text-olive">
-                    Successfully uploaded: {uploadedPhotoCount}
+                    Confirmed on server: {uploadedPhotoCount} / 5
                   </p>
                 </div>
               </div>
@@ -1004,12 +1128,20 @@ export default function BookingWizard({
             ) : null}
 
             <div className="sticky bottom-0 -mx-5 mt-2 border-t border-mist bg-paper/95 px-5 py-4 backdrop-blur sm:-mx-6 sm:px-6">
-              {(service === "repair" || step === "review") && !successRef ? (
-                <TurnstileWidget
-                  key={turnstileKey}
-                  className="mb-3"
-                  onToken={setTurnstileToken}
-                />
+              {step === "review" && !successRef ? (
+                <div className="mb-3">
+                  <p className="mb-2 text-xs font-medium tracking-[0.14em] text-muted uppercase">
+                    Security verification
+                  </p>
+                  <p className="mb-2 text-xs text-muted">
+                    Cloudflare check before sending your request. This is not a
+                    photo upload status.
+                  </p>
+                  <TurnstileWidget
+                    key={turnstileKey}
+                    onToken={setTurnstileToken}
+                  />
+                </div>
               ) : null}
               <div className="flex gap-2">
                 {stepIndex > 0 ? (

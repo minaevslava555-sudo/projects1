@@ -8,7 +8,6 @@ import { detectImageMagic } from "@/lib/image-magic";
 import { clientIpFromHeaders, consumeRateLimit } from "@/lib/rate-limit";
 import { cleanupOrphanRepairPhotos } from "@/lib/repair-photos-cleanup";
 import { assertSupabaseServiceKey, getSupabaseServer } from "@/lib/supabase/server";
-import { verifyTurnstileToken } from "@/lib/turnstile";
 
 export const runtime = "nodejs";
 
@@ -36,21 +35,12 @@ export async function POST(request: Request) {
 
     const form = await request.formData();
     const draftTokenRaw = form.get("draftToken");
-    const turnstileRaw = form.get("turnstileToken");
     const file = form.get("file");
 
-    const turnstile = await verifyTurnstileToken(
-      typeof turnstileRaw === "string" ? turnstileRaw : null,
-      ip,
-    );
-    if (!turnstile.ok) {
-      return jsonError(turnstile.error, 403);
-    }
-
+    // Anti-bot for uploads: draft HMAC + IP rate limit (Turnstile is on final order submit).
     const draft = verifyDraftToken(
       typeof draftTokenRaw === "string" ? draftTokenRaw : null,
-    );
-    if (!draft.ok) {
+    );    if (!draft.ok) {
       return jsonError(draft.error, 400);
     }
     const draftId = draft.draftId;
