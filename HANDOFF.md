@@ -26,6 +26,7 @@
 - Лендинг + пошаговое бронирование (локально после `npm run dev`).
 - Заказы в Supabase через `service_role`.
 - Telegram notify (после обновления токена на Vercel).
+- Home Repairs: после save заказа админу уходит текст + до 5 фото из private `repair-order-photos` через Bot API (`sendMediaGroup`, без публичных URL).
 
 ## Пока только локально (wizard + security)
 

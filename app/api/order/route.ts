@@ -287,6 +287,7 @@ export async function POST(request: Request) {
         massageCategory: service === "massage" ? massageCategory : undefined,
         problemDescription: service === "repair" ? problemDescription : undefined,
         repairPhotoCount: service === "repair" ? repairPhotoPaths.length : undefined,
+        repairPhotoPaths: service === "repair" ? repairPhotoPaths : undefined,
       });
     } catch (notifyError) {
       telegramOk = false;
