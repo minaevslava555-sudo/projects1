@@ -1,11 +1,27 @@
 import {
+  assertPhotosBelongToDraft,
+  isDraftConsumed,
+  markDraftConsumed,
+  verifyDraftToken,
+} from "@/lib/booking-draft";
+import {
+  claimIdempotencyKey,
+  getIdempotentOrder,
+  normalizeIdempotencyKey,
+  storeIdempotentOrder,
+  type IdempotentOrderResult,
+} from "@/lib/booking-idempotency";
+import {
   type BookingService,
   isValidPreferredTime,
   resolveBookingPricing,
 } from "@/lib/booking-pricing";
 import { generateOrderRef } from "@/lib/order-ref";
 import { saveOrderToSupabase } from "@/lib/orders";
+import { clientIpFromHeaders, consumeRateLimit } from "@/lib/rate-limit";
+import { cleanupOrphanRepairPhotos } from "@/lib/repair-photos-cleanup";
 import { notifyAdminAboutOrder } from "@/lib/telegram-notify";
+import { verifyTurnstileToken } from "@/lib/turnstile";
 
 export const runtime = "nodejs";
 
@@ -60,8 +76,28 @@ function parsePhotoPaths(value: unknown): { ok: true; paths: string[] } | { ok: 
   return { ok: true, paths };
 }
 
+function pendingPlaceholder(): IdempotentOrderResult {
+  return {
+    id: "__pending__",
+    orderRef: "",
+    pricingMode: "fixed",
+    priceEuro: null,
+    telegramOk: false,
+  };
+}
+
 export async function POST(request: Request) {
   try {
+    void cleanupOrphanRepairPhotos({ limit: 3 }).catch((error) => {
+      console.warn("[order] lazy cleanup skipped", error);
+    });
+
+    const ip = clientIpFromHeaders(request.headers);
+    const limited = await consumeRateLimit(`order:${ip}`, 10, 600);
+    if (!limited.ok) {
+      return jsonError("Слишком много запросов. Попробуйте позже", 429);
+    }
+
     let body: unknown;
     try {
       body = await request.json();
@@ -70,6 +106,43 @@ export async function POST(request: Request) {
     }
 
     const raw = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+
+    const turnstile = await verifyTurnstileToken(
+      asTrimmedString(raw.turnstileToken, 4096) ||
+        request.headers.get("x-turnstile-token"),
+      ip,
+    );
+    if (!turnstile.ok) {
+      return jsonError(turnstile.error, 403);
+    }
+
+    const idempotencyKey =
+      normalizeIdempotencyKey(raw.idempotencyKey) ||
+      normalizeIdempotencyKey(request.headers.get("idempotency-key"));
+    if (!idempotencyKey) {
+      return jsonError("Нужен Idempotency-Key", 400);
+    }
+
+    const existing = await getIdempotentOrder(idempotencyKey);
+    if (existing && existing.id !== "__pending__") {
+      return Response.json({ ok: true, ...existing });
+    }
+    if (existing?.id === "__pending__") {
+      return jsonError("Заказ уже обрабатывается", 409);
+    }
+
+    const claim = await claimIdempotencyKey(idempotencyKey, pendingPlaceholder());
+    if (claim === "unavailable") {
+      return jsonError("Сервис временно недоступен", 503);
+    }
+    if (claim === "exists") {
+      const again = await getIdempotentOrder(idempotencyKey);
+      if (again && again.id !== "__pending__") {
+        return Response.json({ ok: true, ...again });
+      }
+      return jsonError("Заказ уже обрабатывается", 409);
+    }
+
     const name = asTrimmedString(raw.name, 120);
     const phone = asTrimmedString(raw.phone, 40);
     const serviceRaw = asTrimmedString(raw.service, 40);
@@ -119,6 +192,22 @@ export async function POST(request: Request) {
       if (!problemDescription) {
         return jsonError("Опишите проблему", 400);
       }
+    }
+
+    const draftToken =
+      asTrimmedString(raw.draftToken, 1024) ||
+      request.headers.get("x-booking-draft-token");
+    const draft = verifyDraftToken(draftToken);
+    if (!draft.ok) {
+      return jsonError(draft.error, 400);
+    }
+    const draftId = draft.draftId;
+    if (await isDraftConsumed(draftId)) {
+      return jsonError("Черновик уже использован", 400);
+    }
+    const bound = await assertPhotosBelongToDraft(draftId, repairPhotoPaths);
+    if (!bound.ok) {
+      return jsonError(bound.error, 400);
     }
 
     const priced = resolveBookingPricing({
@@ -173,6 +262,8 @@ export async function POST(request: Request) {
       orderRef,
     });
 
+    await markDraftConsumed(draftId);
+
     let telegramOk = true;
     try {
       await notifyAdminAboutOrder({
@@ -202,13 +293,18 @@ export async function POST(request: Request) {
       console.error("[order] telegram notify failed", notifyError);
     }
 
-    return Response.json({
-      ok: true,
+    const result: IdempotentOrderResult = {
       id,
       orderRef: savedRef,
       pricingMode: priced.mode,
       priceEuro: priced.priceEuro,
       telegramOk,
+    };
+    await storeIdempotentOrder(idempotencyKey, result);
+
+    return Response.json({
+      ok: true,
+      ...result,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Не удалось отправить заказ";

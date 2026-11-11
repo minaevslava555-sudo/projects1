@@ -14,6 +14,7 @@ import {
   getMassageCategory,
   type MassageCategoryId,
 } from "@/lib/massage-catalog";
+import TurnstileWidget from "@/components/turnstile-widget";
 import {
   useEffect,
   useId,
@@ -145,7 +146,11 @@ export default function BookingWizard({
   const [rooms, setRooms] = useState(2);
   const [massageMinutes, setMassageMinutes] = useState<MassageMinutes>(60);
   const [problemDescription, setProblemDescription] = useState("");
-  const [repairDraftId, setRepairDraftId] = useState(() => crypto.randomUUID());
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [draftToken, setDraftToken] = useState<string | null>(null);
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileKey, setTurnstileKey] = useState(0);
   const [repairPhotoPaths, setRepairPhotoPaths] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [date, setDate] = useState("");
@@ -178,7 +183,11 @@ export default function BookingWizard({
     setRooms(2);
     setMassageMinutes(60);
     setProblemDescription("");
-    setRepairDraftId(crypto.randomUUID());
+    setDraftId(null);
+    setDraftToken(null);
+    setIdempotencyKey(crypto.randomUUID());
+    setTurnstileToken(null);
+    setTurnstileKey((value) => value + 1);
     setRepairPhotoPaths([]);
     setUploading(false);
     setDate("");
@@ -192,6 +201,23 @@ export default function BookingWizard({
     setSending(false);
     setError("");
     setSuccessRef(null);
+  }
+
+  async function ensureDraft() {
+    if (draftToken && draftId) return { draftId, draftToken };
+    const response = await fetch("/api/order/draft", { method: "POST" });
+    const data = (await response.json()) as {
+      ok?: boolean;
+      draftId?: string;
+      draftToken?: string;
+      error?: string;
+    };
+    if (!response.ok || !data.ok || !data.draftId || !data.draftToken) {
+      throw new Error(data.error || "Не удалось открыть бронирование");
+    }
+    setDraftId(data.draftId);
+    setDraftToken(data.draftToken);
+    return { draftId: data.draftId, draftToken: data.draftToken };
   }
 
   // Fresh mount (parent key) starts at Step 1. Switching service mid-session resets fields.
@@ -220,6 +246,34 @@ export default function BookingWizard({
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [open, onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch("/api/order/draft", { method: "POST" });
+        const data = (await response.json()) as {
+          ok?: boolean;
+          draftId?: string;
+          draftToken?: string;
+          error?: string;
+        };
+        if (cancelled) return;
+        if (!response.ok || !data.ok || !data.draftId || !data.draftToken) {
+          setError(data.error || "Не удалось открыть бронирование");
+          return;
+        }
+        setDraftId(data.draftId);
+        setDraftToken(data.draftToken);
+      } catch {
+        if (!cancelled) setError("Не удалось открыть бронирование");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, service, massageCategoryId, idempotencyKey]);
 
   function validateStep(current: StepId): string | null {
     if (current === "configure") {
@@ -266,15 +320,21 @@ export default function BookingWizard({
       setError("Maximum 5 photos");
       return;
     }
+    if (!turnstileToken) {
+      setError("Complete the security check before uploading photos");
+      return;
+    }
 
     setUploading(true);
     setError("");
     try {
+      const draft = await ensureDraft();
       const files = Array.from(fileList).slice(0, remaining);
       const uploaded: string[] = [];
       for (const file of files) {
         const body = new FormData();
-        body.set("draftId", repairDraftId);
+        body.set("draftToken", draft.draftToken);
+        body.set("turnstileToken", turnstileToken);
         body.set("file", file);
         const response = await fetch("/api/order/photos", {
           method: "POST",
@@ -287,6 +347,9 @@ export default function BookingWizard({
         uploaded.push(data.path);
       }
       setRepairPhotoPaths((prev) => [...prev, ...uploaded]);
+      // Refresh Turnstile after upload — tokens are typically single-use
+      setTurnstileToken(null);
+      setTurnstileKey((value) => value + 1);
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Photo upload failed");
     } finally {
@@ -307,13 +370,22 @@ export default function BookingWizard({
       }
     }
 
+    if (!turnstileToken) {
+      setError("Complete the security check before submitting");
+      return;
+    }
+
     setSending(true);
     setError("");
 
     try {
+      const draft = await ensureDraft();
       const response = await fetch("/api/order", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
         body: JSON.stringify({
           name: name.trim(),
           phone: phone.trim(),
@@ -333,6 +405,9 @@ export default function BookingWizard({
           problemDescription:
             service === "repair" ? problemDescription.trim() : undefined,
           repairPhotoPaths: service === "repair" ? repairPhotoPaths : undefined,
+          draftToken: draft.draftToken,
+          turnstileToken,
+          idempotencyKey,
         }),
       });
 
@@ -770,6 +845,13 @@ export default function BookingWizard({
             ) : null}
 
             <div className="sticky bottom-0 -mx-5 mt-2 border-t border-mist bg-paper/95 px-5 py-4 backdrop-blur sm:-mx-6 sm:px-6">
+              {(service === "repair" || step === "review") && !successRef ? (
+                <TurnstileWidget
+                  key={turnstileKey}
+                  className="mb-3"
+                  onToken={setTurnstileToken}
+                />
+              ) : null}
               <div className="flex gap-2">
                 {stepIndex > 0 ? (
                   <button
