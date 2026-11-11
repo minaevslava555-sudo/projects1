@@ -14,7 +14,7 @@ export default function MassageCatalogView({
   onBook,
 }: {
   onBack: () => void;
-  onBook: (categoryTitle: string) => void;
+  onBook: (categoryId?: MassageCategoryId) => void;
 }) {
   const [selectedId, setSelectedId] = useState<MassageCategoryId | null>(null);
   const selected = selectedId ? getMassageCategory(selectedId) : null;
@@ -40,7 +40,7 @@ export default function MassageCatalogView({
           {!selected ? (
             <button
               type="button"
-              onClick={() => onBook("Massage")}
+              onClick={() => onBook()}
               className="inline-flex items-center bg-olive px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-olive-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
             >
               Book Massage
@@ -161,7 +161,7 @@ export default function MassageCatalogView({
               <div className="mt-10 flex flex-wrap gap-3">
                 <button
                   type="button"
-                  onClick={() => onBook(selected.title)}
+                  onClick={() => onBook(selected.id)}
                   className="inline-flex items-center bg-olive px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold sm:text-base"
                 >
                   Book Massage

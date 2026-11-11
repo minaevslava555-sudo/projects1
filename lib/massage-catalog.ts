@@ -1,7 +1,7 @@
 /**
  * Premium in-home massage menu for the landing UI.
- * Category choice is not a dedicated DB column — it is written into order `details`
- * together with duration. Prices/durations stay in MASSAGE_OPTIONS on the page.
+ * Category id/title is stored in projects1_orders.massage_category.
+ * Prices/durations live in lib/booking-pricing.ts (MASSAGE_OPTIONS).
  */
 export type MassageCategoryId =
   | "relaxing"

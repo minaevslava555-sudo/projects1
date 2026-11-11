@@ -2,6 +2,7 @@
 
 import HotspotGallery from "@/components/hotspot-gallery";
 import MassageCatalogView from "@/components/massage-catalog-view";
+import type { MassageCategoryId } from "@/lib/massage-catalog";
 import { SERVICE_HOTSPOTS, type ServiceValue } from "@/lib/service-hotspots";
 
 export default function ServiceDetailView({
@@ -11,13 +12,13 @@ export default function ServiceDetailView({
 }: {
   service: ServiceValue;
   onBack: () => void;
-  onBook: (massageStyle?: string) => void;
+  onBook: (massageCategoryId?: MassageCategoryId) => void;
 }) {
   if (service === "massage") {
     return (
       <MassageCatalogView
         onBack={onBack}
-        onBook={(categoryTitle) => onBook(categoryTitle)}
+        onBook={(categoryId) => onBook(categoryId)}
       />
     );
   }

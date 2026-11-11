@@ -2,20 +2,17 @@
 
 import "./havenly.css";
 
+import BookingWizard from "@/components/booking-wizard";
 import ServiceDetailView from "@/components/service-detail-view";
+import type { MassageCategoryId } from "@/lib/massage-catalog";
 import type { ServiceValue } from "@/lib/service-hotspots";
 import {
-  FormEvent,
   useEffect,
-  useId,
-  useMemo,
   useRef,
   useState,
   type CSSProperties,
   type ReactNode,
 } from "react";
-
-type MassageMinutes = 60 | 90 | 120;
 
 const SERVICE_META: Record<
   ServiceValue,
@@ -28,8 +25,8 @@ const SERVICE_META: Record<
   },
   repair: {
     title: "Home Repairs",
-    rateLabel: "20€ / hour per technician",
-    cardPrice: "from 20€",
+    rateLabel: "Quote after assessment",
+    cardPrice: "quote",
   },
   massage: {
     title: "Massage",
@@ -37,29 +34,6 @@ const SERVICE_META: Record<
     cardPrice: "from 45€",
   },
 };
-
-const MASSAGE_OPTIONS: Array<{ minutes: MassageMinutes; price: number; label: string }> = [
-  { minutes: 60, price: 45, label: "60 min — 45€" },
-  { minutes: 90, price: 67.5, label: "90 min — 67.50€" },
-  { minutes: 120, price: 90, label: "120 min — 90€" },
-];
-
-function cleaningPlan(rooms: number): { hours: number; workers: number } {
-  switch (Math.min(6, Math.max(1, rooms))) {
-    case 1:
-      return { hours: 2, workers: 1 };
-    case 2:
-      return { hours: 3, workers: 1 };
-    case 3:
-      return { hours: 4, workers: 2 };
-    case 4:
-      return { hours: 5, workers: 2 };
-    case 5:
-    case 6:
-    default:
-      return { hours: 6, workers: 3 };
-  }
-}
 
 type CleaningRoomTab = "Kitchen" | "Rooms" | "Bathroom" | "Hallway";
 type MassageFocusTab = "Back" | "Legs" | "Face";
@@ -202,14 +176,6 @@ const HERO_SERVICES: Array<{
   },
 ];
 
-function formatEuro(value: number) {
-  return new Intl.NumberFormat("en-IE", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: value % 1 === 0 ? 0 : 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
 
 function Reveal({
   children,
@@ -247,442 +213,16 @@ function Reveal({
   );
 }
 
-function Stepper({
-  id,
-  label,
-  value,
-  min,
-  max,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <div>
-      <label htmlFor={id} className="mb-2 block text-sm font-medium text-ink">
-        {label}
-      </label>
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          className="inline-flex h-11 w-11 items-center justify-center border border-mist bg-paper text-lg font-semibold text-ink transition hover:border-olive disabled:opacity-40"
-          aria-label={`Decrease ${label}`}
-          disabled={value <= min}
-          onClick={() => onChange(Math.max(min, value - 1))}
-        >
-          −
-        </button>
-        <input
-          id={id}
-          type="number"
-          min={min}
-          max={max}
-          value={value}
-          onChange={(event) => {
-            const next = Number(event.target.value);
-            if (!Number.isFinite(next)) return;
-            onChange(Math.min(max, Math.max(min, Math.round(next))));
-          }}
-          className="w-full border border-mist bg-paper px-4 py-3 text-center text-ink outline-none transition focus:border-olive"
-        />
-        <button
-          type="button"
-          className="inline-flex h-11 w-11 items-center justify-center border border-mist bg-paper text-lg font-semibold text-ink transition hover:border-olive disabled:opacity-40"
-          aria-label={`Increase ${label}`}
-          disabled={value >= max}
-          onClick={() => onChange(Math.min(max, value + 1))}
-        >
-          +
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function OrderModal({
-  open,
-  service,
-  onServiceChange,
-  onClose,
-  lockService = false,
-  massageStyle = "",
-}: {
-  open: boolean;
-  service: ServiceValue;
-  onServiceChange: (service: ServiceValue) => void;
-  onClose: () => void;
-  lockService?: boolean;
-  /** Optional massage menu label — stored in free-text `details`, not a DB column. */
-  massageStyle?: string;
-}) {
-  const titleId = useId();
-  const [rooms, setRooms] = useState(2);
-  const [hours, setHours] = useState(2);
-  const [workers, setWorkers] = useState(1);
-  const [massageMinutes, setMassageMinutes] = useState<MassageMinutes>(60);
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [date, setDate] = useState("");
-  const [success, setSuccess] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState("");
-
-  const cleaning = useMemo(() => cleaningPlan(rooms), [rooms]);
-  const cleaningHours = cleaning.hours;
-  const cleaningWorkers = cleaning.workers;
-
-  useEffect(() => {
-    if (!open) return;
-    setRooms(2);
-    setHours(2);
-    setWorkers(1);
-    setMassageMinutes(60);
-    setName("");
-    setPhone("");
-    setDate("");
-    setSuccess(false);
-    setSending(false);
-    setError("");
-  }, [open, service]);
-
-  useEffect(() => {
-    if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open, onClose]);
-
-  const total = useMemo(() => {
-    if (service === "massage") {
-      return MASSAGE_OPTIONS.find((option) => option.minutes === massageMinutes)?.price ?? 45;
-    }
-    if (service === "cleaning") {
-      return cleaningHours * cleaningWorkers * 20;
-    }
-    return hours * workers * 20;
-  }, [service, hours, workers, massageMinutes, cleaningHours, cleaningWorkers]);
-
-  function orderDetails() {
-    if (service === "massage") {
-      const duration = `${massageMinutes} min session`;
-      const style = massageStyle.trim();
-      return style ? `${style} · ${duration}` : duration;
-    }
-    if (service === "cleaning") {
-      return `${rooms} room(s) require ~${cleaningHours} hours and ${cleaningWorkers} cleaner(s)`;
-    }
-    return `${hours} h × ${workers} technician${workers > 1 ? "s" : ""} × 20€`;
-  }
-
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    if (!form.checkValidity()) {
-      form.reportValidity();
-      return;
-    }
-    if (sending) return;
-
-    setSending(true);
-    setError("");
-    setSuccess(false);
-
-    try {
-      const response = await fetch("/api/order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          phone: phone.trim(),
-          service,
-          priceEuro: total,
-          date,
-          details: orderDetails(),
-          rooms: service === "cleaning" ? rooms : undefined,
-          hours:
-            service === "massage"
-              ? undefined
-              : service === "cleaning"
-                ? cleaningHours
-                : hours,
-          workers:
-            service === "massage"
-              ? undefined
-              : service === "cleaning"
-                ? cleaningWorkers
-                : workers,
-          massageMinutes: service === "massage" ? massageMinutes : undefined,
-        }),
-      });
-
-      const contentType = response.headers.get("content-type") || "";
-      const rawText = await response.text();
-      let data: { error?: string; ok?: boolean; id?: string; telegramOk?: boolean } = {};
-      if (contentType.includes("application/json")) {
-        try {
-          data = JSON.parse(rawText) as {
-            error?: string;
-            ok?: boolean;
-            id?: string;
-            telegramOk?: boolean;
-          };
-        } catch {
-          throw new Error("Сервер вернул некорректный JSON");
-        }
-      } else if (rawText.trim()) {
-        throw new Error(
-          response.ok
-            ? "Сервер вернул не JSON"
-            : `Ошибка сервера (${response.status}). Проверьте деплой API на Vercel.`,
-        );
-      } else {
-        throw new Error(`Пустой ответ сервера (${response.status})`);
-      }
-
-      if (!response.ok || !data.ok || !data.id) {
-        throw new Error(data.error || "Не удалось сохранить заказ");
-      }
-      setSuccess(true);
-    } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Не удалось отправить заказ");
-    } finally {
-      setSending(false);
-    }
-  }
-
-  if (!open) return null;
-
-  const meta = SERVICE_META[service];
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-ink/55 p-0 sm:items-center sm:p-6"
-      role="presentation"
-      onClick={onClose}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="max-h-[92svh] w-full max-w-lg overflow-y-auto border border-mist bg-paper shadow-2xl sm:max-h-[90svh]"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-mist bg-paper/95 px-5 py-4 backdrop-blur sm:px-6">
-          <div>
-            <p className="text-xs font-medium tracking-[0.18em] text-gold uppercase">
-              Booking calculator
-            </p>
-            <h2 id={titleId} className="mt-1 font-display text-2xl font-medium text-ink">
-              {meta.title}
-            </h2>
-            {service === "massage" && massageStyle.trim() ? (
-              <p className="mt-1 text-sm font-medium text-olive">{massageStyle.trim()}</p>
-            ) : null}
-            <p className="mt-1 text-sm text-muted">{meta.rateLabel}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-10 w-10 items-center justify-center border border-mist bg-white text-ink transition hover:border-olive"
-            aria-label="Close"
-          >
-            ×
-          </button>
-        </div>
-
-        <form className="space-y-6 px-5 py-5 sm:px-6 sm:py-6" noValidate onSubmit={onSubmit}>
-          {!lockService ? (
-            <div className="grid grid-cols-3 gap-2">
-              {(Object.keys(SERVICE_META) as ServiceValue[]).map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => onServiceChange(value)}
-                  className={`rounded-lg px-2 py-2.5 text-xs font-semibold transition sm:text-sm ${
-                    service === value
-                      ? "bg-olive text-white shadow-sm shadow-olive/25"
-                      : "border border-mist bg-white text-ink hover:border-olive/50"
-                  }`}
-                >
-                  {SERVICE_META[value].title}
-                </button>
-              ))}
-            </div>
-          ) : null}
-
-          <div className="rounded-xl border border-mist bg-white px-5 py-6 text-center">
-            <p className="text-xs font-medium tracking-[0.18em] text-muted uppercase">Total</p>
-            <p className="mt-2 font-display text-5xl font-bold tracking-tight text-olive sm:text-6xl">
-              {formatEuro(total)}
-            </p>
-          </div>
-
-          {service === "cleaning" ? (
-            <div className="space-y-4">
-              <Stepper
-                id="cleaning-rooms"
-                label="Number of rooms"
-                value={rooms}
-                min={1}
-                max={6}
-                onChange={setRooms}
-              />
-              <div className="rounded-xl border border-sand bg-sand/70 px-4 py-3 text-sm leading-relaxed text-ink">
-                <p className="font-medium">
-                  {rooms} room(s) require ~{cleaningHours} hours and {cleaningWorkers}{" "}
-                  cleaner(s)
-                </p>
-                <p className="mt-1 text-olive/80">
-                  {cleaningHours} × {cleaningWorkers} × 20€ = {formatEuro(total)}
-                </p>
-              </div>
-            </div>
-          ) : null}
-
-          {service === "repair" ? (
-            <div className="space-y-4">
-              <Stepper
-                id="repair-hours"
-                label="Number of hours"
-                value={hours}
-                min={1}
-                max={12}
-                onChange={setHours}
-              />
-              <Stepper
-                id="repair-workers"
-                label="Number of technicians"
-                value={workers}
-                min={1}
-                max={6}
-                onChange={setWorkers}
-              />
-              <p className="text-sm text-muted">
-                {hours} h × {workers} technician{workers > 1 ? "s" : ""} × 20€ = {formatEuro(total)}
-              </p>
-            </div>
-          ) : null}
-
-          {service === "massage" ? (
-            <div>
-              <p className="mb-2 text-sm font-medium text-ink">Session duration</p>
-              <div className="grid gap-2">
-                {MASSAGE_OPTIONS.map((option) => {
-                  const active = massageMinutes === option.minutes;
-                  return (
-                    <button
-                      key={option.minutes}
-                      type="button"
-                      onClick={() => setMassageMinutes(option.minutes)}
-                      className={`flex items-center justify-between border px-4 py-3 text-left transition ${
-                        active
-                          ? "border-olive bg-olive/10 text-ink"
-                          : "border-mist bg-white text-ink hover:border-olive"
-                      }`}
-                    >
-                      <span className="font-medium">{option.minutes} minutes</span>
-                      <span className="font-display text-lg font-bold">{formatEuro(option.price)}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
-
-          <div className="space-y-4 border-t border-mist pt-6">
-            <div>
-              <label htmlFor="order-name" className="mb-2 block text-sm font-medium text-ink">
-                Name
-              </label>
-              <input
-                id="order-name"
-                name="name"
-                type="text"
-                required
-                autoComplete="name"
-                placeholder="Your name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                className="w-full border border-mist bg-white px-4 py-3 text-ink outline-none transition placeholder:text-muted/60 focus:border-olive"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="order-phone" className="mb-2 block text-sm font-medium text-ink">
-                Phone
-              </label>
-              <input
-                id="order-phone"
-                name="phone"
-                type="tel"
-                required
-                autoComplete="tel"
-                placeholder="+351 ..."
-                value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-                className="w-full border border-mist bg-white px-4 py-3 text-ink outline-none transition placeholder:text-muted/60 focus:border-olive"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="order-date" className="mb-2 block text-sm font-medium text-ink">
-                Date
-              </label>
-              <input
-                id="order-date"
-                name="date"
-                type="date"
-                required
-                value={date}
-                onChange={(event) => setDate(event.target.value)}
-                className="w-full border border-mist bg-white px-4 py-3 text-ink outline-none transition focus:border-olive"
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={sending}
-            className="w-full bg-olive px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep disabled:opacity-60 sm:text-base"
-          >
-            {sending ? "Sending..." : `Confirm order — ${formatEuro(total)}`}
-          </button>
-
-          {error ? (
-            <p className="text-sm font-medium text-danger" role="alert">
-              {error}
-            </p>
-          ) : null}
-
-          {success ? (
-            <p className="text-sm font-medium text-olive" role="status">
-              Request received for {meta.title} ({formatEuro(total)}). We’ll be in touch shortly.
-            </p>
-          ) : null}
-        </form>
-      </div>
-    </div>
-  );
-}
 
 export default function Home() {
   const [modalOpen, setModalOpen] = useState(false);
+  const [bookingSession, setBookingSession] = useState(0);
   const [service, setService] = useState<ServiceValue>("cleaning");
   const [activeServiceView, setActiveServiceView] = useState<ServiceValue | null>(null);
   const [lockService, setLockService] = useState(false);
-  const [massageStyle, setMassageStyle] = useState("");
+  const [massageCategoryId, setMassageCategoryId] = useState<MassageCategoryId | null>(
+    null,
+  );
   const [includedService, setIncludedService] = useState<ServiceValue>("cleaning");
   const [cleaningTab, setCleaningTab] = useState<CleaningRoomTab>("Kitchen");
   const [massageTab, setMassageTab] = useState<MassageFocusTab>("Back");
@@ -716,10 +256,15 @@ export default function Home() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function openOrder(value: ServiceValue, locked = false, style = "") {
+  function openOrder(
+    value: ServiceValue,
+    locked = false,
+    categoryId: MassageCategoryId | null = null,
+  ) {
     setService(value);
     setLockService(locked);
-    setMassageStyle(value === "massage" ? style : "");
+    setMassageCategoryId(value === "massage" ? categoryId : null);
+    setBookingSession((n) => n + 1);
     setModalOpen(true);
   }
 
@@ -844,7 +389,7 @@ export default function Home() {
           <ServiceDetailView
             service={activeServiceView}
             onBack={() => setActiveServiceView(null)}
-            onBook={(style) => openOrder(activeServiceView, true, style)}
+            onBook={(categoryId) => openOrder(activeServiceView, true, categoryId ?? null)}
           />
         ) : (
           <>
@@ -1328,17 +873,23 @@ export default function Home() {
         </div>
       </footer>
 
-      <OrderModal
-        open={modalOpen}
-        service={service}
-        onServiceChange={setService}
-        onClose={() => {
-          setModalOpen(false);
-          setMassageStyle("");
-        }}
-        lockService={lockService}
-        massageStyle={massageStyle}
-      />
+      {modalOpen ? (
+        <BookingWizard
+          key={bookingSession}
+          open={modalOpen}
+          service={service}
+          onServiceChange={(next) => {
+            setService(next);
+            if (next !== "massage") setMassageCategoryId(null);
+          }}
+          onClose={() => {
+            setModalOpen(false);
+            setMassageCategoryId(null);
+          }}
+          lockService={lockService}
+          massageCategoryId={massageCategoryId}
+        />
+      ) : null}
     </div>
   );
 }

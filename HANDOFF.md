@@ -1,58 +1,43 @@
-# HAVENLY — HANDOFF (продолжение завтра)
+# HAVENLY — HANDOFF
 
-Дата чекпоинта: 2026-11-10  
-Локальный commit: `checkpoint: HAVENLY premium redesign and booking migration preparation`  
-Ветка: `main` (только локально впереди origin; **push не делался**)
+Дата: 2026-11-11
 
-## Что сделано сегодня
+## Сделано
 
-- Premium-редизайн лендинга HAVENLY (типографика, hero, атмосфера, стили `havenly.css` / layout).
-- Каталог Massage без силуэта/hotspots: `lib/massage-catalog.ts`, `components/massage-catalog-view.tsx`, фото `public/images/massage-*.jpg`.
-- Обновлены service images / hero; правки hotspot gallery и service detail под новый UX.
-- Подготовлена **финальная** SQL-миграция Premium Booking Wizard:  
-  `supabase/safe_booking_wizard_migration.sql`  
-  (одна транзакция `BEGIN`…`COMMIT`, точная проверка legacy `projects1_orders_price_check`, quote/fixed pricing, RLS, private Storage bucket).
+- Premium redesign + massage catalog (локальные commits).
+- SQL-миграция Premium Booking Wizard **применена** в Production Supabase.
+- Backup: `C:\backups\havenly\supabase-full-20261111-192627.sql` (1 заказ на момент снятия).
+- Telegram: новый `TOKEN_TELEGRAM` проверен через `getMe`; Vercel Production redeploy Ready.
+- **Premium Booking Wizard (код):**
+  - `lib/booking-pricing.ts` — общие цены/слоты
+  - `POST /api/order` — серверные цены, `order_ref`, адрес, время, quote для repair
+  - `POST /api/order/photos` — private upload в `repair-order-photos`
+  - UI: `components/booking-wizard.tsx` (шаги configure → schedule → address → contact → review)
 
-## Что уже работает (локально / текущий код)
+## Работает
 
-- Лендинг, калькулятор/заказ через существующий `POST /api/order`.
-- Каталог Massage и навигация по услугам в UI.
-- Telegram-уведомления админу и агент/чат — без изменений контракта на сегодняшнем чекпоинте.
-- TypeScript (`tsc --noEmit`) и `npm run build` — успешно на момент чекпоинта.
+- Лендинг + пошаговое бронирование (локально после `npm run dev`).
+- Заказы в Supabase через `service_role`.
+- Telegram notify (после обновления токена на Vercel).
 
-## Что пока только локально (не на remote / не в Production)
+## Пока только локально (код wizard)
 
-- Весь сегодняшний UI + миграционный SQL-файл — в локальных commits, **не запушены**.
-- Deploy на Vercel **не выполнялся**.
-- Production Supabase **не менялась**.
+- Booking wizard / серверные цены / photos API — **нужен commit + deploy**, иначе Production Vercel ещё на старом `/api/order`.
+- Не пушить без явного решения.
 
-## Что ещё не применено в Supabase
+## Production Supabase
 
-- `supabase/safe_booking_wizard_migration.sql` — **не запускалась**.
-- Новые колонки wizard (`order_ref`, адрес, `preferred_time`, `pricing_mode`, quote, Storage policies и т.д.) в Production ещё нет.
-- Пользователь отдельно экспортировал `projects1_orders` (CSV/SQL); полный `pg_dump` БД — по инструкции, если ещё не снят.
+- Миграция применена: `pricing_mode`, `order_ref`, адрес, слоты, Storage bucket.
+- Production Vercel пока может быть на старом коде заказа. Деплой wizard+API делать **одним** релизом (UI и `/api/order` вместе).
 
-## Что не опубликовано на Vercel
+## Следующие шаги
 
-- Premium redesign / massage catalog / любые связанные фронтовые правки.
-- Любые будущие API-изменения под wizard (их ещё нет в коде заказа).
+1. Локальный smoke: Cleaning / Massage / Repair quote (+ фото).
+2. Commit безопасных файлов (без `.env*`).
+3. Deploy Vercel (после подтверждения).
+4. Один Production smoke-заказ.
 
-## Секреты и бэкапы (не в git)
+## Запреты без согласования
 
-- `.env.local`, токены, ключи Supabase/Telegram — в `.gitignore`, в commit не входили.
-- Истории чатов `data/chats`, `.vercel`, `node_modules` — игнорируются.
-- Резервные копии БД держать вне репозитория (например `C:\backups\havenly\`), не коммитить.
-
-## Следующие шаги (завтра)
-
-1. **Backup** — полный `pg_dump` через Session pooler (если ещё нет), плюс уже сделанный экспорт `projects1_orders`.
-2. **SQL migration** — вручную в Supabase SQL Editor: `safe_booking_wizard_migration.sql`, затем read-only проверки.
-3. **API** — расширить `POST /api/order` / `lib/orders.ts` под wizard-поля, server-side цены, quote для Repair, `order_ref`, загрузку фото в private bucket.
-4. **Booking wizard** — UI шагов (слоты 09–19 / 30 мин, адрес, massage category, repair description/photos).
-5. **Testing** — локально + smoke Production после миграции; только потом push/deploy по отдельному решению.
-
-## Запреты на старте завтрашнего дня (пока не согласовано)
-
-- Не push / не deploy / не SQL на Production без явного «ок».
-- Не затирать `data/agent.json` дефолтом.
-- Не коммитить `.env*` и бэкапы с ПДн клиентов.
+- Не push/deploy/SQL без «ок».
+- Не коммитить `.env*` и бэкапы с ПДн.
