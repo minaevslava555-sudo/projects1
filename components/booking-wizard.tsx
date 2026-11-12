@@ -1,5 +1,7 @@
 "use client";
 
+import LanguageSwitcher from "@/components/language-switcher";
+import TurnstileWidget from "@/components/turnstile-widget";
 import {
   MASSAGE_OPTIONS,
   buildTimeSlots,
@@ -14,7 +16,7 @@ import {
   getMassageCategory,
   type MassageCategoryId,
 } from "@/lib/massage-catalog";
-import TurnstileWidget from "@/components/turnstile-widget";
+import { useTranslations } from "next-intl";
 import {
   useEffect,
   useId,
@@ -24,30 +26,6 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-
-function cleanerLabel(count: number) {
-  return count === 1 ? "1 cleaner" : `${count} cleaners`;
-}
-
-const SERVICE_META: Record<
-  BookingService,
-  { title: string; rateLabel: string }
-> = {
-  cleaning: {
-    title: "Cleaning",
-    rateLabel: "20€ / hour per cleaner",
-  },
-  repair: {
-    title: "Home Repairs",
-    rateLabel: "Quote after assessment",
-  },
-  massage: {
-    title: "Massage",
-    rateLabel: "45€ / hour",
-  },
-};
-
-const TIME_SLOTS = buildTimeSlots();
 
 type StepId = "configure" | "schedule" | "address" | "contact" | "review";
 
@@ -62,6 +40,34 @@ type RepairPhotoItem = {
   file?: File;
   previewUrl: string;
 };
+
+type ErrorCode =
+  | "draftOpenFailed"
+  | "repairDetail"
+  | "chooseDate"
+  | "chooseTime"
+  | "addressRequired"
+  | "contactRequired"
+  | "photoUploadFailed"
+  | "noPhotoSelected"
+  | "noPhotoReplace"
+  | "photoType"
+  | "photoSize"
+  | "maxPhotos"
+  | "retryChooseAgain"
+  | "fixFailedPhotos"
+  | "photosOrConfirm"
+  | "turnstileRequired"
+  | "badJson"
+  | "notJson"
+  | "serverStatus"
+  | "emptyResponse"
+  | "saveFailed"
+  | "submitFailed";
+
+type WizardError =
+  | { kind: "code"; code: ErrorCode; values?: Record<string, string | number> }
+  | { kind: "raw"; message: string };
 
 const ACCEPTED_PHOTO_TYPES = new Set([
   "image/jpeg",
@@ -83,6 +89,8 @@ function revokePreview(url: string | undefined) {
 }
 
 const STEPS: StepId[] = ["configure", "schedule", "address", "contact", "review"];
+const SERVICES: BookingService[] = ["cleaning", "repair", "massage"];
+const TIME_SLOTS = buildTimeSlots();
 
 function Stepper({
   id,
@@ -91,6 +99,8 @@ function Stepper({
   min,
   max,
   onChange,
+  decreaseLabel,
+  increaseLabel,
 }: {
   id: string;
   label: string;
@@ -98,6 +108,8 @@ function Stepper({
   min: number;
   max: number;
   onChange: (value: number) => void;
+  decreaseLabel: string;
+  increaseLabel: string;
 }) {
   return (
     <div>
@@ -107,7 +119,7 @@ function Stepper({
       <div className="flex items-center gap-3">
         <button
           type="button"
-          aria-label={`Decrease ${label}`}
+          aria-label={decreaseLabel}
           disabled={value <= min}
           onClick={() => onChange(Math.max(min, value - 1))}
           className="inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
@@ -123,7 +135,7 @@ function Stepper({
         />
         <button
           type="button"
-          aria-label={`Increase ${label}`}
+          aria-label={increaseLabel}
           disabled={value >= max}
           onClick={() => onChange(Math.min(max, value + 1))}
           className="inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
@@ -172,6 +184,7 @@ export default function BookingWizard({
   lockService?: boolean;
   massageCategoryId?: MassageCategoryId | null;
 }) {
+  const t = useTranslations("BookingWizard");
   const titleId = useId();
   const [stepIndex, setStepIndex] = useState(0);
   const [rooms, setRooms] = useState(2);
@@ -193,7 +206,7 @@ export default function BookingWizard({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<WizardError | null>(null);
   const [successRef, setSuccessRef] = useState<string | null>(null);
   const bookingContextRef = useRef({ service, massageCategoryId });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -217,12 +230,28 @@ export default function BookingWizard({
   const hasFailedPhotos = repairPhotos.some((item) => item.status === "failed");
   const uploadedPhotoCount = repairPhotoPaths.length;
   const occupiedPhotoSlots = repairPhotos.length;
+  const failedPhotoCount = repairPhotos.filter((item) => item.status === "failed").length;
 
   const total = useMemo(() => {
     if (service === "massage") return massagePriceEuro(massageMinutes) ?? 45;
     if (service === "cleaning") return cleaningPriceEuro(rooms);
     return null;
   }, [service, massageMinutes, rooms]);
+
+  function setErrorCode(
+    code: ErrorCode,
+    values?: Record<string, string | number>,
+  ) {
+    setError({ kind: "code", code, values });
+  }
+
+  function setRawError(message: string) {
+    setError({ kind: "raw", message });
+  }
+
+  function clearError() {
+    setError(null);
+  }
 
   function clearRepairPhotos() {
     setRepairPhotos((prev) => {
@@ -252,7 +281,7 @@ export default function BookingWizard({
     setName("");
     setPhone("");
     setSending(false);
-    setError("");
+    clearError();
     setSuccessRef(null);
   }
 
@@ -280,7 +309,7 @@ export default function BookingWizard({
       error?: string;
     };
     if (!response.ok || !data.ok || !data.draftId || !data.draftToken) {
-      throw new Error(data.error || "Не удалось открыть бронирование");
+      throw new Error(data.error || t("errors.draftOpenFailed"));
     }
     setDraftId(data.draftId);
     setDraftToken(data.draftToken);
@@ -288,7 +317,7 @@ export default function BookingWizard({
   }
 
   // Fresh mount (parent key) starts at Step 1. Switching service mid-session resets fields.
-  // Back/Next within the same service keep entered data.
+  // Back/Next within the same service keep entered data. Locale switch must not reset.
   useEffect(() => {
     const prev = bookingContextRef.current;
     if (
@@ -328,13 +357,14 @@ export default function BookingWizard({
         };
         if (cancelled) return;
         if (!response.ok || !data.ok || !data.draftId || !data.draftToken) {
-          setError(data.error || "Не удалось открыть бронирование");
+          if (data.error) setRawError(data.error);
+          else setErrorCode("draftOpenFailed");
           return;
         }
         setDraftId(data.draftId);
         setDraftToken(data.draftToken);
       } catch {
-        if (!cancelled) setError("Не удалось открыть бронирование");
+        if (!cancelled) setErrorCode("draftOpenFailed");
       }
     })();
     return () => {
@@ -342,41 +372,41 @@ export default function BookingWizard({
     };
   }, [open, service, massageCategoryId, idempotencyKey]);
 
-  function validateStep(current: StepId): string | null {
+  function validateStep(current: StepId): ErrorCode | null {
     if (current === "configure") {
       if (service === "repair" && problemDescription.trim().length < 10) {
-        return "Describe the repair in a bit more detail";
+        return "repairDetail";
       }
       return null;
     }
     if (current === "schedule") {
-      if (!date) return "Choose a date";
-      if (!preferredTime) return "Choose a preferred time";
+      if (!date) return "chooseDate";
+      if (!preferredTime) return "chooseTime";
       return null;
     }
     if (current === "address") {
-      if (!streetAddress.trim() || !city.trim()) return "Enter street address and city";
+      if (!streetAddress.trim() || !city.trim()) return "addressRequired";
       return null;
     }
     if (current === "contact") {
-      if (!name.trim() || !phone.trim()) return "Enter your name and phone";
+      if (!name.trim() || !phone.trim()) return "contactRequired";
       return null;
     }
     return null;
   }
 
   function goNext() {
-    const message = validateStep(step);
-    if (message) {
-      setError(message);
+    const code = validateStep(step);
+    if (code) {
+      setErrorCode(code);
       return;
     }
-    setError("");
+    clearError();
     setStepIndex((value) => Math.min(STEPS.length - 1, value + 1));
   }
 
   function goBack() {
-    setError("");
+    clearError();
     setStepIndex((value) => Math.max(0, value - 1));
   }
 
@@ -402,7 +432,7 @@ export default function BookingWizard({
         error?: string;
       };
       if (!response.ok || !data.ok || !data.path) {
-        throw new Error(data.error || "Photo upload failed");
+        throw new Error(data.error || t("errors.photoUploadFailed"));
       }
       updateRepairPhoto(itemId, {
         status: "uploaded",
@@ -415,7 +445,9 @@ export default function BookingWizard({
       updateRepairPhoto(itemId, {
         status: "failed",
         error:
-          uploadError instanceof Error ? uploadError.message : "Photo upload failed",
+          uploadError instanceof Error
+            ? uploadError.message
+            : t("errors.photoUploadFailed"),
         file,
         path: undefined,
       });
@@ -424,7 +456,7 @@ export default function BookingWizard({
 
   async function onUploadPhotos(fileList: FileList | null) {
     if (!fileList?.length) {
-      setError("No photo selected. Please choose JPG, PNG or WEBP files.");
+      setErrorCode("noPhotoSelected");
       return;
     }
 
@@ -435,18 +467,18 @@ export default function BookingWizard({
     if (replaceId) {
       const file = fileList[0];
       if (!file) {
-        setError("No photo selected for replace.");
+        setErrorCode("noPhotoReplace");
         return;
       }
       if (!isAcceptedPhotoFile(file)) {
-        setError("Only JPG, JPEG, PNG and WEBP images are allowed.");
+        setErrorCode("photoType");
         return;
       }
       if (file.size <= 0 || file.size > 5 * 1024 * 1024) {
-        setError("Each photo must be up to 5 MB.");
+        setErrorCode("photoSize");
         return;
       }
-      setError("");
+      clearError();
       const previewUrl = URL.createObjectURL(file);
       setRepairPhotos((prev) => {
         const existing = prev.find((item) => item.id === replaceId);
@@ -469,20 +501,20 @@ export default function BookingWizard({
 
     const remaining = 5 - occupiedPhotoSlots;
     if (remaining <= 0) {
-      setError("Maximum 5 photos");
+      setErrorCode("maxPhotos");
       return;
     }
 
-    setError("");
+    clearError();
     const selected = Array.from(fileList).slice(0, remaining);
     const accepted: File[] = [];
     for (const file of selected) {
       if (!isAcceptedPhotoFile(file)) {
-        setError("Only JPG, JPEG, PNG and WEBP images are allowed.");
+        setErrorCode("photoType");
         continue;
       }
       if (file.size <= 0 || file.size > 5 * 1024 * 1024) {
-        setError("Each photo must be up to 5 MB.");
+        setErrorCode("photoSize");
         continue;
       }
       accepted.push(file);
@@ -506,10 +538,10 @@ export default function BookingWizard({
 
   async function retryRepairPhoto(item: RepairPhotoItem) {
     if (!item.file) {
-      setError("Choose the photo again to retry upload");
+      setErrorCode("retryChooseAgain");
       return;
     }
-    setError("");
+    clearError();
     await uploadOneRepairPhoto(item.id, item.file);
   }
 
@@ -526,32 +558,32 @@ export default function BookingWizard({
     if (sending || successRef || hasUploadingPhotos) return;
 
     for (const id of STEPS) {
-      const message = validateStep(id);
-      if (message) {
-        setError(message);
+      const code = validateStep(id);
+      if (code) {
+        setErrorCode(code);
         setStepIndex(STEPS.indexOf(id));
         return;
       }
     }
 
     if (service === "repair" && hasFailedPhotos) {
-      setError("Fix failed photo uploads or remove them before submitting");
+      setErrorCode("fixFailedPhotos");
       setStepIndex(STEPS.indexOf("configure"));
       return;
     }
 
     if (service === "repair" && uploadedPhotoCount === 0 && !allowWithoutPhotos) {
-      setError("Upload photos or confirm sending the quote request without photos");
+      setErrorCode("photosOrConfirm");
       return;
     }
 
     if (!turnstileToken) {
-      setError("Complete the security check before submitting");
+      setErrorCode("turnstileRequired");
       return;
     }
 
     setSending(true);
-    setError("");
+    clearError();
 
     try {
       const draft = await ensureDraft();
@@ -599,24 +631,30 @@ export default function BookingWizard({
         try {
           data = JSON.parse(rawText) as typeof data;
         } catch {
-          throw new Error("Сервер вернул некорректный JSON");
+          setErrorCode("badJson");
+          return;
         }
       } else if (rawText.trim()) {
-        throw new Error(
-          response.ok
-            ? "Сервер вернул не JSON"
-            : `Ошибка сервера (${response.status}). Проверьте деплой API на Vercel.`,
-        );
+        if (response.ok) setErrorCode("notJson");
+        else setErrorCode("serverStatus", { status: response.status });
+        return;
       } else {
-        throw new Error(`Пустой ответ сервера (${response.status})`);
+        setErrorCode("emptyResponse", { status: response.status });
+        return;
       }
 
       if (!response.ok || !data.ok || !data.id || !data.orderRef) {
-        throw new Error(data.error || "Не удалось сохранить заказ");
+        if (data.error) setRawError(data.error);
+        else setErrorCode("saveFailed");
+        return;
       }
       setSuccessRef(data.orderRef);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Не удалось отправить заказ");
+      if (submitError instanceof Error && submitError.message) {
+        setRawError(submitError.message);
+      } else {
+        setErrorCode("submitFailed");
+      }
     } finally {
       setSending(false);
     }
@@ -624,17 +662,16 @@ export default function BookingWizard({
 
   if (!open) return null;
 
-  const meta = SERVICE_META[service];
-  const stepLabel =
-    step === "configure"
-      ? "Service details"
-      : step === "schedule"
-        ? "Date & time"
-        : step === "address"
-          ? "Address"
-          : step === "contact"
-            ? "Contact"
-            : "Review";
+  const serviceTitle = t(`services.${service}.title`);
+  const rateLabel = t(`services.${service}.rateLabel`);
+  const stepLabel = t(`steps.${step}`);
+  const roomsLabel = t("roomsLabel");
+  const errorText =
+    error?.kind === "raw"
+      ? error.message
+      : error?.kind === "code"
+        ? t(`errors.${error.code}`, error.values)
+        : "";
 
   return (
     <div
@@ -653,24 +690,27 @@ export default function BookingWizard({
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-medium tracking-[0.18em] text-gold uppercase">
-                Premium booking
+                {t("eyebrow")}
               </p>
               <h2 id={titleId} className="mt-1 font-display text-2xl font-medium text-ink">
-                {meta.title}
+                {serviceTitle}
               </h2>
               {massageCategory ? (
                 <p className="mt-1 text-sm font-medium text-olive">{massageCategory.title}</p>
               ) : null}
-              <p className="mt-1 text-sm text-muted">{meta.rateLabel}</p>
+              <p className="mt-1 text-sm text-muted">{rateLabel}</p>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex h-10 w-10 items-center justify-center border border-mist bg-white text-ink transition hover:border-olive"
-              aria-label="Close"
-            >
-              ×
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <LanguageSwitcher tone="onLight" />
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex h-10 w-10 items-center justify-center border border-mist bg-white text-ink transition hover:border-olive"
+                aria-label={t("close")}
+              >
+                ×
+              </button>
+            </div>
           </div>
 
           {!successRef ? (
@@ -684,7 +724,11 @@ export default function BookingWizard({
                 ))}
               </div>
               <p className="mt-2 text-xs tracking-[0.14em] text-muted uppercase">
-                Step {stepIndex + 1} of {STEPS.length} · {stepLabel}
+                {t("stepOf", {
+                  current: stepIndex + 1,
+                  total: STEPS.length,
+                  label: stepLabel,
+                })}
               </p>
             </div>
           ) : null}
@@ -694,21 +738,22 @@ export default function BookingWizard({
         {successRef ? (
           <div className="space-y-4 px-5 py-8 text-center sm:px-6">
             <p className="text-xs font-medium tracking-[0.18em] text-gold uppercase">
-              Request received
+              {t("successEyebrow")}
             </p>
-            <p className="font-display text-3xl font-medium text-ink">Thank you</p>
+            <p className="font-display text-3xl font-medium text-ink">{t("thankYou")}</p>
             <p className="text-sm leading-relaxed text-muted">
-              Your booking reference is{" "}
-              <span className="font-semibold text-olive">{successRef}</span>.
-              We will confirm the visit shortly.
+              {t.rich("successBody", {
+                orderRef: successRef,
+                ref: (chunks) => (
+                  <span className="font-semibold text-olive">{chunks}</span>
+                ),
+              })}
             </p>
             {service === "repair" ? (
-              <p className="text-sm text-muted">
-                Home repair is quoted after assessment — no price was charged at booking.
-              </p>
+              <p className="text-sm text-muted">{t("successRepairNote")}</p>
             ) : (
               <p className="text-sm text-muted">
-                Estimated total: {formatEuro(total ?? 0)}
+                {t("successEstimatedTotal", { total: formatEuro(total ?? 0) })}
               </p>
             )}
             <button
@@ -716,14 +761,14 @@ export default function BookingWizard({
               onClick={onClose}
               className="w-full bg-olive px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep"
             >
-              Close
+              {t("close")}
             </button>
           </div>
         ) : (
           <form className="space-y-6 px-5 py-5 sm:px-6 sm:py-6" noValidate onSubmit={onSubmit}>
             {!lockService && step === "configure" ? (
               <div className="grid grid-cols-3 gap-2">
-                {(Object.keys(SERVICE_META) as BookingService[]).map((value) => (
+                {SERVICES.map((value) => (
                   <button
                     key={value}
                     type="button"
@@ -734,7 +779,7 @@ export default function BookingWizard({
                         : "border border-mist bg-white text-ink hover:border-olive/50"
                     }`}
                   >
-                    {SERVICE_META[value].title}
+                    {t(`services.${value}.title`)}
                   </button>
                 ))}
               </div>
@@ -743,7 +788,7 @@ export default function BookingWizard({
             {step === "configure" && service !== "repair" ? (
               <div className="rounded-xl border border-mist bg-white px-5 py-6 text-center">
                 <p className="text-xs font-medium tracking-[0.18em] text-muted uppercase">
-                  Total
+                  {t("total")}
                 </p>
                 <p className="mt-2 font-display text-5xl font-bold tracking-tight text-olive sm:text-6xl">
                   {formatEuro(total ?? 0)}
@@ -753,10 +798,8 @@ export default function BookingWizard({
 
             {step === "configure" && service === "repair" ? (
               <div className="rounded-xl border border-sand bg-sand/70 px-4 py-3 text-sm leading-relaxed text-ink">
-                <p className="font-medium">Quote on assessment</p>
-                <p className="mt-1 text-olive/80">
-                  Describe the issue and add optional photos. Final price after we review.
-                </p>
+                <p className="font-medium">{t("quoteBannerTitle")}</p>
+                <p className="mt-1 text-olive/80">{t("quoteBannerBody")}</p>
               </div>
             ) : null}
 
@@ -764,19 +807,28 @@ export default function BookingWizard({
               <div className="space-y-4">
                 <Stepper
                   id="cleaning-rooms"
-                  label="Number of rooms"
+                  label={roomsLabel}
                   value={rooms}
                   min={1}
                   max={6}
                   onChange={setRooms}
+                  decreaseLabel={t("decrease", { label: roomsLabel })}
+                  increaseLabel={t("increase", { label: roomsLabel })}
                 />
                   <div className="rounded-xl border border-sand bg-sand/70 px-4 py-3 text-sm leading-relaxed text-ink">
                   <p className="font-medium">
-                    {rooms === 1 ? "1 room" : `${rooms} rooms`} require ~{cleaning.hours}{" "}
-                    {cleaning.hours === 1 ? "hour" : "hours"} and {cleanerLabel(cleaning.workers)}
+                    {t("cleaningPlan", {
+                      rooms: t("roomCount", { count: rooms }),
+                      hours: t("hourCount", { count: cleaning.hours }),
+                      cleaners: t("cleanerCount", { count: cleaning.workers }),
+                    })}
                   </p>
                   <p className="mt-1 text-olive/80">
-                    {cleaning.hours} × {cleaning.workers} × 20€ = {formatEuro(total ?? 0)}
+                    {t("cleaningFormula", {
+                      hours: cleaning.hours,
+                      workers: cleaning.workers,
+                      total: formatEuro(total ?? 0),
+                    })}
                   </p>
                 </div>
               </div>
@@ -784,7 +836,7 @@ export default function BookingWizard({
 
             {step === "configure" && service === "massage" ? (
               <div>
-                <p className="mb-2 text-sm font-medium text-ink">Session duration</p>
+                <p className="mb-2 text-sm font-medium text-ink">{t("sessionDuration")}</p>
                 <div className="grid gap-2">
                   {MASSAGE_OPTIONS.map((option) => {
                     const active = massageMinutes === option.minutes;
@@ -799,7 +851,9 @@ export default function BookingWizard({
                             : "border-mist bg-white text-ink hover:border-olive"
                         }`}
                       >
-                        <span className="font-medium">{option.minutes} minutes</span>
+                        <span className="font-medium">
+                          {t("minutes", { count: option.minutes })}
+                        </span>
                         <span className="font-display text-lg font-bold">
                           {formatEuro(option.price)}
                         </span>
@@ -812,25 +866,20 @@ export default function BookingWizard({
 
             {step === "configure" && service === "repair" ? (
               <div className="space-y-4">
-                <Field id="repair-problem" label="Describe the problem">
+                <Field id="repair-problem" label={t("problemLabel")}>
                   <textarea
                     id="repair-problem"
                     rows={5}
                     maxLength={2000}
                     value={problemDescription}
                     onChange={(event) => setProblemDescription(event.target.value)}
-                    placeholder="What needs fixing? Where is it? Any urgency?"
+                    placeholder={t("problemPlaceholder")}
                     className={inputClass}
                   />
                 </Field>
                 <div>
-                  <p className="mb-2 text-sm font-medium text-ink">
-                    Photos (up to 5)
-                  </p>
-                  <p className="mb-2 text-xs text-muted">
-                    JPG, JPEG, PNG or WEBP. Thumbnails appear right after you
-                    choose files. “Uploaded” only after the server confirms.
-                  </p>
+                  <p className="mb-2 text-sm font-medium text-ink">{t("photosLabel")}</p>
+                  <p className="mb-2 text-xs text-muted">{t("photosHint")}</p>
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -847,7 +896,7 @@ export default function BookingWizard({
                       event.target.value = "";
                     }}
                     className="sr-only"
-                    aria-label="Choose repair photos"
+                    aria-label={t("choosePhotosAria")}
                   />
                   <button
                     type="button"
@@ -855,7 +904,7 @@ export default function BookingWizard({
                     onClick={() => openPhotoPicker()}
                     className="inline-flex items-center border border-mist bg-white px-4 py-3 text-sm font-semibold text-ink transition hover:border-olive disabled:opacity-50"
                   >
-                    {occupiedPhotoSlots > 0 ? "Add more photos" : "Choose photos"}
+                    {occupiedPhotoSlots > 0 ? t("addMorePhotos") : t("choosePhotos")}
                   </button>
                   {repairPhotos.length ? (
                     <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -881,10 +930,10 @@ export default function BookingWizard({
                               }`}
                             >
                               {item.status === "uploading"
-                                ? "Uploading…"
+                                ? t("uploading")
                                 : item.status === "uploaded"
-                                  ? "Uploaded"
-                                  : "Failed"}
+                                  ? t("uploaded")
+                                  : t("failed")}
                             </span>
                           </div>
                           <div className="space-y-1 p-2">
@@ -900,7 +949,7 @@ export default function BookingWizard({
                                   disabled={hasUploadingPhotos}
                                   className="border border-mist px-2 py-1 text-[11px] font-semibold text-ink disabled:opacity-50"
                                 >
-                                  Retry
+                                  {t("retry")}
                                 </button>
                               ) : null}
                               <button
@@ -909,7 +958,7 @@ export default function BookingWizard({
                                 disabled={hasUploadingPhotos}
                                 className="border border-mist px-2 py-1 text-[11px] font-semibold text-ink disabled:opacity-50"
                               >
-                                Replace
+                                {t("replace")}
                               </button>
                               <button
                                 type="button"
@@ -917,7 +966,7 @@ export default function BookingWizard({
                                 disabled={hasUploadingPhotos}
                                 className="border border-mist px-2 py-1 text-[11px] font-semibold text-ink disabled:opacity-50"
                               >
-                                Remove
+                                {t("remove")}
                               </button>
                             </div>
                           </div>
@@ -925,10 +974,10 @@ export default function BookingWizard({
                       ))}
                     </ul>
                   ) : (
-                    <p className="mt-2 text-sm text-muted">No photos selected yet.</p>
+                    <p className="mt-2 text-sm text-muted">{t("noPhotosYet")}</p>
                   )}
                   <p className="mt-2 text-sm text-olive">
-                    Confirmed on server: {uploadedPhotoCount} / 5
+                    {t("confirmedOnServer", { count: uploadedPhotoCount })}
                   </p>
                 </div>
               </div>
@@ -936,7 +985,7 @@ export default function BookingWizard({
 
             {step === "schedule" ? (
               <div className="space-y-4">
-                <Field id="order-date" label="Preferred date">
+                <Field id="order-date" label={t("preferredDate")}>
                   <input
                     id="order-date"
                     type="date"
@@ -948,7 +997,7 @@ export default function BookingWizard({
                 </Field>
                   <div>
                   <p className="mb-2 text-sm font-medium text-ink" id="preferred-time-label">
-                    Preferred time
+                    {t("preferredTime")}
                   </p>
                   <div
                     className="grid max-h-56 grid-cols-3 gap-2 overflow-y-auto overscroll-contain sm:grid-cols-4"
@@ -965,8 +1014,8 @@ export default function BookingWizard({
                           aria-pressed={active}
                           aria-label={
                             active
-                              ? `Preferred time ${slot}, selected`
-                              : `Preferred time ${slot}`
+                              ? t("timeSelected", { slot })
+                              : t("timeOption", { slot })
                           }
                           className={`border px-2 py-2.5 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold ${
                             active
@@ -980,8 +1029,7 @@ export default function BookingWizard({
                     })}
                   </div>
                   <p className="mt-2 text-xs text-muted" aria-live="polite">
-                    Selected: {preferredTime}. Preferred start — we confirm availability
-                    separately.
+                    {t("timeHint", { time: preferredTime })}
                   </p>
                 </div>
               </div>
@@ -989,7 +1037,7 @@ export default function BookingWizard({
 
             {step === "address" ? (
               <div className="space-y-4">
-                <Field id="order-street" label="Street address">
+                <Field id="order-street" label={t("streetLabel")}>
                   <input
                     id="order-street"
                     type="text"
@@ -997,10 +1045,10 @@ export default function BookingWizard({
                     value={streetAddress}
                     onChange={(event) => setStreetAddress(event.target.value)}
                     className={inputClass}
-                    placeholder="Street and number"
+                    placeholder={t("streetPlaceholder")}
                   />
                 </Field>
-                <Field id="order-city" label="City">
+                <Field id="order-city" label={t("cityLabel")}>
                   <input
                     id="order-city"
                     type="text"
@@ -1008,10 +1056,10 @@ export default function BookingWizard({
                     value={city}
                     onChange={(event) => setCity(event.target.value)}
                     className={inputClass}
-                    placeholder="Faro, Loulé, …"
+                    placeholder={t("cityPlaceholder")}
                   />
                 </Field>
-                <Field id="order-floor" label="Apartment / floor (optional)">
+                <Field id="order-floor" label={t("floorLabel")}>
                   <input
                     id="order-floor"
                     type="text"
@@ -1020,14 +1068,14 @@ export default function BookingWizard({
                     className={inputClass}
                   />
                 </Field>
-                <Field id="order-access" label="Access notes (optional)">
+                <Field id="order-access" label={t("accessLabel")}>
                   <textarea
                     id="order-access"
                     rows={3}
                     value={accessInstructions}
                     onChange={(event) => setAccessInstructions(event.target.value)}
                     className={inputClass}
-                    placeholder="Gate code, parking, entry notes"
+                    placeholder={t("accessPlaceholder")}
                   />
                 </Field>
               </div>
@@ -1035,7 +1083,7 @@ export default function BookingWizard({
 
             {step === "contact" ? (
               <div className="space-y-4">
-                <Field id="order-name" label="Name">
+                <Field id="order-name" label={t("nameLabel")}>
                   <input
                     id="order-name"
                     type="text"
@@ -1043,10 +1091,10 @@ export default function BookingWizard({
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     className={inputClass}
-                    placeholder="Your name"
+                    placeholder={t("namePlaceholder")}
                   />
                 </Field>
-                <Field id="order-phone" label="Phone">
+                <Field id="order-phone" label={t("phoneLabel")}>
                   <input
                     id="order-phone"
                     type="tel"
@@ -1054,7 +1102,7 @@ export default function BookingWizard({
                     value={phone}
                     onChange={(event) => setPhone(event.target.value)}
                     className={inputClass}
-                    placeholder="+351 ..."
+                    placeholder={t("phonePlaceholder")}
                   />
                 </Field>
               </div>
@@ -1063,32 +1111,37 @@ export default function BookingWizard({
             {step === "review" ? (
               <div className="space-y-4 text-sm leading-relaxed text-ink">
                 <div className="rounded-xl border border-mist bg-white px-4 py-4">
-                  <p className="text-xs tracking-[0.14em] text-muted uppercase">Summary</p>
-                  <p className="mt-2 font-display text-xl text-ink">{meta.title}</p>
+                  <p className="text-xs tracking-[0.14em] text-muted uppercase">
+                    {t("summary")}
+                  </p>
+                  <p className="mt-2 font-display text-xl text-ink">{serviceTitle}</p>
                   {massageCategory ? (
                     <p className="mt-1 text-olive">{massageCategory.title}</p>
                   ) : null}
                   {service === "cleaning" ? (
                     <p className="mt-2">
-                      {rooms === 1 ? "1 room" : `${rooms} rooms`} · ~{cleaning.hours}h ·{" "}
-                      {cleanerLabel(cleaning.workers)} · {formatEuro(total ?? 0)}
+                      {t("cleaningSummary", {
+                        rooms: t("roomCount", { count: rooms }),
+                        hours: cleaning.hours,
+                        cleaners: t("cleanerCount", { count: cleaning.workers }),
+                        total: formatEuro(total ?? 0),
+                      })}
                     </p>
                   ) : null}
                   {service === "massage" ? (
                     <p className="mt-2">
-                      {massageMinutes} min · {formatEuro(total ?? 0)}
+                      {t("massageSummary", {
+                        minutes: massageMinutes,
+                        total: formatEuro(total ?? 0),
+                      })}
                     </p>
                   ) : null}
                   {service === "repair" ? (
                     <div className="mt-2 space-y-2">
-                      <p>
-                        Quote request · Successfully uploaded: {uploadedPhotoCount}{" "}
-                        photo(s)
-                      </p>
+                      <p>{t("repairSummary", { count: uploadedPhotoCount })}</p>
                       {hasFailedPhotos ? (
                         <p className="text-danger">
-                          {repairPhotos.filter((item) => item.status === "failed").length}{" "}
-                          photo(s) failed — go back and retry before submitting.
+                          {t("photosFailedReview", { count: failedPhotoCount })}
                         </p>
                       ) : null}
                       {uploadedPhotoCount === 0 ? (
@@ -1101,16 +1154,12 @@ export default function BookingWizard({
                               setAllowWithoutPhotos(event.target.checked)
                             }
                           />
-                          <span>
-                            Send this quote request without photos
-                          </span>
+                          <span>{t("sendWithoutPhotos")}</span>
                         </label>
                       ) : null}
                     </div>
                   ) : null}
-                  <p className="mt-2">
-                    {date} at {preferredTime}
-                  </p>
+                  <p className="mt-2">{t("atTime", { date, time: preferredTime })}</p>
                   <p className="mt-1">
                     {[streetAddress, apartmentFloor, city].filter(Boolean).join(", ")}
                   </p>
@@ -1121,9 +1170,9 @@ export default function BookingWizard({
               </div>
             ) : null}
 
-            {error ? (
+            {errorText ? (
               <p className="text-sm font-medium text-danger" role="alert">
-                {error}
+                {errorText}
               </p>
             ) : null}
 
@@ -1131,12 +1180,9 @@ export default function BookingWizard({
               {step === "review" && !successRef ? (
                 <div className="mb-3">
                   <p className="mb-2 text-xs font-medium tracking-[0.14em] text-muted uppercase">
-                    Security verification
+                    {t("securityTitle")}
                   </p>
-                  <p className="mb-2 text-xs text-muted">
-                    Cloudflare check before sending your request. This is not a
-                    photo upload status.
-                  </p>
+                  <p className="mb-2 text-xs text-muted">{t("securityHint")}</p>
                   <TurnstileWidget
                     key={turnstileKey}
                     onToken={setTurnstileToken}
@@ -1150,7 +1196,7 @@ export default function BookingWizard({
                     onClick={goBack}
                     className="flex-1 border border-mist bg-white px-4 py-3.5 text-sm font-semibold text-ink transition hover:border-olive"
                   >
-                    Back
+                    {t("back")}
                   </button>
                 ) : null}
                 {step !== "review" ? (
@@ -1160,7 +1206,7 @@ export default function BookingWizard({
                     disabled={hasUploadingPhotos}
                     className="flex-1 bg-olive px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep disabled:opacity-60"
                   >
-                    Continue
+                    {t("continue")}
                   </button>
                 ) : (
                   <button
@@ -1176,10 +1222,10 @@ export default function BookingWizard({
                     className="flex-1 bg-olive px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep disabled:opacity-60"
                   >
                     {sending
-                      ? "Sending..."
+                      ? t("sending")
                       : service === "repair"
-                        ? "Request quote"
-                        : `Confirm — ${formatEuro(total ?? 0)}`}
+                        ? t("requestQuote")
+                        : t("confirmPrice", { price: formatEuro(total ?? 0) })}
                   </button>
                 )}
               </div>
