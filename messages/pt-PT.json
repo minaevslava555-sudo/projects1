@@ -1,0 +1,181 @@
+{
+  "Meta": {
+    "title": "HAVENLY — Cuidado Premium do Lar no Algarve",
+    "description": "Limpeza, pequenas reparações e bem-estar de excelência para vivendas e residências no Algarve Central."
+  },
+  "Language": {
+    "label": "Idioma",
+    "en": "EN",
+    "pt": "PT",
+    "switchToEn": "Switch to English",
+    "switchToPt": "Mudar para português"
+  },
+  "Nav": {
+    "home": "Início",
+    "services": "Serviços",
+    "howItWorks": "Como funciona",
+    "area": "Área",
+    "faq": "FAQ",
+    "book": "Reservar",
+    "bookCleaning": "Reservar limpeza",
+    "openMenu": "Abrir menu",
+    "closeMenu": "Fechar menu",
+    "primary": "Principal",
+    "mobile": "Mobile",
+    "homeAria": "Início HAVENLY"
+  },
+  "Hero": {
+    "eyebrow": "Algarve Central",
+    "title": "Cuidado elevado do lar para a vida no Algarve.",
+    "subtitleMobile": "Limpeza, reparações e bem-estar para vivendas de Faro a Albufeira.",
+    "subtitleDesktop": "Limpeza, reparações e bem-estar — com discrição, para vivendas e residências de Faro a Albufeira.",
+    "heroAlt": "Vivenda de luxo ao sol com terraço e piscina",
+    "servicesAria": "Serviços"
+  },
+  "Services": {
+    "cleaning": {
+      "title": "Limpeza",
+      "rateLabel": "20€ / hora por profissional",
+      "cardPrice": "desde 20€",
+      "blurb": "Vivendas e apartamentos impecáveis, preparados com precisão discreta.",
+      "imageAlt": "Pormenor de limpeza profissional numa casa de banho luminosa"
+    },
+    "repair": {
+      "title": "Reparações em casa",
+      "rateLabel": "Orçamento após avaliação",
+      "cardPrice": "orçamento",
+      "blurb": "Apoio discreto de handyman para o conforto do dia a dia.",
+      "imageAlt": "Acabamento cuidadoso num interior moderno"
+    },
+    "massage": {
+      "title": "Massagem",
+      "rateLabel": "45€ / hora",
+      "cardPrice": "desde 45€",
+      "blurb": "Massagem profissional no conforto da sua casa.",
+      "imageAlt": "Massagem ao domicílio num interior residencial luminoso"
+    }
+  },
+  "Trust": {
+    "verifiedTitle": "Profissionais verificados",
+    "verifiedBody": "Especialistas cuidadosamente seleccionados em quem pode confiar em sua casa.",
+    "englishTitle": "Apoio em inglês",
+    "englishBody": "Comunicação clara desde a primeira mensagem até ao serviço concluído.",
+    "pricingTitle": "Preços transparentes",
+    "pricingBody": "Tarifas claras, sem custos escondidos.",
+    "secureTitle": "Reserva segura",
+    "secureBody": "Pedidos simples e confirmação fiável em cada reserva."
+  },
+  "Included": {
+    "eyebrow": "Como funciona",
+    "title": "O que está incluído no nosso serviço",
+    "subtitle": "Listas claras para saber exactamente o que esperar antes de reservar.",
+    "handymanTitle": "Essenciais de handyman",
+    "explore": "Explorar {service}",
+    "cleaningTabs": {
+      "Kitchen": "Cozinha",
+      "Rooms": "Quartos",
+      "Bathroom": "Casa de banho",
+      "Hallway": "Entrada / corredor"
+    },
+    "massageTabs": {
+      "Back": "Costas",
+      "Legs": "Pernas",
+      "Face": "Rosto"
+    },
+    "cleaningKitchen": [
+      "Lavar a loiça e carregar/descarregar a máquina",
+      "Limpar o fogão e a placa",
+      "Limpar bancadas e frentes dos armários",
+      "Esvaziar o lixo e arrumar superfícies"
+    ],
+    "cleaningRooms": [
+      "Espanares móveis e prateleiras acessíveis",
+      "Fazer as camas e alinhar a roupa de cama",
+      "Aspirar por baixo e à volta dos móveis",
+      "Limpar interruptores, puxadores e espelhos"
+    ],
+    "cleaningBathroom": [
+      "Desinfectar a sanita e o assento",
+      "Esfregar banheira, duche e azulejos",
+      "Polir espelhos e torneiras",
+      "Esfregar o chão e repor básicos, se fornecidos"
+    ],
+    "cleaningHallway": [
+      "Aspirar e esfregar o chão da entrada",
+      "Espanares consolas e molduras",
+      "Limpar puxadores e interruptores",
+      "Arrumar zona de sapatos e casacos"
+    ],
+    "massageBack": [
+      "Alívio de tensão em toda a zona das costas",
+      "Foco em ombros e pescoço",
+      "Pressão adequada à postura",
+      "Finalização em relaxamento profundo"
+    ],
+    "massageLegs": [
+      "Massagem de coxas e gémeos",
+      "Movimentos favoráveis à circulação",
+      "Apoio à recuperação desportiva",
+      "Sugestões suaves de alongamento"
+    ],
+    "massageFace": [
+      "Massagem facial suave",
+      "Alívio de têmporas e mandíbula",
+      "Trabalho ligeiro de estilo linfático",
+      "Encerramento calmo da sessão"
+    ],
+    "repairItems": [
+      "Montagem de móveis e prateleiras",
+      "Pequenos ajustes de canalização",
+      "Substituição de tomadas e interruptores",
+      "Reparação de dobradiças, puxadores e fechaduras",
+      "Instalação de candeeiros"
+    ]
+  },
+  "Area": {
+    "eyebrow": "Cobertura",
+    "title": "A servir o Algarve Central",
+    "cities": "Faro · Loulé · Quarteira · Vilamoura · Almancil · Albufeira",
+    "note": "Primeira fase da nossa área de serviço — mais localidades em breve."
+  },
+  "Cta": {
+    "title": "Prontos quando a sua casa estiver.",
+    "subtitle": "Escolha um serviço, reveja os detalhes e confirme a reserva.",
+    "bookCleaning": "Reservar limpeza",
+    "orCall": "Ou ligue-nos agora:"
+  },
+  "Faq": {
+    "eyebrow": "FAQ",
+    "title": "Perguntas antes de reservar",
+    "subtitle": "Respostas claras sobre serviço, pagamento e padrão de cuidado.",
+    "items": [
+      {
+        "question": "E se algo for danificado ou desaparecer?",
+        "answer": "Seleccionamos cuidadosamente os nossos especialistas locais e dispomos de cobertura de seguro abrangente."
+      },
+      {
+        "question": "Preciso de fornecer produtos de limpeza?",
+        "answer": "Não. Os nossos profissionais trazem produtos ecológicos de qualidade e equipamento padrão."
+      },
+      {
+        "question": "Como pago o serviço?",
+        "answer": "Pague de forma segura após a conclusão e inspeção do serviço — em numerário, cartão ou Revolut."
+      },
+      {
+        "question": "Posso reservar um plano recorrente?",
+        "answer": "Sim. Oferecemos planos de assinatura regulares com poupança até 20% nos cuidados do lar."
+      }
+    ]
+  },
+  "Footer": {
+    "tagline": "Lar • Conforto • Confiança",
+    "copyright": "© 2026 HAVENLY · Algarve Central",
+    "quickLinks": "Ligações rápidas",
+    "cleaning": "Limpeza",
+    "repairs": "Reparações",
+    "massage": "Massagem",
+    "faq": "FAQ",
+    "coverage": "Área de cobertura",
+    "cities": "Faro, Loulé, Quarteira, Vilamoura, Almancil, Albufeira"
+  }
+}

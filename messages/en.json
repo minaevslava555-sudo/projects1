@@ -1,0 +1,181 @@
+{
+  "Meta": {
+    "title": "HAVENLY — Premium Home Care in the Algarve",
+    "description": "Elevated cleaning, home repairs and wellness for villas and residences across Central Algarve."
+  },
+  "Language": {
+    "label": "Language",
+    "en": "EN",
+    "pt": "PT",
+    "switchToEn": "Switch to English",
+    "switchToPt": "Mudar para português"
+  },
+  "Nav": {
+    "home": "Home",
+    "services": "Services",
+    "howItWorks": "How It Works",
+    "area": "Area",
+    "faq": "FAQ",
+    "book": "Book",
+    "bookCleaning": "Book Cleaning",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "primary": "Primary",
+    "mobile": "Mobile",
+    "homeAria": "HAVENLY home"
+  },
+  "Hero": {
+    "eyebrow": "Central Algarve",
+    "title": "Elevated home care for life in the Algarve.",
+    "subtitleMobile": "Cleaning, repairs and wellness for villas from Faro to Albufeira.",
+    "subtitleDesktop": "Cleaning, repairs and wellness — delivered with discretion for villas and residences from Faro to Albufeira.",
+    "heroAlt": "Sunlit luxury villa with pool terrace",
+    "servicesAria": "Services"
+  },
+  "Services": {
+    "cleaning": {
+      "title": "Cleaning",
+      "rateLabel": "20€ / hour per cleaner",
+      "cardPrice": "from 20€",
+      "blurb": "Immaculate villas and apartments, prepared with quiet precision.",
+      "imageAlt": "Professional cleaning detail in a bright luxury bathroom"
+    },
+    "repair": {
+      "title": "Home Repairs",
+      "rateLabel": "Quote after assessment",
+      "cardPrice": "quote",
+      "blurb": "Discreet handyman care for everyday comfort at home.",
+      "imageAlt": "Careful finishing work on a clean modern interior wall"
+    },
+    "massage": {
+      "title": "Massage",
+      "rateLabel": "45€ / hour",
+      "cardPrice": "from 45€",
+      "blurb": "Professional massage, brought to the comfort of your home.",
+      "imageAlt": "In-home massage in a bright residential interior"
+    }
+  },
+  "Trust": {
+    "verifiedTitle": "Verified Professionals",
+    "verifiedBody": "Carefully checked specialists you can trust in your home.",
+    "englishTitle": "English-speaking Support",
+    "englishBody": "Clear communication from first message to finished job.",
+    "pricingTitle": "Transparent Pricing",
+    "pricingBody": "Straightforward rates with no hidden extras.",
+    "secureTitle": "Secure Booking",
+    "secureBody": "Simple requests and reliable confirmation every time."
+  },
+  "Included": {
+    "eyebrow": "How it works",
+    "title": "What's included in our service",
+    "subtitle": "Clear checklists so you know exactly what to expect before booking.",
+    "handymanTitle": "Handyman essentials",
+    "explore": "Explore {service}",
+    "cleaningTabs": {
+      "Kitchen": "Kitchen",
+      "Rooms": "Rooms",
+      "Bathroom": "Bathroom",
+      "Hallway": "Hallway"
+    },
+    "massageTabs": {
+      "Back": "Back",
+      "Legs": "Legs",
+      "Face": "Face"
+    },
+    "cleaningKitchen": [
+      "Wash dishes and load/unload dishwasher",
+      "Clean stovetop and hob",
+      "Wipe countertops and cabinet fronts",
+      "Empty trash and tidy surfaces"
+    ],
+    "cleaningRooms": [
+      "Dust furniture and accessible shelves",
+      "Make beds and straighten bedding",
+      "Vacuum under and around furniture",
+      "Wipe switches, handles and mirrors"
+    ],
+    "cleaningBathroom": [
+      "Sanitize toilet and seat",
+      "Scrub tub, shower and tiles",
+      "Polish mirrors and chrome fittings",
+      "Mop floor and restock basics if provided"
+    ],
+    "cleaningHallway": [
+      "Vacuum and mop entry floors",
+      "Dust console tables and frames",
+      "Wipe door handles and light switches",
+      "Tidy shoes and coat area"
+    ],
+    "massageBack": [
+      "Full-back tension release",
+      "Shoulder and neck focus",
+      "Posture-friendly pressure",
+      "Deep relaxation finish"
+    ],
+    "massageLegs": [
+      "Thigh and calf massage",
+      "Circulation-friendly strokes",
+      "Sport recovery support",
+      "Gentle stretch cues"
+    ],
+    "massageFace": [
+      "Soft facial massage",
+      "Temple and jaw ease",
+      "Lymphatic-style light work",
+      "Calming close of session"
+    ],
+    "repairItems": [
+      "Furniture assembly and shelf mounting",
+      "Minor plumbing adjustments",
+      "Socket and switch replacements",
+      "Door hinge, handle and lock fixes",
+      "Light fixture installation"
+    ]
+  },
+  "Area": {
+    "eyebrow": "Coverage",
+    "title": "Serving Central Algarve",
+    "cities": "Faro · Loulé · Quarteira · Vilamoura · Almancil · Albufeira",
+    "note": "Phase one of our service area — more locations coming soon."
+  },
+  "Cta": {
+    "title": "Ready when your home is.",
+    "subtitle": "Choose a service, review the details, then confirm your booking.",
+    "bookCleaning": "Book Cleaning",
+    "orCall": "Or call us now:"
+  },
+  "Faq": {
+    "eyebrow": "FAQ",
+    "title": "Questions before you book",
+    "subtitle": "Straightforward answers about service, payment and care standards.",
+    "items": [
+      {
+        "question": "What if something gets damaged or missing?",
+        "answer": "We fully vet our local specialists and carry comprehensive insurance coverage."
+      },
+      {
+        "question": "Do I need to provide cleaning supplies?",
+        "answer": "No, our professionals bring high-quality eco-friendly products and standard equipment."
+      },
+      {
+        "question": "How do I pay for the service?",
+        "answer": "Pay securely after the job is completed and inspected — via Cash, Card, or Revolut."
+      },
+      {
+        "question": "Can I book a recurring plan?",
+        "answer": "Yes, we offer regular subscription plans that save you up to 20% on home care."
+      }
+    ]
+  },
+  "Footer": {
+    "tagline": "Home • Comfort • Trust",
+    "copyright": "© 2026 HAVENLY · Central Algarve",
+    "quickLinks": "Quick Links",
+    "cleaning": "Cleaning",
+    "repairs": "Repairs",
+    "massage": "Massage",
+    "faq": "FAQ",
+    "coverage": "Coverage Area",
+    "cities": "Faro, Loulé, Quarteira, Vilamoura, Almancil, Albufeira"
+  }
+}

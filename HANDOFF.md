@@ -1,6 +1,13 @@
 # HAVENLY — HANDOFF
 
-Дата: 2026-11-11
+Дата: 2026-11-12
+
+## i18n (Phase 1)
+
+- `next-intl`, cookie `havenly_locale`, **без** locale-префикса в URL (`/` остаётся `/`).
+- Словари: `messages/en.json`, `messages/pt-PT.json` (европейский португальский).
+- Switcher EN/PT в header (desktop + mobile).
+- Переведена только homepage (`app/page.tsx`). Wizard / catalog / admin — пока EN.
 
 ## Сделано
 
