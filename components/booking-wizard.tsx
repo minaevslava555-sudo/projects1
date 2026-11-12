@@ -185,6 +185,7 @@ export default function BookingWizard({
   massageCategoryId?: MassageCategoryId | null;
 }) {
   const t = useTranslations("BookingWizard");
+  const tMassage = useTranslations("MassageCatalog");
   const titleId = useId();
   const [stepIndex, setStepIndex] = useState(0);
   const [rooms, setRooms] = useState(2);
@@ -696,7 +697,9 @@ export default function BookingWizard({
                 {serviceTitle}
               </h2>
               {massageCategory ? (
-                <p className="mt-1 text-sm font-medium text-olive">{massageCategory.title}</p>
+                <p className="mt-1 text-sm font-medium text-olive">
+                  {tMassage(`categories.${massageCategory.id}.title`)}
+                </p>
               ) : null}
               <p className="mt-1 text-sm text-muted">{rateLabel}</p>
             </div>
@@ -1116,7 +1119,9 @@ export default function BookingWizard({
                   </p>
                   <p className="mt-2 font-display text-xl text-ink">{serviceTitle}</p>
                   {massageCategory ? (
-                    <p className="mt-1 text-olive">{massageCategory.title}</p>
+                    <p className="mt-1 text-olive">
+                      {tMassage(`categories.${massageCategory.id}.title`)}
+                    </p>
                   ) : null}
                   {service === "cleaning" ? (
                     <p className="mt-2">

@@ -1,16 +1,31 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useEffect, useId, useState, type CSSProperties } from "react";
-import type { HotspotScene, HotspotSpot } from "@/lib/service-hotspots";
+
+export type TranslatedHotspotSpot = {
+  id: string;
+  x: number;
+  y: number;
+  title: string;
+  text: string;
+};
+
+export type TranslatedHotspotScene = {
+  id: string;
+  label: string;
+  image: string;
+  spots: TranslatedHotspotSpot[];
+};
 
 function SpotMarker({
   spot,
   active,
   onSelect,
 }: {
-  spot: HotspotSpot;
+  spot: TranslatedHotspotSpot;
   active: boolean;
-  onSelect: (spot: HotspotSpot) => void;
+  onSelect: (spot: TranslatedHotspotSpot) => void;
 }) {
   return (
     <button
@@ -33,7 +48,7 @@ function SpotMarker({
   );
 }
 
-function popupStyle(spot: HotspotSpot): CSSProperties {
+function popupStyle(spot: TranslatedHotspotSpot): CSSProperties {
   const preferLeft = spot.x > 58;
   const preferTop = spot.y > 62;
   return {
@@ -44,13 +59,20 @@ function popupStyle(spot: HotspotSpot): CSSProperties {
   };
 }
 
-export default function HotspotGallery({ scenes }: { scenes: HotspotScene[] }) {
+export default function HotspotGallery({ scenes }: { scenes: TranslatedHotspotScene[] }) {
+  const t = useTranslations("ServiceDetail");
   const baseId = useId();
   const [sceneId, setSceneId] = useState(scenes[0]?.id ?? "");
   const [activeSpotId, setActiveSpotId] = useState<string | null>(null);
 
   const scene = scenes.find((item) => item.id === sceneId) ?? scenes[0];
   const activeSpot = scene?.spots.find((spot) => spot.id === activeSpotId) ?? null;
+
+  useEffect(() => {
+    if (!scenes.some((item) => item.id === sceneId) && scenes[0]) {
+      setSceneId(scenes[0].id);
+    }
+  }, [scenes, sceneId]);
 
   useEffect(() => {
     setActiveSpotId(null);
@@ -70,7 +92,7 @@ export default function HotspotGallery({ scenes }: { scenes: HotspotScene[] }) {
   return (
     <div className="hotspot-gallery">
       {scenes.length > 1 ? (
-        <div className="hotspot-scene-tabs" role="tablist" aria-label="Rooms">
+        <div className="hotspot-scene-tabs" role="tablist" aria-label={t("roomsAria")}>
           {scenes.map((item) => {
             const selected = item.id === scene.id;
             return (
@@ -121,7 +143,7 @@ export default function HotspotGallery({ scenes }: { scenes: HotspotScene[] }) {
               <button
                 type="button"
                 className="hotspot-popup-close"
-                aria-label="Close"
+                aria-label={t("close")}
                 onClick={() => setActiveSpotId(null)}
               >
                 ×
@@ -130,7 +152,7 @@ export default function HotspotGallery({ scenes }: { scenes: HotspotScene[] }) {
             <p className="hotspot-popup-text">{activeSpot.text}</p>
           </div>
         ) : (
-          <p className="hotspot-hint">Hover or tap + to explore</p>
+          <p className="hotspot-hint">{t("exploreHint")}</p>
         )}
       </div>
     </div>

@@ -290,5 +290,227 @@
       "saveFailed": "Não foi possível guardar o pedido",
       "submitFailed": "Não foi possível enviar o pedido"
     }
+  },
+  "ServiceDetail": {
+    "howWeWork": "Como funciona",
+    "backToServices": "← Voltar aos serviços",
+    "bookThisService": "Reservar este serviço",
+    "bookService": "Reservar {title}",
+    "chooseAnother": "Escolher outro serviço",
+    "roomsAria": "Divisões",
+    "exploreHint": "Passe o rato ou toque em + para explorar",
+    "close": "Fechar",
+    "cleaning": {
+      "title": "Limpeza",
+      "subtitle": "Explore cada divisão — toque num marcador para ver exactamente o que limpamos.",
+      "scenes": {
+        "kitchen": {
+          "label": "Cozinha",
+          "spots": {
+            "hob": {
+              "title": "Fogão e placa",
+              "text": "Desengorduramos a placa, os queimadores e as zonas adjacentes até ficarem como novos."
+            },
+            "counters": {
+              "title": "Bancadas",
+              "text": "As bancadas são limpas, as migalhas removidas e cada superfície fica fresca e arrumada."
+            },
+            "fronts": {
+              "title": "Frentes dos armários",
+              "text": "Frentes e puxadores ficam limpos de impressões digitais, marcas e gordura ligeira."
+            },
+            "sink": {
+              "title": "Lava-loiças e torneira",
+              "text": "O lava-loiças e a torneira são limpos e polidos; a loiça disponível é lavada e deixada arrumada."
+            }
+          }
+        },
+        "bathroom": {
+          "label": "Casa de banho",
+          "spots": {
+            "toilet": {
+              "title": "Sanita",
+              "text": "A sanita e o assento são desinfectados com cuidado para um acabamento higiénico."
+            },
+            "taps": {
+              "title": "Torneiras e cromados",
+              "text": "Misturadoras e detalhes cromados são lavados e polidos até um brilho suave."
+            },
+            "glass": {
+              "title": "Vidro do duche",
+              "text": "Os painéis de vidro ficam limpos, sem marcas, para o duche voltar a sentir-se luminoso."
+            },
+            "floor": {
+              "title": "Chão",
+              "text": "O chão da casa de banho é aspirado e lavado com atenção."
+            }
+          }
+        },
+        "bedroom": {
+          "label": "Quarto",
+          "spots": {
+            "under-bed": {
+              "title": "Debaixo da cama",
+              "text": "As zonas acessíveis debaixo da cama são aspiradas e ficam sem pó."
+            },
+            "bedding": {
+              "title": "Roupa de cama",
+              "text": "A roupa de cama é alinhada ou refeita para o quarto ficar calmo e concluído."
+            },
+            "dusting": {
+              "title": "Remoção de pó",
+              "text": "Objectos leves são levantados para prateleiras e superfícies serem despóadas correctamente."
+            },
+            "mirrors": {
+              "title": "Espelhos e vidros",
+              "text": "Espelhos e vidros são limpos sem marcas, para um aspecto luminoso."
+            }
+          }
+        },
+        "living": {
+          "label": "Sala de estar",
+          "spots": {
+            "surfaces": {
+              "title": "Superfícies",
+              "text": "Mesas, prateleiras e superfícies de decoração são despóadas e limpas com suavidade."
+            },
+            "floors": {
+              "title": "Chãos",
+              "text": "Os chãos são aspirados e lavados, incluindo cantos de fácil acesso."
+            },
+            "glass": {
+              "title": "Vidros e molduras",
+              "text": "Detalhes em vidro e molduras são limpos para um acabamento claro e polido."
+            }
+          }
+        }
+      }
+    },
+    "repair": {
+      "title": "Reparações em casa",
+      "subtitle": "Toque nos marcadores para ver as reparações quotidianas e cuidadosas que fazemos em casa.",
+      "scenes": {
+        "furniture": {
+          "label": "Mobiliário",
+          "spots": {
+            "assemble": {
+              "title": "Montagem de mobiliário",
+              "text": "Montagem cuidada de kits para prateleiras, secretárias e roupeiros."
+            },
+            "shelves": {
+              "title": "Prateleiras e fixação",
+              "text": "As prateleiras são fixadas ao nível e bem seguras na parede."
+            }
+          }
+        },
+        "bathroom-fix": {
+          "label": "Casa de banho",
+          "spots": {
+            "taps": {
+              "title": "Torneiras e misturadoras",
+              "text": "Substituímos ou ajustamos torneiras e misturadoras para um uso diário fluido."
+            },
+            "minor-leak": {
+              "title": "Canalização ligeira",
+              "text": "Juntas, ligações e verificações simples de fugas — com cuidado e limpeza."
+            }
+          }
+        },
+        "living-fix": {
+          "label": "Espaço de estar",
+          "spots": {
+            "sockets": {
+              "title": "Tomadas e interruptores",
+              "text": "Tomadas e interruptores substituídos para um uso diário mais seguro e limpo."
+            },
+            "fixtures": {
+              "title": "Iluminação",
+              "text": "Candeeiros e luminárias padrão instalados e ligados com nitidez."
+            }
+          }
+        },
+        "hallway": {
+          "label": "Portas",
+          "spots": {
+            "hinges": {
+              "title": "Dobradiças e alinhamento",
+              "text": "As portas são ajustadas para voltarem a fechar de forma suave e silenciosa."
+            },
+            "handles": {
+              "title": "Puxadores e fechaduras",
+              "text": "Reparações de puxadores e fechaduras nas portas do dia a dia."
+            }
+          }
+        }
+      }
+    }
+  },
+  "MassageCatalog": {
+    "eyebrow": "Massagem premium ao domicílio",
+    "title": "Massagem",
+    "tagline": "Massagem profissional no conforto da sua casa.",
+    "intro": "Cada sessão é realizada na sua vivenda ou apartamento no Algarve — escolha o foco que melhor combina com o seu dia.",
+    "viewDetails": "Ver detalhes",
+    "bookMassage": "Reservar massagem",
+    "backToServices": "← Voltar aos serviços",
+    "allTypes": "← Todos os tipos de massagem",
+    "browseOther": "Ver outros tipos",
+    "availableDurations": "Durações disponíveis",
+    "durationHint": "Escolha a duração no formulário de reserva — as mesmas tarifas transparentes de sempre.",
+    "durations": {
+      "m60": "60 min — 45€",
+      "m90": "90 min — 67.50€",
+      "m120": "120 min — 90€"
+    },
+    "categories": {
+      "relaxing": {
+        "title": "Massagem Relaxante",
+        "short": "Um reset calmo de corpo inteiro no conforto da sua vivenda ou apartamento.",
+        "description": "Uma sessão calma e sem pressas onde vive — sem deslocações nem sala de espera. Ritmo suave e ambiente privado para descansar em casa, no Algarve.",
+        "imageAlt": "Massagem relaxante ao domicílio num interior residencial luminoso",
+        "focus": [
+          "Calma de corpo inteiro em sua casa",
+          "Ritmo suave e sem pressas",
+          "Ambiente privado em casa",
+          "Descontracção fácil após a sessão"
+        ]
+      },
+      "back-neck": {
+        "title": "Massagem de Costas e Pescoço",
+        "short": "Cuidados focados nas costas e no pescoço sem sair de casa.",
+        "description": "Ombros, pescoço e costas — tratados em casa após trabalho à secretária, condução ou um dia longo. Fica no seu espaço; nós levamos a sessão até si.",
+        "imageAlt": "Massagem de costas preparada num ambiente doméstico acolhedor",
+        "focus": [
+          "Foco no pescoço e nos ombros",
+          "Cuidados nas costas superiores e inferiores",
+          "Sessão na sua casa",
+          "Final estável e centrado"
+        ]
+      },
+      "face-head": {
+        "title": "Massagem de Rosto e Cabeça",
+        "short": "Trabalho suave no rosto e no couro cabeludo no sossego das suas divisões.",
+        "description": "Toque leve no rosto, têmporas, maxilar e couro cabeludo — num espaço familiar e privado. Ideal quando procura quietude mental sem ir a um salão.",
+        "imageAlt": "Massagem suave de rosto e cabeça num ambiente de bem-estar em casa",
+        "focus": [
+          "Alívio das têmporas e do maxilar",
+          "Calma no couro cabeludo e na linha do cabelo",
+          "Toque facial suave",
+          "Momentos finais tranquilos"
+        ]
+      },
+      "legs-feet": {
+        "title": "Massagem de Pernas e Pés",
+        "short": "Pernas e pés cuidados em casa após caminhadas, viagens ou um dia quente.",
+        "description": "Das gémeas às plantas — na sua vivenda ou apartamento, para as pernas cansadas recuperarem onde já está. Ritmo estável, conforto sólido, sem ambiente de clínica.",
+        "imageAlt": "Massagem de pernas e pés sobre uma toalha macia em casa",
+        "focus": [
+          "Foco nas coxas e gémeas",
+          "Cuidados nos tornozelos e pés",
+          "Conveniência ao domicílio",
+          "Final leve e estabilizador"
+        ]
+      }
+    }
   }
 }

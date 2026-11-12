@@ -5,9 +5,10 @@ import {
   getMassageCategory,
   type MassageCategoryId,
 } from "@/lib/massage-catalog";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 
-const DURATION_HINTS = ["60 min — 45€", "90 min — 67.50€", "120 min — 90€"] as const;
+const DURATION_KEYS = ["m60", "m90", "m120"] as const;
 
 export default function MassageCatalogView({
   onBack,
@@ -16,6 +17,7 @@ export default function MassageCatalogView({
   onBack: () => void;
   onBook: (categoryId?: MassageCategoryId) => void;
 }) {
+  const t = useTranslations("MassageCatalog");
   const [selectedId, setSelectedId] = useState<MassageCategoryId | null>(null);
   const selected = selectedId ? getMassageCategory(selectedId) : null;
 
@@ -35,7 +37,7 @@ export default function MassageCatalogView({
             }}
             className="inline-flex items-center border border-mist bg-white px-4 py-2.5 text-sm font-semibold text-ink transition hover:border-olive focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
           >
-            {selected ? "← All massage types" : "← Back to services"}
+            {selected ? t("allTypes") : t("backToServices")}
           </button>
           {!selected ? (
             <button
@@ -43,7 +45,7 @@ export default function MassageCatalogView({
               onClick={() => onBook()}
               className="inline-flex items-center bg-olive px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-olive-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
             >
-              Book Massage
+              {t("bookMassage")}
             </button>
           ) : null}
         </div>
@@ -52,17 +54,16 @@ export default function MassageCatalogView({
           <>
             <div className="mt-10 max-w-2xl">
               <p className="text-xs font-medium tracking-[0.26em] text-gold uppercase">
-                Premium In-Home Massage
+                {t("eyebrow")}
               </p>
               <h2 className="mt-4 font-display text-3xl font-medium tracking-tight text-ink sm:text-4xl lg:text-[2.75rem]">
-                Massage
+                {t("title")}
               </h2>
               <p className="mt-4 max-w-xl text-base leading-relaxed text-ink sm:text-lg">
-                Professional massage, brought to the comfort of your home.
+                {t("tagline")}
               </p>
               <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted sm:text-base">
-                Every session is delivered to your villa or apartment in the Algarve — choose the
-                focus that suits your day.
+                {t("intro")}
               </p>
             </div>
 
@@ -78,20 +79,20 @@ export default function MassageCatalogView({
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={item.image}
-                      alt={item.imageAlt}
+                      alt={t(`categories.${item.id}.imageAlt`)}
                       className="absolute inset-0 h-full w-full object-cover transition duration-[1.1s] ease-out group-hover:scale-[1.03]"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-ink/45 via-transparent to-transparent" />
                   </div>
                   <div className="px-5 py-5 sm:px-6 sm:py-6">
                     <h3 className="font-display text-2xl font-medium tracking-tight text-ink">
-                      {item.title}
+                      {t(`categories.${item.id}.title`)}
                     </h3>
                     <p className="mt-2 text-sm leading-relaxed text-muted sm:text-[0.95rem]">
-                      {item.short}
+                      {t(`categories.${item.id}.short`)}
                     </p>
                     <p className="mt-4 text-xs font-semibold tracking-[0.16em] text-olive uppercase">
-                      View details
+                      {t("viewDetails")}
                     </p>
                   </div>
                 </button>
@@ -104,7 +105,7 @@ export default function MassageCatalogView({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={selected.image}
-                alt={selected.imageAlt}
+                alt={t(`categories.${selected.id}.imageAlt`)}
                 className="absolute inset-0 h-full w-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-ink/40 via-transparent to-ink/10" />
@@ -112,20 +113,20 @@ export default function MassageCatalogView({
 
             <div>
               <p className="text-xs font-medium tracking-[0.26em] text-gold uppercase">
-                Premium In-Home Massage
+                {t("eyebrow")}
               </p>
               <h2 className="mt-4 font-display text-3xl font-medium tracking-tight text-ink sm:text-4xl lg:text-[2.65rem]">
-                {selected.title}
+                {t(`categories.${selected.id}.title`)}
               </h2>
               <p className="mt-3 text-sm font-medium text-olive sm:text-base">
-                Professional massage, brought to the comfort of your home.
+                {t("tagline")}
               </p>
               <p className="mt-4 text-base leading-relaxed text-muted sm:text-lg">
-                {selected.description}
+                {t(`categories.${selected.id}.description`)}
               </p>
 
               <ul className="mt-8 divide-y divide-mist/70 border-y border-mist/70">
-                {selected.focus.map((line) => (
+                {(t.raw(`categories.${selected.id}.focus`) as string[]).map((line) => (
                   <li
                     key={line}
                     className="flex items-start gap-3.5 py-3.5 text-sm leading-relaxed text-ink sm:text-[0.95rem]"
@@ -141,21 +142,19 @@ export default function MassageCatalogView({
 
               <div className="mt-8">
                 <p className="text-sm font-semibold tracking-wide text-olive">
-                  Available durations
+                  {t("availableDurations")}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {DURATION_HINTS.map((label) => (
+                  {DURATION_KEYS.map((key) => (
                     <span
-                      key={label}
+                      key={key}
                       className="border border-mist bg-white/80 px-3.5 py-2 text-sm text-ink"
                     >
-                      {label}
+                      {t(`durations.${key}`)}
                     </span>
                   ))}
                 </div>
-                <p className="mt-3 text-sm text-muted">
-                  Choose your length in the booking form — same transparent rates as always.
-                </p>
+                <p className="mt-3 text-sm text-muted">{t("durationHint")}</p>
               </div>
 
               <div className="mt-10 flex flex-wrap gap-3">
@@ -164,14 +163,14 @@ export default function MassageCatalogView({
                   onClick={() => onBook(selected.id)}
                   className="inline-flex items-center bg-olive px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold sm:text-base"
                 >
-                  Book Massage
+                  {t("bookMassage")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setSelectedId(null)}
                   className="inline-flex items-center border border-mist bg-white px-6 py-3.5 text-sm font-semibold text-ink transition hover:border-olive focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold sm:text-base"
                 >
-                  Browse other types
+                  {t("browseOther")}
                 </button>
               </div>
             </div>

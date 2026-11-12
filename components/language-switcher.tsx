@@ -1,7 +1,7 @@
 "use client";
 
 import { LOCALE_COOKIE, type AppLocale } from "@/i18n/config";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
@@ -19,6 +19,7 @@ export default function LanguageSwitcher({
   tone?: "onDark" | "onLight";
 }) {
   const locale = useLocale();
+  const t = useTranslations("Language");
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const active = (locale === "pt-PT" ? "pt-PT" : "en") as AppLocale;
@@ -44,31 +45,31 @@ export default function LanguageSwitcher({
     <div
       className={`inline-flex items-center gap-1 ${className}`.trim()}
       role="group"
-      aria-label="Language"
+      aria-label={t("label")}
     >
       <button
         type="button"
         disabled={pending}
         aria-pressed={active === "en"}
-        aria-label="Switch to English"
+        aria-label={t("switchToEn")}
         onClick={() => select("en")}
         className={`min-w-9 px-2 py-1.5 text-xs font-semibold tracking-[0.12em] transition disabled:opacity-60 ${
           active === "en" ? activeBtn : baseBtn
         } border`}
       >
-        EN
+        {t("en")}
       </button>
       <button
         type="button"
         disabled={pending}
         aria-pressed={active === "pt-PT"}
-        aria-label="Mudar para português"
+        aria-label={t("switchToPt")}
         onClick={() => select("pt-PT")}
         className={`min-w-9 px-2 py-1.5 text-xs font-semibold tracking-[0.12em] transition disabled:opacity-60 ${
           active === "pt-PT" ? activeBtn : baseBtn
         } border`}
       >
-        PT
+        {t("pt")}
       </button>
     </div>
   );

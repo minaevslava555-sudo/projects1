@@ -290,5 +290,227 @@
       "saveFailed": "Could not save the order",
       "submitFailed": "Could not submit the order"
     }
+  },
+  "ServiceDetail": {
+    "howWeWork": "How we work",
+    "backToServices": "← Back to services",
+    "bookThisService": "Book this service",
+    "bookService": "Book {title}",
+    "chooseAnother": "Choose another service",
+    "roomsAria": "Rooms",
+    "exploreHint": "Hover or tap + to explore",
+    "close": "Close",
+    "cleaning": {
+      "title": "Cleaning",
+      "subtitle": "Explore each room — tap a marker to see exactly what we clean.",
+      "scenes": {
+        "kitchen": {
+          "label": "Kitchen",
+          "spots": {
+            "hob": {
+              "title": "Hob & stove",
+              "text": "We degrease the hob, burners and nearby splash zones until they look brand new."
+            },
+            "counters": {
+              "title": "Worktops",
+              "text": "Counters are wiped, crumbs removed, and every surface left fresh and clear."
+            },
+            "fronts": {
+              "title": "Cabinet fronts",
+              "text": "Fronts and handles are cleaned of fingerprints, marks and light grease."
+            },
+            "sink": {
+              "title": "Sink & faucet",
+              "text": "The sink and faucet are cleaned and polished, with available dishes washed and left tidy."
+            }
+          }
+        },
+        "bathroom": {
+          "label": "Bathroom",
+          "spots": {
+            "toilet": {
+              "title": "Toilet",
+              "text": "The bowl and seat are disinfected carefully for a hygienic finish."
+            },
+            "taps": {
+              "title": "Taps & chrome",
+              "text": "Mixers and chrome details are washed and polished to a soft shine."
+            },
+            "glass": {
+              "title": "Shower glass",
+              "text": "Glass panels are cleaned streak-free so the shower feels bright again."
+            },
+            "floor": {
+              "title": "Floor",
+              "text": "The bathroom floor is vacuumed and mopped with care."
+            }
+          }
+        },
+        "bedroom": {
+          "label": "Bedroom",
+          "spots": {
+            "under-bed": {
+              "title": "Under the bed",
+              "text": "Accessible areas under the bed are vacuumed and left dust-free."
+            },
+            "bedding": {
+              "title": "Bedding",
+              "text": "Bed linen is straightened or remade so the room feels calm and finished."
+            },
+            "dusting": {
+              "title": "Dusting",
+              "text": "Light objects are lifted so shelves and surfaces are dusted properly."
+            },
+            "mirrors": {
+              "title": "Mirrors & glass",
+              "text": "Mirrors and glass are cleaned streak-free for a bright look."
+            }
+          }
+        },
+        "living": {
+          "label": "Living room",
+          "spots": {
+            "surfaces": {
+              "title": "Surfaces",
+              "text": "Tables, shelves and décor surfaces are dusted and wiped gently."
+            },
+            "floors": {
+              "title": "Floors",
+              "text": "Floors are vacuumed and washed, including easy-to-reach corners."
+            },
+            "glass": {
+              "title": "Glass & frames",
+              "text": "Glass details and frames are cleaned for a clear, polished finish."
+            }
+          }
+        }
+      }
+    },
+    "repair": {
+      "title": "Home Repairs",
+      "subtitle": "Tap the markers to see the careful, everyday fixes we handle at home.",
+      "scenes": {
+        "furniture": {
+          "label": "Furniture",
+          "spots": {
+            "assemble": {
+              "title": "Furniture assembly",
+              "text": "Neat flat-pack assembly for shelves, desks and wardrobes."
+            },
+            "shelves": {
+              "title": "Shelves & mounting",
+              "text": "Shelves are mounted level and secured cleanly on the wall."
+            }
+          }
+        },
+        "bathroom-fix": {
+          "label": "Bathroom",
+          "spots": {
+            "taps": {
+              "title": "Taps & mixers",
+              "text": "We replace or adjust taps and mixers for smooth everyday use."
+            },
+            "minor-leak": {
+              "title": "Minor plumbing",
+              "text": "Seals, connections and simple leak checks — tidy and careful."
+            }
+          }
+        },
+        "living-fix": {
+          "label": "Living space",
+          "spots": {
+            "sockets": {
+              "title": "Sockets & switches",
+              "text": "Sockets and switches replaced for safer, cleaner daily use."
+            },
+            "fixtures": {
+              "title": "Light fixtures",
+              "text": "Standard light fixtures hung and connected neatly."
+            }
+          }
+        },
+        "hallway": {
+          "label": "Doors",
+          "spots": {
+            "hinges": {
+              "title": "Hinges & alignment",
+              "text": "Doors are adjusted so they close smoothly and quietly again."
+            },
+            "handles": {
+              "title": "Handles & locks",
+              "text": "Handle and lock fixes for everyday doors around the home."
+            }
+          }
+        }
+      }
+    }
+  },
+  "MassageCatalog": {
+    "eyebrow": "Premium In-Home Massage",
+    "title": "Massage",
+    "tagline": "Professional massage, brought to the comfort of your home.",
+    "intro": "Every session is delivered to your villa or apartment in the Algarve — choose the focus that suits your day.",
+    "viewDetails": "View details",
+    "bookMassage": "Book Massage",
+    "backToServices": "← Back to services",
+    "allTypes": "← All massage types",
+    "browseOther": "Browse other types",
+    "availableDurations": "Available durations",
+    "durationHint": "Choose your length in the booking form — same transparent rates as always.",
+    "durations": {
+      "m60": "60 min — 45€",
+      "m90": "90 min — 67.50€",
+      "m120": "120 min — 90€"
+    },
+    "categories": {
+      "relaxing": {
+        "title": "Relaxing Massage",
+        "short": "A quiet full-body reset in the comfort of your own villa or apartment.",
+        "description": "A calm, unhurried session delivered where you live — no travel, no waiting room. Soft pacing and a private atmosphere so you can settle into rest at home in the Algarve.",
+        "imageAlt": "In-home relaxing massage in a bright residential interior",
+        "focus": [
+          "Full-body calm at your place",
+          "Soft, unhurried pace",
+          "Private home setting",
+          "Easy wind-down after the session"
+        ]
+      },
+      "back-neck": {
+        "title": "Back & Neck Massage",
+        "short": "Focused back and neck care without leaving your living space.",
+        "description": "Shoulders, neck and back — treated at home after desk work, driving or a long day. You stay in your own space; we bring the session to you.",
+        "imageAlt": "Back massage prepared in a warm home setting",
+        "focus": [
+          "Neck and shoulder focus",
+          "Upper and lower back care",
+          "Session in your home",
+          "Steady, grounded finish"
+        ]
+      },
+      "face-head": {
+        "title": "Face & Head Massage",
+        "short": "Gentle face and scalp work in the quiet of your own rooms.",
+        "description": "Light touch for the face, temples, jaw and scalp — in a familiar, private space. Ideal when you want mental quiet without stepping into a salon.",
+        "imageAlt": "Gentle face and head massage in a home wellness setting",
+        "focus": [
+          "Temple and jaw ease",
+          "Scalp and hairline calm",
+          "Soft facial touch",
+          "Quiet closing moments"
+        ]
+      },
+      "legs-feet": {
+        "title": "Legs & Feet Massage",
+        "short": "Legs and feet cared for at home after walks, travel or a warm day.",
+        "description": "From calves to soles — delivered in your villa or apartment so tired legs can recover where you already are. Steady rhythm, grounded comfort, no clinic feel.",
+        "imageAlt": "Legs and feet massage on a soft towel at home",
+        "focus": [
+          "Thigh and calf focus",
+          "Ankle and foot care",
+          "At-home convenience",
+          "Light, settling finish"
+        ]
+      }
+    }
   }
 }
