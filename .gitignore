@@ -33,6 +33,14 @@ yarn-error.log*
 .env*
 !.env.example
 
+# local DB / Storage backups (prefer C:\backups\havenly\ outside the repo)
+/backups/
+*.dump
+*.dump.sha256
+*.pgdump
+*.sql.gz
+*.backup
+
 # chat histories
 /data/chats/*.json
 /data/bot-ui/*.json
