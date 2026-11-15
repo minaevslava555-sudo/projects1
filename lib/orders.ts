@@ -67,6 +67,10 @@ export async function saveOrderToSupabase(order: OrderRecord): Promise<SavedOrde
         : null,
       order_ref: orderRef,
       status: "new",
+      pricing_config_id: order.pricingConfigId ?? null,
+      pricing_version: order.pricingVersion ?? null,
+      hourly_rate_snapshot: order.hourlyRateSnapshot ?? null,
+      pricing_snapshot: order.pricingSnapshot ?? null,
     });
 
     if (!error) {

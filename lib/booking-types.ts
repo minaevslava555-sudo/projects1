@@ -22,4 +22,8 @@ export type OrderRecord = {
   problemDescription?: string;
   repairPhotoPaths?: string[];
   orderRef: string;
+  pricingConfigId?: string;
+  pricingVersion?: number;
+  hourlyRateSnapshot?: number;
+  pricingSnapshot?: Record<string, unknown> | null;
 };

@@ -14,9 +14,9 @@ import {
 import {
   type BookingService,
   isValidPreferredTime,
-  resolveBookingPricing,
 } from "@/lib/booking-pricing";
 import { generateOrderRef } from "@/lib/order-ref";
+import { resolveOrderPricing } from "@/lib/order-pricing";
 import { saveOrderToSupabase } from "@/lib/orders";
 import { clientIpFromHeaders, consumeRateLimit } from "@/lib/rate-limit";
 import { cleanupOrphanRepairPhotos } from "@/lib/repair-photos-cleanup";
@@ -213,14 +213,21 @@ export async function POST(request: Request) {
       return jsonError(bound.error, 400);
     }
 
-    const priced = resolveBookingPricing({
+    const pricingResult = await resolveOrderPricing({
       service,
       rooms: rooms ?? undefined,
       massageMinutes: massageMinutes ?? undefined,
     });
-    if ("error" in priced) {
-      return jsonError(priced.error, 400);
+    if (!pricingResult.ok) {
+      return jsonError(pricingResult.message, pricingResult.status);
     }
+    const {
+      priced,
+      pricingConfigId,
+      pricingVersion,
+      hourlyRateSnapshot,
+      pricingSnapshot,
+    } = pricingResult;
 
     let orderDetails = details ?? undefined;
     if (service === "cleaning" && priced.mode === "fixed") {
@@ -263,6 +270,10 @@ export async function POST(request: Request) {
       problemDescription: service === "repair" ? problemDescription : undefined,
       repairPhotoPaths: service === "repair" ? repairPhotoPaths : undefined,
       orderRef,
+      pricingConfigId,
+      pricingVersion,
+      hourlyRateSnapshot,
+      pricingSnapshot,
     });
 
     await markDraftConsumed(draftId);
