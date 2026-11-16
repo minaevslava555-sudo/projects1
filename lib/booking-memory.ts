@@ -69,4 +69,10 @@ export const bookingMemory = {
   setIdem(key: string, value: string) {
     idem.set(key, value);
   },
+  compareAndDeleteIdem(key: string, expectedValue: string): boolean {
+    const current = idem.get(key);
+    if (current === undefined || current !== expectedValue) return false;
+    idem.delete(key);
+    return true;
+  },
 };
