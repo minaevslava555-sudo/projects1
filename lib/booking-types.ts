@@ -22,6 +22,8 @@ export type OrderRecord = {
   problemDescription?: string;
   repairPhotoPaths?: string[];
   orderRef: string;
+  idempotencyKey?: string;
+  requestFingerprint?: string;
   pricingConfigId?: string;
   pricingVersion?: number;
   hourlyRateSnapshot?: number;

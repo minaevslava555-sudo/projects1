@@ -75,4 +75,11 @@ export const bookingMemory = {
     idem.delete(key);
     return true;
   },
+  /** Replace only if the stored value exactly matches expected (no TTL on memory idem). */
+  compareAndSetIdem(key: string, expected: string, next: string): boolean {
+    const current = idem.get(key);
+    if (current === undefined || current !== expected) return false;
+    idem.set(key, next);
+    return true;
+  },
 };

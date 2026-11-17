@@ -1,3 +1,4 @@
+import { findOrderByIdempotencyKey } from "@/lib/orders";
 import {
   defaultOrderRouteDeps,
   handleOrderPost,
@@ -6,5 +7,8 @@ import {
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  return handleOrderPost(request, defaultOrderRouteDeps);
+  return handleOrderPost(request, {
+    ...defaultOrderRouteDeps,
+    findOrderByIdempotencyKey,
+  });
 }

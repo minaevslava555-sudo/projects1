@@ -16,9 +16,14 @@ import {
   type BookingService,
   isValidPreferredTime,
 } from "@/lib/booking-pricing";
+import { buildOrderRequestFingerprint } from "@/lib/order-request-fingerprint";
 import { resolveOrderPricing } from "@/lib/order-pricing";
 import { generateOrderRef } from "@/lib/order-ref";
-import { saveOrderToSupabase } from "@/lib/orders";
+import {
+  findOrderByIdempotencyKey,
+  OrderIdempotencyConflictError,
+  saveOrderToSupabase,
+} from "@/lib/orders";
 import { clientIpFromHeaders, consumeRateLimit } from "@/lib/rate-limit";
 import { cleanupOrphanRepairPhotos } from "@/lib/repair-photos-cleanup";
 import { notifyAdminAboutOrder } from "@/lib/telegram-notify";
@@ -41,6 +46,7 @@ export type OrderRouteDeps = {
   resolveOrderPricing: typeof resolveOrderPricing;
   generateOrderRef: typeof generateOrderRef;
   saveOrderToSupabase: typeof saveOrderToSupabase;
+  findOrderByIdempotencyKey: typeof findOrderByIdempotencyKey;
   notifyAdminAboutOrder: typeof notifyAdminAboutOrder;
 };
 
@@ -61,6 +67,7 @@ export const defaultOrderRouteDeps: OrderRouteDeps = {
   resolveOrderPricing,
   generateOrderRef,
   saveOrderToSupabase,
+  findOrderByIdempotencyKey,
   notifyAdminAboutOrder,
 };
 
@@ -125,6 +132,107 @@ function pendingPlaceholder(): IdempotentOrderResult {
   };
 }
 
+type ValidatedBookingFields = {
+  name: string;
+  phone: string;
+  service: BookingService;
+  date: string;
+  preferredTime: string;
+  streetAddress: string;
+  city: string;
+  apartmentFloor: string | undefined;
+  accessInstructions: string | undefined;
+  details: string | undefined;
+  problemDescription: string | undefined;
+  massageCategory: string | undefined;
+  rooms: number | null;
+  massageMinutes: number | null;
+  repairPhotoPaths: string[];
+};
+
+function parseValidatedBookingFields(
+  raw: Record<string, unknown>,
+):
+  | { ok: true; fields: ValidatedBookingFields }
+  | { ok: false; message: string; status: number } {
+  const name = asTrimmedString(raw.name, 120);
+  const phone = asTrimmedString(raw.phone, 40);
+  const serviceRaw = asTrimmedString(raw.service, 40);
+  const date = asTrimmedString(raw.date, 40);
+  const preferredTime = asTrimmedString(raw.preferredTime, 5);
+  const streetAddress = asTrimmedString(raw.streetAddress, 200);
+  const city = asTrimmedString(raw.city, 100);
+  const apartmentFloor = asOptionalTrimmed(raw.apartmentFloor, 80);
+  const accessInstructions = asOptionalTrimmed(raw.accessInstructions, 500);
+  const details = asOptionalTrimmed(raw.details, 200);
+  const problemDescription = asOptionalTrimmed(raw.problemDescription, 2000);
+  const massageCategory = asOptionalTrimmed(raw.massageCategory, 120);
+  const rooms = asPositiveInt(raw.rooms, 6);
+  const massageMinutes = asPositiveInt(raw.massageMinutes, 240);
+  const photos = parsePhotoPaths(raw.repairPhotoPaths);
+  if (!photos.ok) {
+    return { ok: false, message: photos.error, status: 400 };
+  }
+  const repairPhotoPaths = photos.paths;
+  if (serviceRaw === "repair") {
+    console.info("[order] repair_photo_count", repairPhotoPaths.length);
+  }
+
+  if (!name || !phone || !serviceRaw || !SERVICES.has(serviceRaw as BookingService)) {
+    return { ok: false, message: "Заполните имя, телефон и услугу", status: 400 };
+  }
+
+  const service = serviceRaw as BookingService;
+
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return { ok: false, message: "Укажите дату", status: 400 };
+  }
+  if (!preferredTime || !isValidPreferredTime(preferredTime)) {
+    return { ok: false, message: "Укажите время в слотах 09:00–19:00", status: 400 };
+  }
+  if (!streetAddress || !city) {
+    return { ok: false, message: "Укажите адрес и город", status: 400 };
+  }
+  if (
+    apartmentFloor === "invalid" ||
+    accessInstructions === "invalid" ||
+    details === "invalid" ||
+    problemDescription === "invalid" ||
+    massageCategory === "invalid"
+  ) {
+    return { ok: false, message: "Проверьте дополнительные поля", status: 400 };
+  }
+
+  if (service === "repair") {
+    if (!problemDescription) {
+      return { ok: false, message: "Опишите проблему", status: 400 };
+    }
+  }
+
+  return {
+    ok: true,
+    fields: {
+      name,
+      phone,
+      service,
+      date,
+      preferredTime,
+      streetAddress,
+      city,
+      apartmentFloor: apartmentFloor === "invalid" ? undefined : apartmentFloor,
+      accessInstructions:
+        accessInstructions === "invalid" ? undefined : accessInstructions,
+      details: details === "invalid" ? undefined : details,
+      problemDescription:
+        problemDescription === "invalid" ? undefined : problemDescription,
+      massageCategory: massageCategory === "invalid" ? undefined : massageCategory,
+      rooms,
+      massageMinutes,
+      repairPhotoPaths,
+    },
+  };
+}
+
 export async function handleOrderPost(
   request: Request,
   deps: OrderRouteDeps,
@@ -168,9 +276,61 @@ export async function handleOrderPost(
       return jsonError("Нужен Idempotency-Key", 400);
     }
 
+    const validated = parseValidatedBookingFields(raw);
+    if (!validated.ok) {
+      return jsonError(validated.message, validated.status);
+    }
+    const {
+      name,
+      phone,
+      service,
+      date,
+      preferredTime,
+      streetAddress,
+      city,
+      apartmentFloor,
+      accessInstructions,
+      details,
+      problemDescription,
+      massageCategory,
+      rooms,
+      massageMinutes,
+      repairPhotoPaths,
+    } = validated.fields;
+
+    const requestFingerprint = buildOrderRequestFingerprint({
+      name,
+      phone,
+      service,
+      date,
+      preferredTime,
+      streetAddress,
+      city,
+      apartmentFloor: apartmentFloor === "invalid" ? null : apartmentFloor ?? null,
+      accessInstructions:
+        accessInstructions === "invalid" ? null : accessInstructions ?? null,
+      details: details === "invalid" ? null : details ?? null,
+      problemDescription:
+        problemDescription === "invalid" ? null : problemDescription ?? null,
+      massageCategory: massageCategory === "invalid" ? null : massageCategory ?? null,
+      rooms,
+      massageMinutes,
+      repairPhotoPaths,
+    });
+
     const existing = await deps.getIdempotentOrder(idempotencyKey);
     if (existing && existing.id !== "__pending__") {
-      return Response.json({ ok: true, ...existing });
+      const existingByKey = await deps.findOrderByIdempotencyKey(idempotencyKey);
+      if (
+        existingByKey &&
+        existingByKey.requestFingerprint != null &&
+        existingByKey.requestFingerprint === requestFingerprint &&
+        existing.id === existingByKey.id &&
+        existing.orderRef === existingByKey.orderRef
+      ) {
+        return Response.json({ ok: true, ...existing });
+      }
+      return jsonError("Ключ идемпотентности уже использован", 409);
     }
     if (existing?.id === "__pending__") {
       return jsonError("Заказ уже обрабатывается", 409);
@@ -186,7 +346,17 @@ export async function handleOrderPost(
     if (claim.status === "exists") {
       const again = await deps.getIdempotentOrder(idempotencyKey);
       if (again && again.id !== "__pending__") {
-        return Response.json({ ok: true, ...again });
+        const existingByKey = await deps.findOrderByIdempotencyKey(idempotencyKey);
+        if (
+          existingByKey &&
+          existingByKey.requestFingerprint != null &&
+          existingByKey.requestFingerprint === requestFingerprint &&
+          again.id === existingByKey.id &&
+          again.orderRef === existingByKey.orderRef
+        ) {
+          return Response.json({ ok: true, ...again });
+        }
+        return jsonError("Ключ идемпотентности уже использован", 409);
       }
       return jsonError("Заказ уже обрабатывается", 409);
     }
@@ -201,60 +371,6 @@ export async function handleOrderPost(
       }
       return jsonError(message, status);
     };
-
-    const name = asTrimmedString(raw.name, 120);
-    const phone = asTrimmedString(raw.phone, 40);
-    const serviceRaw = asTrimmedString(raw.service, 40);
-    const date = asTrimmedString(raw.date, 40);
-    const preferredTime = asTrimmedString(raw.preferredTime, 5);
-    const streetAddress = asTrimmedString(raw.streetAddress, 200);
-    const city = asTrimmedString(raw.city, 100);
-    const apartmentFloor = asOptionalTrimmed(raw.apartmentFloor, 80);
-    const accessInstructions = asOptionalTrimmed(raw.accessInstructions, 500);
-    const details = asOptionalTrimmed(raw.details, 200);
-    const problemDescription = asOptionalTrimmed(raw.problemDescription, 2000);
-    const massageCategory = asOptionalTrimmed(raw.massageCategory, 120);
-    const rooms = asPositiveInt(raw.rooms, 6);
-    const massageMinutes = asPositiveInt(raw.massageMinutes, 240);
-    const photos = parsePhotoPaths(raw.repairPhotoPaths);
-    if (!photos.ok) {
-      return failBeforeSave(photos.error, 400);
-    }
-    const repairPhotoPaths = photos.paths;
-    if (serviceRaw === "repair") {
-      console.info("[order] repair_photo_count", repairPhotoPaths.length);
-    }
-
-    if (!name || !phone || !serviceRaw || !SERVICES.has(serviceRaw as BookingService)) {
-      return failBeforeSave("Заполните имя, телефон и услугу", 400);
-    }
-
-    const service = serviceRaw as BookingService;
-
-    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      return failBeforeSave("Укажите дату", 400);
-    }
-    if (!preferredTime || !isValidPreferredTime(preferredTime)) {
-      return failBeforeSave("Укажите время в слотах 09:00–19:00", 400);
-    }
-    if (!streetAddress || !city) {
-      return failBeforeSave("Укажите адрес и город", 400);
-    }
-    if (
-      apartmentFloor === "invalid" ||
-      accessInstructions === "invalid" ||
-      details === "invalid" ||
-      problemDescription === "invalid" ||
-      massageCategory === "invalid"
-    ) {
-      return failBeforeSave("Проверьте дополнительные поля", 400);
-    }
-
-    if (service === "repair") {
-      if (!problemDescription) {
-        return failBeforeSave("Опишите проблему", 400);
-      }
-    }
 
     const draftToken =
       asTrimmedString(raw.draftToken, 1024) ||
@@ -306,35 +422,98 @@ export async function handleOrderPost(
       orderDetails = orderDetails ?? "Home repair quote request";
     }
 
+    const existingByKey = await deps.findOrderByIdempotencyKey(idempotencyKey);
+    if (existingByKey) {
+      if (
+        existingByKey.requestFingerprint != null &&
+        existingByKey.requestFingerprint === requestFingerprint
+      ) {
+        const cached = await deps.getIdempotentOrder(idempotencyKey);
+        const telegramOk =
+          cached != null &&
+          cached.id === existingByKey.id &&
+          cached.orderRef === existingByKey.orderRef &&
+          cached.id !== "__pending__" &&
+          typeof cached.telegramOk === "boolean"
+            ? cached.telegramOk
+            : false;
+        const replayed: IdempotentOrderResult = {
+          id: existingByKey.id,
+          orderRef: existingByKey.orderRef,
+          pricingMode: existingByKey.pricingMode,
+          priceEuro: existingByKey.priceEuro,
+          telegramOk,
+        };
+        // Finalize Redis claim so the key is not left pending.
+        await deps.storeIdempotentOrder(idempotencyKey, replayed);
+        return Response.json({
+          ok: true,
+          ...replayed,
+        });
+      }
+      // Mismatch or legacy null fingerprint: reject without leaking order details.
+      return failBeforeSave("Ключ идемпотентности уже использован", 409);
+    }
+
     const orderRef = deps.generateOrderRef();
 
     saveStarted = true;
-    const { id, orderRef: savedRef } = await deps.saveOrderToSupabase({
-      name,
-      phone,
-      service,
-      pricingMode: priced.mode,
-      priceEuro: priced.priceEuro,
-      date,
-      preferredTime,
-      streetAddress,
-      city,
-      apartmentFloor,
-      accessInstructions,
-      details: orderDetails,
-      rooms: service === "cleaning" ? rooms ?? undefined : undefined,
-      hours: priced.mode === "fixed" ? priced.hours : undefined,
-      workers: priced.mode === "fixed" ? priced.workers : undefined,
-      massageMinutes: priced.mode === "fixed" ? priced.massageMinutes : undefined,
-      massageCategory: service === "massage" ? massageCategory : undefined,
-      problemDescription: service === "repair" ? problemDescription : undefined,
-      repairPhotoPaths: service === "repair" ? repairPhotoPaths : undefined,
-      orderRef,
-      pricingConfigId,
-      pricingVersion,
-      hourlyRateSnapshot,
-      pricingSnapshot,
-    });
+    let id: string;
+    let savedRef: string;
+    try {
+      const saved = await deps.saveOrderToSupabase({
+        name,
+        phone,
+        service,
+        pricingMode: priced.mode,
+        priceEuro: priced.priceEuro,
+        date,
+        preferredTime,
+        streetAddress,
+        city,
+        apartmentFloor,
+        accessInstructions,
+        details: orderDetails,
+        rooms: service === "cleaning" ? rooms ?? undefined : undefined,
+        hours: priced.mode === "fixed" ? priced.hours : undefined,
+        workers: priced.mode === "fixed" ? priced.workers : undefined,
+        massageMinutes: priced.mode === "fixed" ? priced.massageMinutes : undefined,
+        massageCategory: service === "massage" ? massageCategory : undefined,
+        problemDescription: service === "repair" ? problemDescription : undefined,
+        repairPhotoPaths: service === "repair" ? repairPhotoPaths : undefined,
+        orderRef,
+        idempotencyKey,
+        requestFingerprint,
+        pricingConfigId,
+        pricingVersion,
+        hourlyRateSnapshot,
+        pricingSnapshot,
+      });
+      id = saved.id;
+      savedRef = saved.orderRef;
+    } catch (saveError) {
+      // Isolated save catch: outer catch cannot see requestFingerprint/idempotencyKey.
+      if (saveError instanceof OrderIdempotencyConflictError) {
+        const existingByKey = await deps.findOrderByIdempotencyKey(idempotencyKey);
+        if (
+          existingByKey &&
+          existingByKey.requestFingerprint != null &&
+          existingByKey.requestFingerprint === requestFingerprint
+        ) {
+          // Redis claim lifecycle intentionally unchanged in this step.
+          return Response.json({
+            ok: true,
+            id: existingByKey.id,
+            orderRef: existingByKey.orderRef,
+            pricingMode: existingByKey.pricingMode,
+            priceEuro: existingByKey.priceEuro,
+            telegramOk: false,
+          });
+        }
+        return jsonError("Ключ идемпотентности уже использован", 409);
+      }
+      throw saveError;
+    }
 
     await deps.markDraftConsumed(draftId);
 
