@@ -282,7 +282,7 @@ export default function Home() {
             </a>
             <button
               type="button"
-              onClick={() => openOrder("cleaning", true)}
+              onClick={() => openOrder("cleaning", false)}
               className="header-book-cta hidden items-center rounded-[12px] border border-white/35 bg-white/10 px-3.5 py-2 text-sm font-semibold text-white backdrop-blur-sm transition hover:border-gold/60 hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold md:inline-flex"
             >
               {t("Nav.book")}
@@ -303,22 +303,34 @@ export default function Home() {
         {navOpen ? (
           <div
             id="mobile-nav"
-            className="border-t border-white/15 bg-olive-deep/95 px-5 py-5 backdrop-blur-md lg:hidden"
+            className="border-t border-white/15 bg-olive-deep/95 px-5 py-4 backdrop-blur-md lg:hidden"
           >
-            <nav className="mx-auto flex max-w-6xl flex-col gap-1" aria-label={t("Nav.mobile")}>
+            <nav
+              className="mobile-nav-list mx-auto flex max-w-6xl flex-col"
+              aria-label={t("Nav.mobile")}
+            >
               {NAV_HREFS.map((link) => (
                 <button
                   key={link.href}
                   type="button"
                   onClick={() => onNavClick(link.href)}
-                  className="rounded-[12px] px-3 py-3 text-left text-base font-medium text-white/90 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+                  className="mobile-nav-item min-h-11 rounded-[12px] px-3 py-2.5 text-left text-base font-medium text-white/90 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
                 >
                   {t(`Nav.${link.key}`)}
                 </button>
               ))}
               <a
+                href="https://wa.me/351920024478"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={t("Hero.whatsAppAria")}
+                className="mobile-nav-item mt-1.5 min-h-11 rounded-[12px] px-3 py-2.5 text-base font-semibold text-sand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+              >
+                {t("Hero.whatsApp")}
+              </a>
+              <a
                 href="tel:+351920024478"
-                className="mt-2 rounded-[12px] px-3 py-3 text-base font-semibold text-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+                className="mobile-nav-item min-h-11 rounded-[12px] px-3 py-2.5 text-base font-semibold text-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
               >
                 {t("Nav.call")} · +351 920 024 478
               </a>
@@ -326,11 +338,11 @@ export default function Home() {
                 type="button"
                 onClick={() => {
                   setNavOpen(false);
-                  openOrder("cleaning", true);
+                  openOrder("cleaning", false);
                 }}
-                className="mt-1 rounded-[12px] bg-olive px-3 py-3 text-left text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+                className="mobile-nav-item mt-1.5 min-h-11 rounded-[12px] bg-olive px-3 py-2.5 text-left text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
               >
-                {t("Nav.bookCleaning")}
+                {t("Hero.bookService")}
               </button>
             </nav>
           </div>

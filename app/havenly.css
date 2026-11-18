@@ -45,6 +45,16 @@
   background: transparent !important;
 }
 
+.havenly-landing #mobile-nav .mobile-nav-list {
+  gap: 0.125rem;
+}
+
+.havenly-landing #mobile-nav .mobile-nav-item {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
 .havenly-landing #services button.group,
 .havenly-landing .hero-service-rail button.group {
   background-color: transparent !important;
