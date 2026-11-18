@@ -73,6 +73,7 @@ type ErrorCode =
   | "submitFailed"
   | "orderProcessing"
   | "temporaryUnavailable"
+  | "tooManyRequests"
   | "attemptPayloadChanged";
 
 type WizardError =
@@ -342,6 +343,9 @@ export default function BookingWizard({
       draftToken?: string;
       error?: string;
     };
+    if (response.status === 429) {
+      throw new Error(t("errors.tooManyRequests"));
+    }
     if (!response.ok || !data.ok || !data.draftId || !data.draftToken) {
       throw new Error(data.error || t("errors.draftOpenFailed"));
     }
@@ -390,6 +394,10 @@ export default function BookingWizard({
           error?: string;
         };
         if (cancelled) return;
+        if (response.status === 429) {
+          setErrorCode("tooManyRequests");
+          return;
+        }
         if (!response.ok || !data.ok || !data.draftId || !data.draftToken) {
           if (data.error) setRawError(data.error);
           else setErrorCode("draftOpenFailed");
@@ -738,6 +746,10 @@ export default function BookingWizard({
         }
         if (response.status === 409) {
           setErrorCode("orderProcessing");
+          return;
+        }
+        if (response.status === 429) {
+          setErrorCode("tooManyRequests");
           return;
         }
         if (data.error) setRawError(data.error);

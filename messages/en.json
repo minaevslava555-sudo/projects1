@@ -295,6 +295,7 @@
       "submitFailed": "Could not submit the order",
       "orderProcessing": "Your booking is still being processed. Wait a moment, then retry with the same details.",
       "temporaryUnavailable": "The service is temporarily unavailable. Please retry shortly — your booking was not confirmed yet.",
+      "tooManyRequests": "Too many requests. Please try again later.",
       "attemptPayloadChanged": "These details differ from your unfinished booking. Restore the original details to retry, or start a new booking."
     }
   },
