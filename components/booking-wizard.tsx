@@ -50,6 +50,7 @@ type RepairPhotoItem = {
 type ErrorCode =
   | "draftOpenFailed"
   | "repairDetail"
+  | "chooseRooms"
   | "chooseDate"
   | "chooseTime"
   | "addressRequired"
@@ -197,7 +198,7 @@ export default function BookingWizard({
   const tMassage = useTranslations("MassageCatalog");
   const titleId = useId();
   const [stepIndex, setStepIndex] = useState(0);
-  const [rooms, setRooms] = useState(2);
+  const [rooms, setRooms] = useState<number | null>(null);
   const [massageMinutes, setMassageMinutes] = useState<MassageMinutes>(60);
   const [problemDescription, setProblemDescription] = useState("");
   const [draftId, setDraftId] = useState<string | null>(null);
@@ -231,7 +232,10 @@ export default function BookingWizard({
   const [replaceTargetId, setReplaceTargetId] = useState<string | null>(null);
 
   const step = STEPS[stepIndex] ?? "configure";
-  const cleaning = useMemo(() => cleaningPlan(rooms), [rooms]);
+  const cleaning = useMemo(
+    () => (rooms == null ? null : cleaningPlan(rooms)),
+    [rooms],
+  );
   const massageCategory = massageCategoryId
     ? getMassageCategory(massageCategoryId)
     : null;
@@ -251,7 +255,9 @@ export default function BookingWizard({
 
   const total = useMemo(() => {
     if (service === "massage") return massagePriceEuro(massageMinutes) ?? 45;
-    if (service === "cleaning") return cleaningPriceEuro(rooms);
+    if (service === "cleaning") {
+      return rooms == null ? null : cleaningPriceEuro(rooms);
+    }
     return null;
   }, [service, massageMinutes, rooms]);
 
@@ -279,7 +285,7 @@ export default function BookingWizard({
 
   function resetWizardFields(options?: { preserveAttempt?: boolean }) {
     setStepIndex(0);
-    setRooms(2);
+    setRooms(null);
     setMassageMinutes(60);
     setProblemDescription("");
     setDraftId(null);
@@ -402,6 +408,9 @@ export default function BookingWizard({
 
   function validateStep(current: StepId): ErrorCode | null {
     if (current === "configure") {
+      if (service === "cleaning" && rooms == null) {
+        return "chooseRooms";
+      }
       if (service === "repair" && problemDescription.trim().length < 10) {
         return "repairDetail";
       }
@@ -609,6 +618,12 @@ export default function BookingWizard({
 
     if (!turnstileToken) {
       setErrorCode("turnstileRequired");
+      return;
+    }
+
+    if (service === "cleaning" && rooms == null) {
+      setErrorCode("chooseRooms");
+      setStepIndex(STEPS.indexOf("configure"));
       return;
     }
 
@@ -821,7 +836,7 @@ export default function BookingWizard({
             </div>
           ) : null}
 
-          {hasUnresolvedAttempt && !successRef ? (
+          {hasUnresolvedAttempt && !successRef && !sending ? (
             <div
               className="mt-4 border border-gold/40 bg-gold/10 px-3 py-3 text-left"
               role="status"
@@ -889,13 +904,24 @@ export default function BookingWizard({
               </div>
             ) : null}
 
-            {step === "configure" && service !== "repair" ? (
+            {step === "configure" && service === "massage" ? (
               <div className="rounded-xl border border-mist bg-white px-5 py-6 text-center">
                 <p className="text-xs font-medium tracking-[0.18em] text-muted uppercase">
                   {t("total")}
                 </p>
                 <p className="mt-2 font-display text-5xl font-bold tracking-tight text-olive sm:text-6xl">
                   {formatEuro(total ?? 0)}
+                </p>
+              </div>
+            ) : null}
+
+            {step === "configure" && service === "cleaning" && total != null ? (
+              <div className="rounded-xl border border-mist bg-white px-5 py-6 text-center">
+                <p className="text-xs font-medium tracking-[0.18em] text-muted uppercase">
+                  {t("total")}
+                </p>
+                <p className="mt-2 font-display text-5xl font-bold tracking-tight text-olive sm:text-6xl">
+                  {formatEuro(total)}
                 </p>
               </div>
             ) : null}
@@ -909,32 +935,64 @@ export default function BookingWizard({
 
             {step === "configure" && service === "cleaning" ? (
               <div className="space-y-4">
-                <Stepper
-                  id="cleaning-rooms"
-                  label={roomsLabel}
-                  value={rooms}
-                  min={1}
-                  max={6}
-                  onChange={setRooms}
-                  decreaseLabel={t("decrease", { label: roomsLabel })}
-                  increaseLabel={t("increase", { label: roomsLabel })}
-                />
+                {rooms == null ? (
+                  <div>
+                    <p className="mb-2 block text-sm font-medium text-ink">
+                      {roomsLabel}
+                    </p>
+                    <p className="mb-3 text-sm leading-relaxed text-muted">
+                      {t("chooseRoomsHint")}
+                    </p>
+                    <div
+                      className="grid grid-cols-3 gap-2 sm:grid-cols-6"
+                      role="group"
+                      aria-label={roomsLabel}
+                    >
+                      {[1, 2, 3, 4, 5, 6].map((count) => (
+                        <button
+                          key={count}
+                          type="button"
+                          onClick={() => {
+                            setRooms(count);
+                            clearError();
+                          }}
+                          className="border border-mist bg-white px-3 py-3 text-sm font-semibold text-ink transition hover:border-olive"
+                        >
+                          {count}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <Stepper
+                    id="cleaning-rooms"
+                    label={roomsLabel}
+                    value={rooms}
+                    min={1}
+                    max={6}
+                    onChange={setRooms}
+                    decreaseLabel={t("decrease", { label: roomsLabel })}
+                    increaseLabel={t("increase", { label: roomsLabel })}
+                  />
+                )}
+                {rooms != null && cleaning != null && total != null ? (
                   <div className="rounded-xl border border-sand bg-sand/70 px-4 py-3 text-sm leading-relaxed text-ink">
-                  <p className="font-medium">
-                    {t("cleaningPlan", {
-                      rooms: t("roomCount", { count: rooms }),
-                      hours: t("hourCount", { count: cleaning.hours }),
-                      cleaners: t("cleanerCount", { count: cleaning.workers }),
-                    })}
-                  </p>
-                  <p className="mt-1 text-olive/80">
-                    {t("cleaningFormula", {
-                      hours: cleaning.hours,
-                      workers: cleaning.workers,
-                      total: formatEuro(total ?? 0),
-                    })}
-                  </p>
-                </div>
+                    <p className="font-medium">
+                      {t("cleaningPlan", {
+                        rooms: t("roomCount", { count: rooms }),
+                        hours: t("hourCount", { count: cleaning.hours }),
+                        cleaners: t("cleanerCount", { count: cleaning.workers }),
+                      })}
+                    </p>
+                    <p className="mt-1 text-olive/80">
+                      {t("cleaningFormula", {
+                        hours: cleaning.hours,
+                        workers: cleaning.workers,
+                        total: formatEuro(total),
+                      })}
+                    </p>
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
@@ -1224,13 +1282,16 @@ export default function BookingWizard({
                       {tMassage(`categories.${massageCategory.id}.title`)}
                     </p>
                   ) : null}
-                  {service === "cleaning" ? (
+                  {service === "cleaning" &&
+                  rooms != null &&
+                  cleaning != null &&
+                  total != null ? (
                     <p className="mt-2">
                       {t("cleaningSummary", {
                         rooms: t("roomCount", { count: rooms }),
                         hours: cleaning.hours,
                         cleaners: t("cleanerCount", { count: cleaning.workers }),
-                        total: formatEuro(total ?? 0),
+                        total: formatEuro(total),
                       })}
                     </p>
                   ) : null}
@@ -1309,7 +1370,10 @@ export default function BookingWizard({
                   <button
                     type="button"
                     onClick={goNext}
-                    disabled={hasUploadingPhotos}
+                    disabled={
+                      hasUploadingPhotos ||
+                      (service === "cleaning" && rooms == null && step === "configure")
+                    }
                     className="flex-1 bg-olive px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep disabled:opacity-60"
                   >
                     {t("continue")}

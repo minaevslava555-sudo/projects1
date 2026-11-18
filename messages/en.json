@@ -207,6 +207,7 @@
     "quoteBannerTitle": "Quote on assessment",
     "quoteBannerBody": "Describe the issue and add optional photos. Final price after we review.",
     "roomsLabel": "Number of rooms",
+    "chooseRoomsHint": "Select how many rooms need cleaning to see hours, cleaners and price.",
     "decrease": "Decrease {label}",
     "increase": "Increase {label}",
     "cleaningPlan": "{rooms} require ~{hours} and {cleaners}",
@@ -271,6 +272,7 @@
     "errors": {
       "draftOpenFailed": "Could not open booking",
       "repairDetail": "Describe the repair in a bit more detail",
+      "chooseRooms": "Select the number of rooms to continue",
       "chooseDate": "Choose a date",
       "chooseTime": "Choose a preferred time",
       "addressRequired": "Enter street address and city",

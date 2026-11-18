@@ -207,6 +207,7 @@
     "quoteBannerTitle": "Orçamento após avaliação",
     "quoteBannerBody": "Descreva o problema e adicione fotografias opcionais. O preço final é definido após a nossa análise.",
     "roomsLabel": "Número de divisões",
+    "chooseRoomsHint": "Escolha o número de divisões a limpar para ver as horas, os profissionais e o preço.",
     "decrease": "Diminuir {label}",
     "increase": "Aumentar {label}",
     "cleaningPlan": "{rooms} — cerca de {hours} e {cleaners}",
@@ -271,6 +272,7 @@
     "errors": {
       "draftOpenFailed": "Não foi possível abrir a reserva",
       "repairDetail": "Descreva a reparação com um pouco mais de detalhe",
+      "chooseRooms": "Seleccione o número de divisões para continuar",
       "chooseDate": "Escolha uma data",
       "chooseTime": "Escolha uma hora preferida",
       "addressRequired": "Introduza a morada e a cidade",
