@@ -266,6 +266,8 @@
     "successBody": "A sua referência de reserva é <ref>{orderRef}</ref>. Confirmaremos a visita em breve.",
     "successRepairNote": "As reparações em casa são orçamentadas após avaliação — não foi cobrado qualquer valor na reserva.",
     "successEstimatedTotal": "Total estimado: {total}",
+    "unresolvedAttemptBody": "Um envio anterior pode ainda estar a ser processado. Tente novamente com os mesmos dados, ou comece uma nova reserva.",
+    "startNewBooking": "Começar uma nova reserva",
     "errors": {
       "draftOpenFailed": "Não foi possível abrir a reserva",
       "repairDetail": "Descreva a reparação com um pouco mais de detalhe",
@@ -288,7 +290,10 @@
       "serverStatus": "Erro do servidor ({status}). Verifique se a API está publicada na Vercel.",
       "emptyResponse": "Resposta vazia do servidor ({status})",
       "saveFailed": "Não foi possível guardar o pedido",
-      "submitFailed": "Não foi possível enviar o pedido"
+      "submitFailed": "Não foi possível enviar o pedido",
+      "orderProcessing": "A sua reserva ainda está a ser processada. Aguarde um momento e tente novamente com os mesmos dados.",
+      "temporaryUnavailable": "O serviço está temporariamente indisponível. Tente novamente em breve — a reserva ainda não foi confirmada.",
+      "attemptPayloadChanged": "Estes dados são diferentes da reserva por concluir. Restaure os dados originais para tentar de novo, ou comece uma nova reserva."
     }
   },
   "ServiceDetail": {

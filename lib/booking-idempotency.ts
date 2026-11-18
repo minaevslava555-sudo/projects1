@@ -139,6 +139,16 @@ else
 end
 `;
 
+/** Compare-and-set: replace owned pending payload with completed result + EX TTL. */
+const FINALIZE_PENDING_LUA = `
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+  redis.call("SET", KEYS[1], ARGV[2], "EX", tonumber(ARGV[3]))
+  return 1
+else
+  return 0
+end
+`;
+
 function isReleasablePendingPayload(claimPayload: string): boolean {
   try {
     const parsed = JSON.parse(claimPayload) as {
@@ -152,6 +162,61 @@ function isReleasablePendingPayload(claimPayload: string): boolean {
     );
   } catch {
     return false;
+  }
+}
+
+export type FinalizePendingResult =
+  | "finalized"
+  | "missing"
+  | "mismatch"
+  | "error";
+
+/**
+ * Atomically replaces an owned pending claim with a completed order result.
+ * Does not overwrite completed/foreign values (exact claimPayload match required).
+ * "error" means Redis EVAL/GET failed — caller must not blind-store.
+ */
+export async function finalizePendingIdempotencyKey(
+  key: string,
+  claimPayload: string,
+  result: IdempotentOrderResult,
+  deps: RedisDeps = defaultRedisDeps,
+): Promise<FinalizePendingResult> {
+  if (!isReleasablePendingPayload(claimPayload)) {
+    return "mismatch";
+  }
+
+  const completedPayload = JSON.stringify(result);
+
+  if (!deps.redisCreds()) {
+    if (deps.redisRequired()) return "error";
+    const current = bookingMemory.getIdem(key);
+    if (current == null) return "missing";
+    const ok = bookingMemory.compareAndSetIdem(key, claimPayload, completedPayload);
+    return ok ? "finalized" : "mismatch";
+  }
+
+  try {
+    const evalResult = await deps.redisCommand([
+      "EVAL",
+      FINALIZE_PENDING_LUA,
+      1,
+      idemKey(key),
+      claimPayload,
+      completedPayload,
+      IDEM_TTL_SEC,
+    ]);
+    if (evalResult === 1 || evalResult === true) {
+      return "finalized";
+    }
+    // Distinguish missing vs mismatch with a GET after failed CAS.
+    const current = await deps.redisCommand(["GET", idemKey(key)]);
+    if (typeof current !== "string" || !current) {
+      return "missing";
+    }
+    return "mismatch";
+  } catch {
+    return "error";
   }
 }
 

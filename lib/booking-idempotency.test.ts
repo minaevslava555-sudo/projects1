@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { bookingMemory } from "./booking-memory";
 import {
   claimIdempotencyKeyWithToken,
+  finalizePendingIdempotencyKey,
   releasePendingIdempotencyKey,
   type IdempotentOrderResult,
   type RedisDeps,
@@ -73,11 +74,27 @@ function createFakeRedisDeps(options?: {
         const redisKey = String(command[3]);
         const expected = String(command[4]);
         const current = store.get(redisKey);
+        // Finalize CAS: EVAL script key expected next ttl
+        if (command.length >= 7) {
+          const next = String(command[5]);
+          assert.equal(Number(command[6]), 86400);
+          if (current === expected) {
+            store.set(redisKey, next);
+            return 1;
+          }
+          return 0;
+        }
+        // Release CAS delete: EVAL script key expected
         if (current === expected) {
           store.delete(redisKey);
           return 1;
         }
         return 0;
+      }
+
+      if (op === "GET") {
+        const redisKey = String(command[1]);
+        return store.get(redisKey) ?? null;
       }
 
       throw new Error(`Unexpected Redis command: ${String(op)}`);
@@ -418,4 +435,209 @@ test("fake Redis expiry and replacement: old claim cannot delete new claim", asy
 
   assert.equal(await releasePendingIdempotencyKey(key, first.claimPayload, deps), false);
   assert.equal(store.get(`booking:idem:${key}`), second.claimPayload);
+});
+
+const COMPLETED: IdempotentOrderResult = {
+  id: "ord-finalize-1",
+  orderRef: "HV-FIN-1",
+  pricingMode: "fixed",
+  priceEuro: 120,
+  telegramOk: true,
+};
+
+test("finalizePendingIdempotencyKey replaces owned pending claim in memory", async () => {
+  forceMemoryBackend();
+  const key = uniqueKey("fin-mem-ok");
+  const claimed = await claimIdempotencyKeyWithToken(key, PENDING_PLACEHOLDER);
+  assert.equal(claimed.status, "claimed");
+  if (claimed.status !== "claimed") return;
+
+  const status = await finalizePendingIdempotencyKey(
+    key,
+    claimed.claimPayload,
+    COMPLETED,
+  );
+  assert.equal(status, "finalized");
+  assert.equal(bookingMemory.getIdem(key), JSON.stringify(COMPLETED));
+});
+
+test("finalizePendingIdempotencyKey rejects mismatched claimToken in memory", async () => {
+  forceMemoryBackend();
+  const key = uniqueKey("fin-mem-mismatch");
+  const claimed = await claimIdempotencyKeyWithToken(key, PENDING_PLACEHOLDER);
+  assert.equal(claimed.status, "claimed");
+  if (claimed.status !== "claimed") return;
+
+  const stale = JSON.stringify({
+    ...PENDING_PLACEHOLDER,
+    claimToken: "00000000-0000-4000-8000-000000000099",
+  });
+  const status = await finalizePendingIdempotencyKey(key, stale, COMPLETED);
+  assert.equal(status, "mismatch");
+  assert.equal(bookingMemory.getIdem(key), claimed.claimPayload);
+});
+
+test("finalizePendingIdempotencyKey returns missing for absent memory key", async () => {
+  forceMemoryBackend();
+  const key = uniqueKey("fin-mem-missing");
+  const payload = JSON.stringify({
+    ...PENDING_PLACEHOLDER,
+    claimToken: "11111111-1111-4111-8111-111111111111",
+  });
+  const status = await finalizePendingIdempotencyKey(key, payload, COMPLETED);
+  assert.equal(status, "missing");
+  assert.equal(bookingMemory.getIdem(key), null);
+});
+
+test("finalizePendingIdempotencyKey cannot overwrite completed result in memory", async () => {
+  forceMemoryBackend();
+  const key = uniqueKey("fin-mem-completed");
+  const claimed = await claimIdempotencyKeyWithToken(key, PENDING_PLACEHOLDER);
+  assert.equal(claimed.status, "claimed");
+  if (claimed.status !== "claimed") return;
+
+  assert.equal(
+    await finalizePendingIdempotencyKey(key, claimed.claimPayload, COMPLETED),
+    "finalized",
+  );
+  const other: IdempotentOrderResult = {
+    ...COMPLETED,
+    id: "ord-other",
+    telegramOk: false,
+  };
+  assert.equal(
+    await finalizePendingIdempotencyKey(key, claimed.claimPayload, other),
+    "mismatch",
+  );
+  assert.equal(bookingMemory.getIdem(key), JSON.stringify(COMPLETED));
+});
+
+test("fake Redis finalizePendingIdempotencyKey replaces owned pending claim", async () => {
+  const key = uniqueKey("fin-redis-ok");
+  const { deps, store } = createFakeRedisDeps();
+  const claimed = await claimIdempotencyKeyWithToken(key, PENDING_PLACEHOLDER, deps);
+  assert.equal(claimed.status, "claimed");
+  if (claimed.status !== "claimed") return;
+
+  const status = await finalizePendingIdempotencyKey(
+    key,
+    claimed.claimPayload,
+    COMPLETED,
+    deps,
+  );
+  assert.equal(status, "finalized");
+  assert.equal(store.get(`booking:idem:${key}`), JSON.stringify(COMPLETED));
+});
+
+test("fake Redis finalizePendingIdempotencyKey rejects foreign or stale claim", async () => {
+  const key = uniqueKey("fin-redis-stale");
+  const { deps, store } = createFakeRedisDeps();
+  const first = await claimIdempotencyKeyWithToken(key, PENDING_PLACEHOLDER, deps);
+  assert.equal(first.status, "claimed");
+  if (first.status !== "claimed") return;
+
+  store.delete(`booking:idem:${key}`);
+  const second = await claimIdempotencyKeyWithToken(key, PENDING_PLACEHOLDER, deps);
+  assert.equal(second.status, "claimed");
+  if (second.status !== "claimed") return;
+
+  assert.equal(
+    await finalizePendingIdempotencyKey(key, first.claimPayload, COMPLETED, deps),
+    "mismatch",
+  );
+  assert.equal(store.get(`booking:idem:${key}`), second.claimPayload);
+});
+
+test("fake Redis concurrent finalize: only matching owner wins", async () => {
+  const key = uniqueKey("fin-redis-race");
+  const { deps, store } = createFakeRedisDeps();
+  const claimed = await claimIdempotencyKeyWithToken(key, PENDING_PLACEHOLDER, deps);
+  assert.equal(claimed.status, "claimed");
+  if (claimed.status !== "claimed") return;
+
+  const winner: IdempotentOrderResult = {
+    ...COMPLETED,
+    id: "ord-winner",
+    orderRef: "HV-WIN",
+  };
+  const loser: IdempotentOrderResult = {
+    ...COMPLETED,
+    id: "ord-loser",
+    orderRef: "HV-LOSE",
+    telegramOk: false,
+  };
+
+  const first = await finalizePendingIdempotencyKey(
+    key,
+    claimed.claimPayload,
+    winner,
+    deps,
+  );
+  const second = await finalizePendingIdempotencyKey(
+    key,
+    claimed.claimPayload,
+    loser,
+    deps,
+  );
+  assert.equal(first, "finalized");
+  assert.equal(second, "mismatch");
+  assert.equal(store.get(`booking:idem:${key}`), JSON.stringify(winner));
+});
+
+test("fake Redis EVAL failure during finalize returns error not missing", async () => {
+  const key = uniqueKey("fin-redis-eval-err");
+  const good = createFakeRedisDeps();
+  const claimed = await claimIdempotencyKeyWithToken(
+    key,
+    PENDING_PLACEHOLDER,
+    good.deps,
+  );
+  assert.equal(claimed.status, "claimed");
+  if (claimed.status !== "claimed") return;
+
+  const broken = createFakeRedisDeps({ throwOnCommand: true });
+  broken.store.set(`booking:idem:${key}`, claimed.claimPayload);
+
+  assert.equal(
+    await finalizePendingIdempotencyKey(
+      key,
+      claimed.claimPayload,
+      COMPLETED,
+      broken.deps,
+    ),
+    "error",
+  );
+  assert.equal(broken.store.get(`booking:idem:${key}`), claimed.claimPayload);
+});
+
+test("fake Redis finalize returns missing when owned key expired", async () => {
+  const key = uniqueKey("fin-redis-expired");
+  const { deps, store } = createFakeRedisDeps();
+  const claimed = await claimIdempotencyKeyWithToken(key, PENDING_PLACEHOLDER, deps);
+  assert.equal(claimed.status, "claimed");
+  if (claimed.status !== "claimed") return;
+
+  store.delete(`booking:idem:${key}`);
+  assert.equal(
+    await finalizePendingIdempotencyKey(
+      key,
+      claimed.claimPayload,
+      COMPLETED,
+      deps,
+    ),
+    "missing",
+  );
+});
+
+test("Redis required without credentials finalize returns error", async () => {
+  const key = uniqueKey("fin-redis-required");
+  const { deps } = createFakeRedisDeps({ credentials: false, required: true });
+  const payload = JSON.stringify({
+    ...PENDING_PLACEHOLDER,
+    claimToken: "token-required",
+  });
+  assert.equal(
+    await finalizePendingIdempotencyKey(key, payload, COMPLETED, deps),
+    "error",
+  );
 });

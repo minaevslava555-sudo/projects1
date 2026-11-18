@@ -3,6 +3,7 @@
 import "./havenly.css";
 
 import BookingWizard from "@/components/booking-wizard";
+import { readBookingAttempt } from "@/lib/booking-attempt";
 import LanguageSwitcher from "@/components/language-switcher";
 import ServiceDetailView from "@/components/service-detail-view";
 import type { MassageCategoryId } from "@/lib/massage-catalog";
@@ -211,7 +212,11 @@ export default function Home() {
     setService(value);
     setLockService(locked);
     setMassageCategoryId(value === "massage" ? categoryId : null);
-    setBookingSession((n) => n + 1);
+    // Remount only for a fresh attempt — keep the same session when an
+    // unresolved submit may still be recoverable via the same idempotency key.
+    if (!readBookingAttempt()) {
+      setBookingSession((n) => n + 1);
+    }
     setModalOpen(true);
   }
 
@@ -812,23 +817,21 @@ export default function Home() {
         </div>
       </footer>
 
-      {modalOpen ? (
-        <BookingWizard
-          key={bookingSession}
-          open={modalOpen}
-          service={service}
-          onServiceChange={(next) => {
-            setService(next);
-            if (next !== "massage") setMassageCategoryId(null);
-          }}
-          onClose={() => {
-            setModalOpen(false);
-            setMassageCategoryId(null);
-          }}
-          lockService={lockService}
-          massageCategoryId={massageCategoryId}
-        />
-      ) : null}
+      <BookingWizard
+        key={bookingSession}
+        open={modalOpen}
+        service={service}
+        onServiceChange={(next) => {
+          setService(next);
+          if (next !== "massage") setMassageCategoryId(null);
+        }}
+        onClose={() => {
+          setModalOpen(false);
+          setMassageCategoryId(null);
+        }}
+        lockService={lockService}
+        massageCategoryId={massageCategoryId}
+      />
     </div>
   );
 }

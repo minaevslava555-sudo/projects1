@@ -3,6 +3,12 @@
 import LanguageSwitcher from "@/components/language-switcher";
 import TurnstileWidget from "@/components/turnstile-widget";
 import {
+  buildBookingAttemptFingerprint,
+  clearBookingAttempt,
+  readBookingAttempt,
+  writeBookingAttempt,
+} from "@/lib/booking-attempt";
+import {
   MASSAGE_OPTIONS,
   buildTimeSlots,
   cleaningPlan,
@@ -63,7 +69,10 @@ type ErrorCode =
   | "serverStatus"
   | "emptyResponse"
   | "saveFailed"
-  | "submitFailed";
+  | "submitFailed"
+  | "orderProcessing"
+  | "temporaryUnavailable"
+  | "attemptPayloadChanged";
 
 type WizardError =
   | { kind: "code"; code: ErrorCode; values?: Record<string, string | number> }
@@ -193,7 +202,13 @@ export default function BookingWizard({
   const [problemDescription, setProblemDescription] = useState("");
   const [draftId, setDraftId] = useState<string | null>(null);
   const [draftToken, setDraftToken] = useState<string | null>(null);
-  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
+  const [idempotencyKey, setIdempotencyKey] = useState(() => {
+    const pending = readBookingAttempt();
+    return pending?.idempotencyKey ?? crypto.randomUUID();
+  });
+  const [hasUnresolvedAttempt, setHasUnresolvedAttempt] = useState(
+    () => readBookingAttempt() != null,
+  );
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileKey, setTurnstileKey] = useState(0);
   const [repairPhotos, setRepairPhotos] = useState<RepairPhotoItem[]>([]);
@@ -210,6 +225,7 @@ export default function BookingWizard({
   const [error, setError] = useState<WizardError | null>(null);
   const [successRef, setSuccessRef] = useState<string | null>(null);
   const bookingContextRef = useRef({ service, massageCategoryId });
+  const submittingRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const replaceTargetIdRef = useRef<string | null>(null);
   const [replaceTargetId, setReplaceTargetId] = useState<string | null>(null);
@@ -261,14 +277,18 @@ export default function BookingWizard({
     });
   }
 
-  function resetWizardFields() {
+  function resetWizardFields(options?: { preserveAttempt?: boolean }) {
     setStepIndex(0);
     setRooms(2);
     setMassageMinutes(60);
     setProblemDescription("");
     setDraftId(null);
     setDraftToken(null);
-    setIdempotencyKey(crypto.randomUUID());
+    if (!options?.preserveAttempt) {
+      clearBookingAttempt();
+      setHasUnresolvedAttempt(false);
+      setIdempotencyKey(crypto.randomUUID());
+    }
     setTurnstileToken(null);
     setTurnstileKey((value) => value + 1);
     clearRepairPhotos();
@@ -282,8 +302,15 @@ export default function BookingWizard({
     setName("");
     setPhone("");
     setSending(false);
+    submittingRef.current = false;
     clearError();
     setSuccessRef(null);
+  }
+
+  function startNewBookingAttempt() {
+    clearBookingAttempt();
+    setHasUnresolvedAttempt(false);
+    resetWizardFields();
   }
 
   function updateRepairPhoto(id: string, patch: Partial<RepairPhotoItem>) {
@@ -556,7 +583,9 @@ export default function BookingWizard({
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (sending || successRef || hasUploadingPhotos) return;
+    if (submittingRef.current || sending || successRef || hasUploadingPhotos) {
+      return;
+    }
 
     for (const id of STEPS) {
       const code = validateStep(id);
@@ -583,16 +612,62 @@ export default function BookingWizard({
       return;
     }
 
+    submittingRef.current = true;
     setSending(true);
     clearError();
 
     try {
+      const massageCategoryValue =
+        service === "massage"
+          ? massageCategory?.title || massageCategoryId || null
+          : null;
+      const fingerprint = await buildBookingAttemptFingerprint({
+        name: name.trim(),
+        phone: phone.trim(),
+        service,
+        date,
+        preferredTime,
+        streetAddress: streetAddress.trim(),
+        city: city.trim(),
+        apartmentFloor: apartmentFloor.trim() || null,
+        accessInstructions: accessInstructions.trim() || null,
+        details: null,
+        problemDescription:
+          service === "repair" ? problemDescription.trim() : null,
+        massageCategory: massageCategoryValue,
+        rooms: service === "cleaning" ? rooms : null,
+        massageMinutes: service === "massage" ? massageMinutes : null,
+        repairPhotoPaths: service === "repair" ? repairPhotoPaths : null,
+      });
+
+      const persisted = readBookingAttempt();
+      if (persisted && persisted.fingerprint !== fingerprint) {
+        setErrorCode("attemptPayloadChanged");
+        setHasUnresolvedAttempt(true);
+        return;
+      }
+
+      const keyToUse =
+        persisted && persisted.fingerprint === fingerprint
+          ? persisted.idempotencyKey
+          : idempotencyKey;
+      if (keyToUse !== idempotencyKey) {
+        setIdempotencyKey(keyToUse);
+      }
+
+      writeBookingAttempt({
+        idempotencyKey: keyToUse,
+        fingerprint,
+        service,
+      });
+      setHasUnresolvedAttempt(true);
+
       const draft = await ensureDraft();
       const response = await fetch("/api/order", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Idempotency-Key": idempotencyKey,
+          "Idempotency-Key": keyToUse,
         },
         body: JSON.stringify({
           name: name.trim(),
@@ -606,16 +681,13 @@ export default function BookingWizard({
           accessInstructions: accessInstructions.trim() || undefined,
           rooms: service === "cleaning" ? rooms : undefined,
           massageMinutes: service === "massage" ? massageMinutes : undefined,
-          massageCategory:
-            service === "massage"
-              ? massageCategory?.title || massageCategoryId || undefined
-              : undefined,
+          massageCategory: massageCategoryValue || undefined,
           problemDescription:
             service === "repair" ? problemDescription.trim() : undefined,
           repairPhotoPaths: service === "repair" ? repairPhotoPaths : undefined,
           draftToken: draft.draftToken,
           turnstileToken,
-          idempotencyKey,
+          idempotencyKey: keyToUse,
         }),
       });
 
@@ -645,18 +717,31 @@ export default function BookingWizard({
       }
 
       if (!response.ok || !data.ok || !data.id || !data.orderRef) {
+        if (response.status === 503) {
+          setErrorCode("temporaryUnavailable");
+          return;
+        }
+        if (response.status === 409) {
+          setErrorCode("orderProcessing");
+          return;
+        }
         if (data.error) setRawError(data.error);
         else setErrorCode("saveFailed");
         return;
       }
+
+      clearBookingAttempt();
+      setHasUnresolvedAttempt(false);
       setSuccessRef(data.orderRef);
     } catch (submitError) {
+      // Keep persisted attempt — network failure may mean the order already landed.
       if (submitError instanceof Error && submitError.message) {
         setRawError(submitError.message);
       } else {
         setErrorCode("submitFailed");
       }
     } finally {
+      submittingRef.current = false;
       setSending(false);
     }
   }
@@ -733,6 +818,22 @@ export default function BookingWizard({
                   label: stepLabel,
                 })}
               </p>
+            </div>
+          ) : null}
+
+          {hasUnresolvedAttempt && !successRef ? (
+            <div
+              className="mt-4 border border-gold/40 bg-gold/10 px-3 py-3 text-left"
+              role="status"
+            >
+              <p className="text-sm text-ink">{t("unresolvedAttemptBody")}</p>
+              <button
+                type="button"
+                onClick={startNewBookingAttempt}
+                className="mt-2 text-sm font-semibold text-olive underline-offset-2 hover:underline"
+              >
+                {t("startNewBooking")}
+              </button>
             </div>
           ) : null}
         </div>

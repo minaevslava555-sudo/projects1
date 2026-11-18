@@ -6,6 +6,7 @@ import {
 } from "@/lib/booking-draft";
 import {
   claimIdempotencyKeyWithToken,
+  finalizePendingIdempotencyKey,
   getIdempotentOrder,
   normalizeIdempotencyKey,
   releasePendingIdempotencyKey,
@@ -38,6 +39,7 @@ export type OrderRouteDeps = {
   getIdempotentOrder: typeof getIdempotentOrder;
   claimIdempotencyKeyWithToken: typeof claimIdempotencyKeyWithToken;
   releasePendingIdempotencyKey: typeof releasePendingIdempotencyKey;
+  finalizePendingIdempotencyKey: typeof finalizePendingIdempotencyKey;
   storeIdempotentOrder: typeof storeIdempotentOrder;
   verifyDraftToken: typeof verifyDraftToken;
   isDraftConsumed: typeof isDraftConsumed;
@@ -59,6 +61,7 @@ export const defaultOrderRouteDeps: OrderRouteDeps = {
   getIdempotentOrder,
   claimIdempotencyKeyWithToken,
   releasePendingIdempotencyKey,
+  finalizePendingIdempotencyKey,
   storeIdempotentOrder,
   verifyDraftToken,
   isDraftConsumed,
@@ -73,6 +76,110 @@ export const defaultOrderRouteDeps: OrderRouteDeps = {
 
 const SERVICES = new Set<BookingService>(["cleaning", "repair", "massage"]);
 
+/** Replay a DB row when fingerprint matches; telegramOk only from a completed Redis cache hit. */
+function replayFromPersistedOrder(
+  existingByKey: {
+    id: string;
+    orderRef: string;
+    pricingMode: "fixed" | "quote";
+    priceEuro: number | null;
+  },
+  cached: IdempotentOrderResult | null,
+): IdempotentOrderResult {
+  const telegramOk =
+    cached != null &&
+    cached.id === existingByKey.id &&
+    cached.orderRef === existingByKey.orderRef &&
+    cached.id !== "__pending__" &&
+    typeof cached.telegramOk === "boolean"
+      ? cached.telegramOk
+      : false;
+  return {
+    id: existingByKey.id,
+    orderRef: existingByKey.orderRef,
+    pricingMode: existingByKey.pricingMode,
+    priceEuro: existingByKey.priceEuro,
+    telegramOk,
+  };
+}
+
+/**
+ * When Redis is still pending, allow fingerprint-gated DB replay after draft auth.
+ * Does not claim, finalize, insert, or notify.
+ */
+async function respondForPendingClaim(
+  deps: OrderRouteDeps,
+  request: Request,
+  raw: Record<string, unknown>,
+  idempotencyKey: string,
+  requestFingerprint: string,
+): Promise<Response> {
+  const draftToken =
+    asTrimmedString(raw.draftToken, 1024) ||
+    request.headers.get("x-booking-draft-token");
+  const draft = deps.verifyDraftToken(draftToken);
+  if (!draft.ok) {
+    return jsonError(draft.error, 400);
+  }
+
+  const existingByKey = await deps.findOrderByIdempotencyKey(idempotencyKey);
+  if (
+    existingByKey &&
+    existingByKey.requestFingerprint != null &&
+    existingByKey.requestFingerprint === requestFingerprint
+  ) {
+    const cached = await deps.getIdempotentOrder(idempotencyKey);
+    return Response.json({
+      ok: true,
+      ...replayFromPersistedOrder(existingByKey, cached),
+    });
+  }
+
+  return jsonError("Заказ уже обрабатывается", 409);
+}
+
+/** Publish completed idempotency result; never blind-store on Redis error or ownership mismatch. */
+async function respondAfterFinalize(
+  deps: OrderRouteDeps,
+  idempotencyKey: string,
+  claimPayload: string,
+  result: IdempotentOrderResult,
+  requestFingerprint: string,
+): Promise<Response> {
+  const finalized = await deps.finalizePendingIdempotencyKey(
+    idempotencyKey,
+    claimPayload,
+    result,
+  );
+  if (finalized === "finalized") {
+    return Response.json({ ok: true, ...result });
+  }
+  if (finalized === "missing") {
+    // Pending expired — safe to publish completed result for retries.
+    await deps.storeIdempotentOrder(idempotencyKey, result);
+    return Response.json({ ok: true, ...result });
+  }
+  if (finalized === "error") {
+    // Redis state unknown — do not overwrite; client may retry.
+    return jsonError("Сервис временно недоступен", 503);
+  }
+  // mismatch: 200 only when DB confirms this result for the authorized fingerprint.
+  try {
+    const row = await deps.findOrderByIdempotencyKey(idempotencyKey);
+    if (
+      row &&
+      row.requestFingerprint != null &&
+      row.requestFingerprint === requestFingerprint &&
+      row.id === result.id &&
+      row.orderRef === result.orderRef
+    ) {
+      return Response.json({ ok: true, ...result });
+    }
+  } catch {
+    // Lookup failure — treat as unverified.
+  }
+  return jsonError("Сервис временно недоступен", 503);
+}
 const SERVICE_TITLES: Record<BookingService, string> = {
   cleaning: "Cleaning / Уборка",
   repair: "Home Repairs / Ремонт",
@@ -333,7 +440,13 @@ export async function handleOrderPost(
       return jsonError("Ключ идемпотентности уже использован", 409);
     }
     if (existing?.id === "__pending__") {
-      return jsonError("Заказ уже обрабатывается", 409);
+      return respondForPendingClaim(
+        deps,
+        request,
+        raw,
+        idempotencyKey,
+        requestFingerprint,
+      );
     }
 
     const claim = await deps.claimIdempotencyKeyWithToken(
@@ -358,7 +471,13 @@ export async function handleOrderPost(
         }
         return jsonError("Ключ идемпотентности уже использован", 409);
       }
-      return jsonError("Заказ уже обрабатывается", 409);
+      return respondForPendingClaim(
+        deps,
+        request,
+        raw,
+        idempotencyKey,
+        requestFingerprint,
+      );
     }
     claimPayload = claim.claimPayload;
     claimedIdempotencyKey = idempotencyKey;
@@ -380,6 +499,27 @@ export async function handleOrderPost(
       return failBeforeSave(draft.error, 400);
     }
     const draftId = draft.draftId;
+
+    // Recover persisted order before consumed-draft rejection (crash / finalize failure).
+    const existingByKey = await deps.findOrderByIdempotencyKey(idempotencyKey);
+    if (existingByKey) {
+      if (
+        existingByKey.requestFingerprint != null &&
+        existingByKey.requestFingerprint === requestFingerprint
+      ) {
+        const cached = await deps.getIdempotentOrder(idempotencyKey);
+        return respondAfterFinalize(
+          deps,
+          idempotencyKey,
+          claim.claimPayload,
+          replayFromPersistedOrder(existingByKey, cached),
+          requestFingerprint,
+        );
+      }
+      // Mismatch or legacy null fingerprint: reject without leaking order details.
+      return failBeforeSave("Ключ идемпотентности уже использован", 409);
+    }
+
     if (await deps.isDraftConsumed(draftId)) {
       return failBeforeSave("Черновик уже использован", 400);
     }
@@ -422,39 +562,6 @@ export async function handleOrderPost(
       orderDetails = orderDetails ?? "Home repair quote request";
     }
 
-    const existingByKey = await deps.findOrderByIdempotencyKey(idempotencyKey);
-    if (existingByKey) {
-      if (
-        existingByKey.requestFingerprint != null &&
-        existingByKey.requestFingerprint === requestFingerprint
-      ) {
-        const cached = await deps.getIdempotentOrder(idempotencyKey);
-        const telegramOk =
-          cached != null &&
-          cached.id === existingByKey.id &&
-          cached.orderRef === existingByKey.orderRef &&
-          cached.id !== "__pending__" &&
-          typeof cached.telegramOk === "boolean"
-            ? cached.telegramOk
-            : false;
-        const replayed: IdempotentOrderResult = {
-          id: existingByKey.id,
-          orderRef: existingByKey.orderRef,
-          pricingMode: existingByKey.pricingMode,
-          priceEuro: existingByKey.priceEuro,
-          telegramOk,
-        };
-        // Finalize Redis claim so the key is not left pending.
-        await deps.storeIdempotentOrder(idempotencyKey, replayed);
-        return Response.json({
-          ok: true,
-          ...replayed,
-        });
-      }
-      // Mismatch or legacy null fingerprint: reject without leaking order details.
-      return failBeforeSave("Ключ идемпотентности уже использован", 409);
-    }
-
     const orderRef = deps.generateOrderRef();
 
     saveStarted = true;
@@ -494,21 +601,40 @@ export async function handleOrderPost(
     } catch (saveError) {
       // Isolated save catch: outer catch cannot see requestFingerprint/idempotencyKey.
       if (saveError instanceof OrderIdempotencyConflictError) {
-        const existingByKey = await deps.findOrderByIdempotencyKey(idempotencyKey);
-        if (
-          existingByKey &&
-          existingByKey.requestFingerprint != null &&
-          existingByKey.requestFingerprint === requestFingerprint
-        ) {
-          // Redis claim lifecycle intentionally unchanged in this step.
-          return Response.json({
-            ok: true,
-            id: existingByKey.id,
-            orderRef: existingByKey.orderRef,
-            pricingMode: existingByKey.pricingMode,
-            priceEuro: existingByKey.priceEuro,
-            telegramOk: false,
-          });
+        try {
+          const conflictRow = await deps.findOrderByIdempotencyKey(idempotencyKey);
+          if (
+            conflictRow &&
+            conflictRow.requestFingerprint != null &&
+            conflictRow.requestFingerprint === requestFingerprint
+          ) {
+            const cached = await deps.getIdempotentOrder(idempotencyKey);
+            return respondAfterFinalize(
+              deps,
+              idempotencyKey,
+              claim.claimPayload,
+              replayFromPersistedOrder(conflictRow, cached),
+              requestFingerprint,
+            );
+          }
+        } catch {
+          try {
+            await deps.releasePendingIdempotencyKey(
+              idempotencyKey,
+              claim.claimPayload,
+            );
+          } catch {
+            // Best-effort release after lookup failure.
+          }
+          throw saveError;
+        }
+        try {
+          await deps.releasePendingIdempotencyKey(
+            idempotencyKey,
+            claim.claimPayload,
+          );
+        } catch {
+          // Best-effort release on fingerprint mismatch / missing row.
         }
         return jsonError("Ключ идемпотентности уже использован", 409);
       }
@@ -554,12 +680,13 @@ export async function handleOrderPost(
       priceEuro: priced.priceEuro,
       telegramOk,
     };
-    await deps.storeIdempotentOrder(idempotencyKey, result);
-
-    return Response.json({
-      ok: true,
-      ...result,
-    });
+    return respondAfterFinalize(
+      deps,
+      idempotencyKey,
+      claim.claimPayload,
+      result,
+      requestFingerprint,
+    );
   } catch (error) {
     if (
       claimPayload !== null &&

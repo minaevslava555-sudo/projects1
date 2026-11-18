@@ -266,6 +266,8 @@
     "successBody": "Your booking reference is <ref>{orderRef}</ref>. We will confirm the visit shortly.",
     "successRepairNote": "Home repair is quoted after assessment — no price was charged at booking.",
     "successEstimatedTotal": "Estimated total: {total}",
+    "unresolvedAttemptBody": "A previous send may still be processing. Retry with the same details, or start a new booking.",
+    "startNewBooking": "Start a new booking",
     "errors": {
       "draftOpenFailed": "Could not open booking",
       "repairDetail": "Describe the repair in a bit more detail",
@@ -288,7 +290,10 @@
       "serverStatus": "Server error ({status}). Check that the API is deployed on Vercel.",
       "emptyResponse": "Empty server response ({status})",
       "saveFailed": "Could not save the order",
-      "submitFailed": "Could not submit the order"
+      "submitFailed": "Could not submit the order",
+      "orderProcessing": "Your booking is still being processed. Wait a moment, then retry with the same details.",
+      "temporaryUnavailable": "The service is temporarily unavailable. Please retry shortly — your booking was not confirmed yet.",
+      "attemptPayloadChanged": "These details differ from your unfinished booking. Restore the original details to retry, or start a new booking."
     }
   },
   "ServiceDetail": {
