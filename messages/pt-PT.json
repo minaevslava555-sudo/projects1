@@ -18,7 +18,6 @@
     "faq": "FAQ",
     "book": "Reservar",
     "bookCleaning": "Reservar limpeza",
-    "call": "Ligar",
     "openMenu": "Abrir menu",
     "closeMenu": "Fechar menu",
     "primary": "Principal",
@@ -146,7 +145,7 @@
     "title": "Prontos quando a sua casa estiver.",
     "subtitle": "Escolha um serviço, reveja os detalhes e confirme a reserva.",
     "bookCleaning": "Reservar limpeza",
-    "orCall": "Ou ligue-nos agora:"
+    "orWhatsApp": "Ou contacte-nos no WhatsApp:"
   },
   "Faq": {
     "eyebrow": "FAQ",

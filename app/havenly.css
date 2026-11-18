@@ -24,14 +24,6 @@
   color: inherit;
 }
 
-.havenly-landing header a[href^="tel:"] {
-  color: rgb(255 255 255 / 0.9);
-}
-
-.havenly-landing header a[href^="tel:"]:hover {
-  color: #fff;
-}
-
 .havenly-landing header nav button {
   background: transparent !important;
   color: rgb(255 255 255 / 0.85) !important;

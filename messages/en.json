@@ -18,7 +18,6 @@
     "faq": "FAQ",
     "book": "Book",
     "bookCleaning": "Book Cleaning",
-    "call": "Call",
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
     "primary": "Primary",
@@ -146,7 +145,7 @@
     "title": "Ready when your home is.",
     "subtitle": "Choose a service, review the details, then confirm your booking.",
     "bookCleaning": "Book Cleaning",
-    "orCall": "Or call us now:"
+    "orWhatsApp": "Or message us on WhatsApp:"
   },
   "Faq": {
     "eyebrow": "FAQ",

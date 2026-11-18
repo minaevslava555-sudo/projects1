@@ -274,12 +274,6 @@ export default function Home() {
 
           <div className="flex items-center gap-2 sm:gap-3">
             <LanguageSwitcher className="shrink-0" tone="onDark" />
-            <a
-              href="tel:+351920024478"
-              className="hidden text-sm font-semibold text-white/90 transition hover:text-white md:inline"
-            >
-              +351 920 024 478
-            </a>
             <button
               type="button"
               onClick={() => openOrder("cleaning", false)}
@@ -324,15 +318,9 @@ export default function Home() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={t("Hero.whatsAppAria")}
-                className="mobile-nav-item mt-1.5 min-h-11 rounded-[12px] px-3 py-2.5 text-base font-semibold text-sand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+                className="mobile-nav-item mt-1.5 min-h-11 rounded-[12px] px-3 py-2.5 text-left text-base font-medium text-white/90 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
               >
                 {t("Hero.whatsApp")}
-              </a>
-              <a
-                href="tel:+351920024478"
-                className="mobile-nav-item min-h-11 rounded-[12px] px-3 py-2.5 text-base font-semibold text-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
-              >
-                {t("Nav.call")} · +351 920 024 478
               </a>
               <button
                 type="button"
@@ -722,12 +710,15 @@ export default function Home() {
                     {t("Cta.bookCleaning")}
                   </button>
                   <p className="mt-6 text-sm text-muted">
-                    {t("Cta.orCall")}{" "}
+                    {t("Cta.orWhatsApp")}{" "}
                     <a
-                      href="tel:+351920024478"
+                      href="https://wa.me/351920024478"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={t("Hero.whatsAppAria")}
                       className="font-medium text-olive underline-offset-4 hover:underline"
                     >
-                      +351 920 024 478
+                      {t("Hero.whatsApp")}
                     </a>
                   </p>
                 </Reveal>
@@ -842,10 +833,13 @@ export default function Home() {
             </p>
             <p className="mt-4 text-sm leading-relaxed text-sand/80">{t("Footer.cities")}</p>
             <a
-              href="tel:+351920024478"
-              className="mt-5 inline-flex text-lg font-semibold text-white transition hover:text-sand"
+              href="https://wa.me/351920024478"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={t("Hero.whatsAppAria")}
+              className="mt-5 inline-flex text-lg font-semibold text-white transition hover:text-sand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
             >
-              +351 920 024 478
+              {t("Hero.whatsApp")}
             </a>
           </div>
         </div>
