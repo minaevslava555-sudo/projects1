@@ -18,6 +18,7 @@
     "faq": "FAQ",
     "book": "Reservar",
     "bookCleaning": "Reservar limpeza",
+    "call": "Ligar",
     "openMenu": "Abrir menu",
     "closeMenu": "Fechar menu",
     "primary": "Principal",
@@ -30,6 +31,8 @@
     "subtitleMobile": "Limpeza, reparações e bem-estar para vivendas de Faro a Albufeira.",
     "subtitleDesktop": "Limpeza, reparações e bem-estar — com discrição, para vivendas e residências de Faro a Albufeira.",
     "bookService": "Reservar um serviço",
+    "whatsApp": "WhatsApp",
+    "whatsAppAria": "Contactar a HAVENLY no WhatsApp",
     "heroAlt": "Vivenda de luxo ao sol com terraço e piscina",
     "servicesAria": "Serviços"
   },

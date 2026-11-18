@@ -283,13 +283,13 @@ export default function Home() {
             <button
               type="button"
               onClick={() => openOrder("cleaning", true)}
-              className="hidden border border-white/35 bg-white/10 px-3.5 py-2 text-sm font-semibold text-white backdrop-blur-sm transition hover:border-gold/60 hover:bg-white/15 lg:inline-flex"
+              className="header-book-cta hidden items-center rounded-[12px] border border-white/35 bg-white/10 px-3.5 py-2 text-sm font-semibold text-white backdrop-blur-sm transition hover:border-gold/60 hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold md:inline-flex"
             >
               {t("Nav.book")}
             </button>
             <button
               type="button"
-              className="inline-flex h-11 w-11 items-center justify-center border border-white/30 text-white lg:hidden"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-[12px] border border-white/30 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold lg:hidden"
               aria-expanded={navOpen}
               aria-controls="mobile-nav"
               aria-label={navOpen ? t("Nav.closeMenu") : t("Nav.openMenu")}
@@ -311,19 +311,16 @@ export default function Home() {
                   key={link.href}
                   type="button"
                   onClick={() => onNavClick(link.href)}
-                  className="rounded-lg px-3 py-3 text-left text-base font-medium text-white/90 transition hover:bg-white/10 hover:text-white"
+                  className="rounded-[12px] px-3 py-3 text-left text-base font-medium text-white/90 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
                 >
                   {t(`Nav.${link.key}`)}
                 </button>
               ))}
-              <div className="mt-2 px-3 py-2">
-                <LanguageSwitcher tone="onDark" />
-              </div>
               <a
                 href="tel:+351920024478"
-                className="mt-2 rounded-lg px-3 py-3 text-base font-semibold text-gold"
+                className="mt-2 rounded-[12px] px-3 py-3 text-base font-semibold text-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
               >
-                +351 920 024 478
+                {t("Nav.call")} · +351 920 024 478
               </a>
               <button
                 type="button"
@@ -331,7 +328,7 @@ export default function Home() {
                   setNavOpen(false);
                   openOrder("cleaning", true);
                 }}
-                className="mt-1 rounded-lg bg-olive px-3 py-3 text-left text-base font-semibold text-white"
+                className="mt-1 rounded-[12px] bg-olive px-3 py-3 text-left text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
               >
                 {t("Nav.bookCleaning")}
               </button>
@@ -349,7 +346,7 @@ export default function Home() {
           />
         ) : (
           <>
-            <section className="relative min-h-[100svh] overflow-hidden">
+            <section className="relative min-h-[82svh] overflow-hidden sm:min-h-[90svh] lg:min-h-[100svh]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={LANDING_MEDIA.hero}
@@ -359,12 +356,12 @@ export default function Home() {
               <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(43,32,18,0.28)_0%,rgba(27,37,33,0.4)_45%,rgba(27,37,33,0.9)_100%)]" />
               <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_20%_80%,rgba(181,154,107,0.22)_0%,transparent_55%)]" />
 
-              <div className="relative z-10 mx-auto flex min-h-[100svh] max-w-6xl flex-col justify-center px-5 pb-16 pt-28 sm:px-8 sm:pb-20 lg:px-10 lg:pb-24">
+              <div className="relative z-10 mx-auto flex min-h-[82svh] max-w-6xl flex-col justify-end px-5 pb-10 pt-24 sm:min-h-[90svh] sm:px-8 sm:pb-16 sm:pt-28 lg:min-h-[100svh] lg:justify-center lg:px-10 lg:pb-24 lg:pt-28">
                 <div className="animate-rise max-w-2xl">
-                  <p className="font-display text-[1.65rem] font-medium tracking-[0.22em] text-white sm:text-3xl sm:tracking-[0.24em]">
+                  <p className="hidden font-display text-[1.65rem] font-medium tracking-[0.22em] text-white sm:block sm:text-3xl sm:tracking-[0.24em]">
                     HAVENLY
                   </p>
-                  <p className="mt-5 text-[0.7rem] font-medium tracking-[0.28em] text-sand/90 uppercase sm:mt-6 sm:text-xs">
+                  <p className="text-[0.7rem] font-medium tracking-[0.28em] text-sand/90 uppercase sm:mt-6 sm:text-xs">
                     {t("Hero.eyebrow")}
                   </p>
                   <h1 className="mt-3 max-w-[16ch] font-display text-[2.35rem] font-medium leading-[1.08] tracking-[-0.01em] text-white sm:mt-4 sm:text-5xl lg:text-[3.55rem] lg:leading-[1.05]">
@@ -377,15 +374,18 @@ export default function Home() {
                     <button
                       type="button"
                       onClick={() => openOrder("cleaning", false)}
-                      className="hero-primary-cta inline-flex items-center justify-center rounded-[12px] bg-olive px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep sm:text-base"
+                      className="hero-primary-cta inline-flex items-center justify-center rounded-[12px] bg-olive px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold sm:text-base"
                     >
                       {t("Hero.bookService")}
                     </button>
                     <a
-                      href="tel:+351920024478"
-                      className="hero-secondary-cta inline-flex items-center justify-center rounded-[12px] border border-white/35 bg-white/10 px-6 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:border-gold/60 hover:bg-white/15 sm:text-base"
+                      href="https://wa.me/351920024478"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={t("Hero.whatsAppAria")}
+                      className="hero-secondary-cta inline-flex items-center justify-center rounded-[12px] border border-sand/80 bg-sand px-6 py-3.5 text-sm font-semibold text-olive transition hover:bg-paper focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold sm:text-base"
                     >
-                      +351 920 024 478
+                      {t("Hero.whatsApp")}
                     </a>
                   </div>
                 </div>

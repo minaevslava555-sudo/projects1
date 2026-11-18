@@ -60,8 +60,29 @@
 }
 
 .havenly-landing .hero-primary-cta,
-.havenly-landing .hero-secondary-cta {
+.havenly-landing .hero-secondary-cta,
+.havenly-landing .header-book-cta {
   border-radius: 12px;
+}
+
+.havenly-landing .hero-secondary-cta {
+  background-color: var(--color-sand) !important;
+  color: var(--color-olive) !important;
+  border-color: rgb(231 221 206 / 0.9) !important;
+}
+
+.havenly-landing .hero-secondary-cta:hover {
+  background-color: var(--color-paper) !important;
+}
+
+.havenly-landing .hero-primary-cta:focus-visible,
+.havenly-landing .hero-secondary-cta:focus-visible,
+.havenly-landing .header-book-cta:focus-visible,
+.havenly-landing header button:focus-visible,
+.havenly-landing #mobile-nav a:focus-visible,
+.havenly-landing #mobile-nav button:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
 }
 
 .havenly-landing .hero-service-rail {

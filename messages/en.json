@@ -18,6 +18,7 @@
     "faq": "FAQ",
     "book": "Book",
     "bookCleaning": "Book Cleaning",
+    "call": "Call",
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
     "primary": "Primary",
@@ -30,6 +31,8 @@
     "subtitleMobile": "Cleaning, repairs and wellness for villas from Faro to Albufeira.",
     "subtitleDesktop": "Cleaning, repairs and wellness — delivered with discretion for villas and residences from Faro to Albufeira.",
     "bookService": "Book a service",
+    "whatsApp": "WhatsApp",
+    "whatsAppAria": "Chat with HAVENLY on WhatsApp",
     "heroAlt": "Sunlit luxury villa with pool terrace",
     "servicesAria": "Services"
   },
