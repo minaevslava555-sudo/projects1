@@ -47,6 +47,16 @@
   align-items: center;
 }
 
+/* Unlayered `.havenly-landing a { color: inherit }` beats Tailwind text-white/90
+   (root landing uses text-ink). Scope only the mobile-menu WhatsApp <a>. */
+.havenly-landing #mobile-nav a.mobile-nav-item {
+  color: rgb(255 255 255 / 0.9);
+}
+
+.havenly-landing #mobile-nav a.mobile-nav-item:hover {
+  color: #fff;
+}
+
 .havenly-landing #services button.group,
 .havenly-landing .hero-service-rail button.group {
   background-color: transparent !important;
