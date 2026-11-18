@@ -397,7 +397,7 @@ export default function Home() {
 
             <section
               id="services"
-              className="relative overflow-hidden border-b border-mist py-14 sm:py-16 lg:py-20"
+              className="relative overflow-hidden border-b border-mist pt-14 pb-8 sm:py-16 lg:py-20"
             >
               <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,_#f7f5f0_0%,_#efe8dc_55%,_#e7ddce_100%)]" />
               <div className="relative mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
@@ -481,7 +481,7 @@ export default function Home() {
               </div>
             </section>
 
-            <section className="relative overflow-hidden border-b border-mist py-16 sm:py-20">
+            <section className="relative overflow-hidden border-b border-mist pt-10 pb-16 sm:py-20">
               <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,_#f7f5f0_0%,_#e7ddce_100%)]" />
               <div className="relative mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
                 <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
