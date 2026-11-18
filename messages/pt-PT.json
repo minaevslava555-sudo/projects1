@@ -36,25 +36,30 @@
     "servicesAria": "Serviços"
   },
   "Services": {
+    "sectionEyebrow": "Os nossos serviços",
+    "sectionTitle": "Cuidados para a sua casa e bem-estar",
     "cleaning": {
       "title": "Limpeza",
       "rateLabel": "20€ / hora por profissional",
-      "cardPrice": "desde 20€",
+      "cardPrice": "€20 / hora por profissional",
       "blurb": "Vivendas e apartamentos impecáveis, preparados com precisão discreta.",
+      "explore": "Explorar limpeza",
       "imageAlt": "Pormenor de limpeza profissional numa casa de banho luminosa"
     },
     "repair": {
       "title": "Reparações em casa",
       "rateLabel": "Orçamento após avaliação",
-      "cardPrice": "orçamento",
+      "cardPrice": "Orçamento após avaliação",
       "blurb": "Apoio discreto de handyman para o conforto do dia a dia.",
+      "explore": "Explorar reparações",
       "imageAlt": "Acabamento cuidadoso num interior moderno"
     },
     "massage": {
       "title": "Massagem",
       "rateLabel": "45€ / hora",
-      "cardPrice": "desde 45€",
+      "cardPrice": "Desde €45 / 60 min",
       "blurb": "Massagem profissional no conforto da sua casa.",
+      "explore": "Explorar massagem",
       "imageAlt": "Massagem ao domicílio num interior residencial luminoso"
     }
   },

@@ -123,6 +123,7 @@ export default function Home() {
           blurb: t("Services.cleaning.blurb"),
           image: LANDING_MEDIA.cleaning,
           price: t("Services.cleaning.cardPrice"),
+          explore: t("Services.cleaning.explore"),
           imageAlt: t("Services.cleaning.imageAlt"),
         },
         {
@@ -131,6 +132,7 @@ export default function Home() {
           blurb: t("Services.repair.blurb"),
           image: LANDING_MEDIA.repair,
           price: t("Services.repair.cardPrice"),
+          explore: t("Services.repair.explore"),
           imageAlt: t("Services.repair.imageAlt"),
         },
         {
@@ -139,6 +141,7 @@ export default function Home() {
           blurb: t("Services.massage.blurb"),
           image: LANDING_MEDIA.massage,
           price: t("Services.massage.cardPrice"),
+          explore: t("Services.massage.explore"),
           imageAlt: t("Services.massage.imageAlt"),
         },
       ] as const,
@@ -398,13 +401,22 @@ export default function Home() {
             >
               <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,_#f7f5f0_0%,_#efe8dc_55%,_#e7ddce_100%)]" />
               <div className="relative mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
-                <div className="hidden grid-cols-3 gap-5 lg:grid lg:gap-6">
+                <div className="max-w-2xl">
+                  <p className="text-xs font-medium tracking-[0.26em] text-gold uppercase">
+                    {t("Services.sectionEyebrow")}
+                  </p>
+                  <h2 className="mt-3 font-display text-3xl font-medium tracking-tight text-ink sm:text-4xl lg:text-[2.75rem]">
+                    {t("Services.sectionTitle")}
+                  </h2>
+                </div>
+
+                <div className="mt-10 hidden grid-cols-3 gap-5 lg:mt-12 lg:grid lg:gap-6">
                   {heroServices.map((item) => (
                     <button
                       key={item.id}
                       type="button"
                       onClick={() => openServiceView(item.id)}
-                      className="group relative aspect-[4/5] overflow-hidden rounded-[12px] text-left shadow-[0_24px_48px_rgba(27,37,33,0.16)] transition duration-500 hover:-translate-y-1"
+                      className="group relative aspect-[4/5] overflow-hidden rounded-[12px] text-left shadow-[0_24px_48px_rgba(27,37,33,0.16)] transition duration-500 hover:-translate-y-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -420,8 +432,12 @@ export default function Home() {
                         <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-white/78">
                           {item.blurb}
                         </p>
-                        <p className="mt-4 text-xs font-semibold tracking-[0.16em] text-gold uppercase">
+                        <p className="mt-4 text-xs font-semibold tracking-[0.14em] text-gold uppercase">
                           {item.price}
+                        </p>
+                        <p className="service-card-explore mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-white/90 transition group-hover:text-white">
+                          <span>{item.explore}</span>
+                          <span aria-hidden="true">→</span>
                         </p>
                       </div>
                     </button>
@@ -429,7 +445,7 @@ export default function Home() {
                 </div>
 
                 <div
-                  className="hero-service-rail -mx-5 flex snap-x snap-mandatory gap-3.5 overflow-x-auto px-5 pb-2 sm:-mx-8 sm:gap-4 sm:px-8 lg:hidden"
+                  className="hero-service-rail -mx-5 mt-8 flex snap-x snap-mandatory gap-3.5 overflow-x-auto px-5 pb-2 sm:-mx-8 sm:mt-10 sm:gap-4 sm:px-8 lg:hidden"
                   aria-label={t("Hero.servicesAria")}
                 >
                   {heroServices.map((item) => (
@@ -437,7 +453,7 @@ export default function Home() {
                       key={item.id}
                       type="button"
                       onClick={() => openServiceView(item.id)}
-                      className="group relative h-[17rem] w-[78vw] max-w-[20rem] shrink-0 snap-center overflow-hidden rounded-[12px] text-left shadow-[0_18px_40px_rgba(27,37,33,0.2)] sm:w-[17.5rem]"
+                      className="group relative h-[18.5rem] w-[78vw] max-w-[20rem] shrink-0 snap-center overflow-hidden rounded-[12px] text-left shadow-[0_18px_40px_rgba(27,37,33,0.2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold sm:w-[17.5rem]"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -451,8 +467,12 @@ export default function Home() {
                         <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-white/78">
                           {item.blurb}
                         </p>
-                        <p className="mt-3.5 text-xs font-semibold tracking-[0.16em] text-gold uppercase">
+                        <p className="mt-3 text-xs font-semibold tracking-[0.14em] text-gold uppercase">
                           {item.price}
+                        </p>
+                        <p className="service-card-explore mt-2.5 inline-flex items-center gap-1.5 text-sm font-semibold text-white/90">
+                          <span>{item.explore}</span>
+                          <span aria-hidden="true">→</span>
                         </p>
                       </div>
                     </button>

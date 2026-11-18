@@ -36,25 +36,30 @@
     "servicesAria": "Services"
   },
   "Services": {
+    "sectionEyebrow": "Our services",
+    "sectionTitle": "Care for your home and wellbeing",
     "cleaning": {
       "title": "Cleaning",
       "rateLabel": "20€ / hour per cleaner",
-      "cardPrice": "from 20€",
+      "cardPrice": "€20 / cleaner-hour",
       "blurb": "Immaculate villas and apartments, prepared with quiet precision.",
+      "explore": "Explore Cleaning",
       "imageAlt": "Professional cleaning detail in a bright luxury bathroom"
     },
     "repair": {
       "title": "Home Repairs",
       "rateLabel": "Quote after assessment",
-      "cardPrice": "quote",
+      "cardPrice": "Quote after assessment",
       "blurb": "Discreet handyman care for everyday comfort at home.",
+      "explore": "Explore Repairs",
       "imageAlt": "Careful finishing work on a clean modern interior wall"
     },
     "massage": {
       "title": "Massage",
       "rateLabel": "45€ / hour",
-      "cardPrice": "from 45€",
+      "cardPrice": "From €45 / 60 min",
       "blurb": "Professional massage, brought to the comfort of your home.",
+      "explore": "Explore Massage",
       "imageAlt": "In-home massage in a bright residential interior"
     }
   },

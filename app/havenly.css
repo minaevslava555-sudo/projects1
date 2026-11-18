@@ -124,6 +124,14 @@
   border-radius: 12px !important;
 }
 
+.havenly-landing #services .service-card-explore {
+  color: rgb(255 255 255 / 0.9);
+}
+
+.havenly-landing #services button.group:hover .service-card-explore {
+  color: #fff;
+}
+
 .havenly-landing button.bg-olive:hover {
   background-color: var(--color-olive-deep) !important;
 }
