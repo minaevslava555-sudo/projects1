@@ -356,33 +356,55 @@ export default function Home() {
                 alt={t("Hero.heroAlt")}
                 className="animate-hero-media absolute inset-0 h-full w-full object-cover object-[58%_center] sm:object-center"
               />
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(43,32,18,0.28)_0%,rgba(27,37,33,0.35)_42%,rgba(27,37,33,0.88)_100%)]" />
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(43,32,18,0.28)_0%,rgba(27,37,33,0.4)_45%,rgba(27,37,33,0.9)_100%)]" />
               <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_20%_80%,rgba(181,154,107,0.22)_0%,transparent_55%)]" />
 
-              <div className="relative z-10 mx-auto flex min-h-[100svh] max-w-6xl flex-col justify-end px-5 pb-7 pt-28 sm:px-8 sm:pb-12 lg:px-10 lg:pb-16">
-                <div className="animate-rise max-w-3xl">
-                  <p className="text-[0.7rem] font-medium tracking-[0.28em] text-sand/90 uppercase sm:text-xs">
+              <div className="relative z-10 mx-auto flex min-h-[100svh] max-w-6xl flex-col justify-center px-5 pb-16 pt-28 sm:px-8 sm:pb-20 lg:px-10 lg:pb-24">
+                <div className="animate-rise max-w-2xl">
+                  <p className="font-display text-[1.65rem] font-medium tracking-[0.22em] text-white sm:text-3xl sm:tracking-[0.24em]">
+                    HAVENLY
+                  </p>
+                  <p className="mt-5 text-[0.7rem] font-medium tracking-[0.28em] text-sand/90 uppercase sm:mt-6 sm:text-xs">
                     {t("Hero.eyebrow")}
                   </p>
-                  <h1 className="mt-4 max-w-[14ch] font-display text-[2.35rem] font-medium leading-[1.08] tracking-[-0.01em] text-white sm:mt-5 sm:max-w-[16ch] sm:text-5xl lg:text-[3.55rem] lg:leading-[1.05]">
+                  <h1 className="mt-3 max-w-[16ch] font-display text-[2.35rem] font-medium leading-[1.08] tracking-[-0.01em] text-white sm:mt-4 sm:text-5xl lg:text-[3.55rem] lg:leading-[1.05]">
                     {t("Hero.title")}
                   </h1>
-                  <p className="mt-4 max-w-md text-[0.98rem] leading-relaxed text-white/82 sm:mt-5 sm:text-lg lg:max-w-lg">
-                    <span className="lg:hidden">{t("Hero.subtitleMobile")}</span>
-                    <span className="hidden lg:inline">{t("Hero.subtitleDesktop")}</span>
+                  <p className="mt-4 max-w-md text-[0.98rem] leading-relaxed text-white/82 sm:mt-5 sm:text-lg">
+                    {t("Hero.subtitleMobile")}
                   </p>
+                  <div className="mt-8 flex flex-col gap-3 sm:mt-10 sm:flex-row sm:items-center sm:gap-4">
+                    <button
+                      type="button"
+                      onClick={() => openOrder("cleaning", false)}
+                      className="hero-primary-cta inline-flex items-center justify-center rounded-[12px] bg-olive px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep sm:text-base"
+                    >
+                      {t("Hero.bookService")}
+                    </button>
+                    <a
+                      href="tel:+351920024478"
+                      className="hero-secondary-cta inline-flex items-center justify-center rounded-[12px] border border-white/35 bg-white/10 px-6 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:border-gold/60 hover:bg-white/15 sm:text-base"
+                    >
+                      +351 920 024 478
+                    </a>
+                  </div>
                 </div>
+              </div>
+            </section>
 
-                <div
-                  id="services"
-                  className="animate-rise-late mt-10 hidden grid-cols-3 gap-5 lg:mt-14 lg:grid"
-                >
+            <section
+              id="services"
+              className="relative overflow-hidden border-b border-mist py-14 sm:py-16 lg:py-20"
+            >
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,_#f7f5f0_0%,_#efe8dc_55%,_#e7ddce_100%)]" />
+              <div className="relative mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
+                <div className="hidden grid-cols-3 gap-5 lg:grid lg:gap-6">
                   {heroServices.map((item) => (
                     <button
                       key={item.id}
                       type="button"
                       onClick={() => openServiceView(item.id)}
-                      className="group relative aspect-[4/5] overflow-hidden text-left shadow-[0_24px_48px_rgba(27,37,33,0.28)] transition duration-500 hover:-translate-y-1"
+                      className="group relative aspect-[4/5] overflow-hidden rounded-[12px] text-left shadow-[0_24px_48px_rgba(27,37,33,0.16)] transition duration-500 hover:-translate-y-1"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -407,7 +429,7 @@ export default function Home() {
                 </div>
 
                 <div
-                  className="animate-rise-late hero-service-rail -mx-5 mt-9 flex snap-x snap-mandatory gap-3.5 overflow-x-auto px-5 pb-2 sm:-mx-8 sm:gap-4 sm:px-8 lg:hidden"
+                  className="hero-service-rail -mx-5 flex snap-x snap-mandatory gap-3.5 overflow-x-auto px-5 pb-2 sm:-mx-8 sm:gap-4 sm:px-8 lg:hidden"
                   aria-label={t("Hero.servicesAria")}
                 >
                   {heroServices.map((item) => (
@@ -415,7 +437,7 @@ export default function Home() {
                       key={item.id}
                       type="button"
                       onClick={() => openServiceView(item.id)}
-                      className="group relative h-[17rem] w-[78vw] max-w-[20rem] shrink-0 snap-center overflow-hidden text-left shadow-[0_18px_40px_rgba(27,37,33,0.35)] sm:w-[17.5rem]"
+                      className="group relative h-[17rem] w-[78vw] max-w-[20rem] shrink-0 snap-center overflow-hidden rounded-[12px] text-left shadow-[0_18px_40px_rgba(27,37,33,0.2)] sm:w-[17.5rem]"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img

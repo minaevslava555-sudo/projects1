@@ -51,12 +51,17 @@
   color: inherit !important;
   width: 100%;
   padding: 0;
-  border-radius: 0;
+  border-radius: 12px;
   border: 0;
 }
 
 .havenly-landing .hero-service-rail button.group {
   width: auto;
+}
+
+.havenly-landing .hero-primary-cta,
+.havenly-landing .hero-secondary-cta {
+  border-radius: 12px;
 }
 
 .havenly-landing .hero-service-rail {
@@ -74,12 +79,16 @@
 }
 
 /* Massage catalog cards — keep premium panels free of global button chrome */
-.havenly-landing section button.group {
+.havenly-landing section:not(#services) button.group {
   background-color: transparent !important;
   color: inherit !important;
   width: 100%;
   padding: 0;
   border-radius: 0;
+}
+
+.havenly-landing #services button.group {
+  border-radius: 12px !important;
 }
 
 .havenly-landing button.bg-olive:hover {
