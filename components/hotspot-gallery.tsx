@@ -96,9 +96,23 @@ function SpotMarker({
       }}
       onMouseEnter={() => onSelect(spot)}
     >
+      <span className="hotspot-marker-pulse hotspot-marker-pulse-a" aria-hidden="true" />
+      <span className="hotspot-marker-pulse hotspot-marker-pulse-b" aria-hidden="true" />
       <span className="hotspot-marker-halo" aria-hidden="true" />
-      <span className="hotspot-marker-ping" aria-hidden="true" />
-      <span className="hotspot-marker-core" aria-hidden="true" />
+      <span className="hotspot-marker-core" aria-hidden="true">
+        <svg
+          className="hotspot-sparkle"
+          viewBox="0 0 24 24"
+          width="12"
+          height="12"
+          focusable="false"
+        >
+          <path
+            fill="currentColor"
+            d="M12 2.1c.32 0 .5.18.62.55l1.48 4.7c.12.38.4.66.78.78l4.7 1.48c.37.12.55.3.55.62s-.18.5-.55.62l-4.7 1.48c-.38.12-.66.4-.78.78l-1.48 4.7c-.12.37-.3.55-.62.55s-.5-.18-.62-.55l-1.48-4.7a1.15 1.15 0 0 0-.78-.78l-4.7-1.48C3.28 12.5 3.1 12.32 3.1 12s.18-.5.55-.62l4.7-1.48c.38-.12.66-.4.78-.78l1.48-4.7c.12-.37.3-.55.62-.55Z"
+          />
+        </svg>
+      </span>
     </motion.button>
   );
 }
