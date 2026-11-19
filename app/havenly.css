@@ -70,6 +70,27 @@
   pointer-events: none;
 }
 
+/*
+  Viewport pin: keep the pixels under the user frozen while scrollTo(0) runs
+  underneath — prevents the home hero from jumping into view on card clicks.
+*/
+.havenly-landing .view-layer-out.is-viewport-pin {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  /* Below header (z-30), above page content. */
+  z-index: 20;
+}
+
+.havenly-landing .view-layer-out-pin {
+  will-change: transform;
+}
+
 .havenly-landing .view-layer-out.is-exit {
   opacity: 0;
   transform: translateY(calc(var(--motion-view-rise) * -0.4));
@@ -547,9 +568,12 @@
   height: 1.2rem;
   margin: auto;
   border-radius: 999px;
-  border: 1.5px solid color-mix(in srgb, var(--hotspot-champagne) 78%, #fff);
-  background: color-mix(in srgb, var(--hotspot-champagne) 22%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--hotspot-olive) 18%, transparent);
+  border: 2px solid #fff;
+  background: rgb(255 255 255 / 0.42);
+  /* Neutral dark rim + soft white bloom — readable on bright tiles and dark photos. */
+  box-shadow:
+    0 0 0 1.5px rgb(0 0 0 / 0.38),
+    0 0 10px rgb(255 255 255 / 0.45);
   pointer-events: none;
   transform-origin: center center;
   will-change: transform, opacity;
@@ -565,11 +589,11 @@
   height: 1.2rem;
   margin: 0;
   border-radius: 999px;
-  border: 1.5px solid var(--hotspot-champagne);
+  border: 1.5px solid #fff;
   background: var(--hotspot-olive);
   color: var(--hotspot-ivory);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--hotspot-olive-deep) 55%, transparent),
+    0 0 0 1px rgb(27 37 33 / 0.28),
     0 7px 16px color-mix(in srgb, var(--hotspot-olive) 34%, transparent);
   transition:
     background-color 0.2s ease,
@@ -586,10 +610,10 @@
 .hotspot-marker:hover .hotspot-marker-core,
 .hotspot-marker.is-active .hotspot-marker-core {
   background: var(--hotspot-olive-deep);
-  border-color: color-mix(in srgb, var(--hotspot-champagne) 70%, #fff);
+  border-color: #fff;
   color: #fff8ee;
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--hotspot-champagne) 35%, transparent),
+    0 0 0 1px rgb(27 37 33 / 0.32),
     0 9px 18px color-mix(in srgb, var(--hotspot-olive) 40%, transparent);
 }
 
@@ -682,14 +706,14 @@
 @keyframes hotspot-radial-pulse {
   0% {
     transform: scale(1);
-    opacity: 0.62;
+    opacity: 1;
   }
   70% {
-    transform: scale(2.35);
+    transform: scale(2.45);
     opacity: 0;
   }
   100% {
-    transform: scale(2.35);
+    transform: scale(2.45);
     opacity: 0;
   }
 }

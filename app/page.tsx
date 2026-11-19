@@ -158,6 +158,8 @@ export default function Home() {
     ServiceValue | null | undefined
   >(undefined);
   const [outgoingExiting, setOutgoingExiting] = useState(false);
+  /** Scroll offset baked into the outgoing pin so card-click scrollTo(0) stays covered. */
+  const [outgoingScrollY, setOutgoingScrollY] = useState(0);
   const [incomingVisible, setIncomingVisible] = useState(true);
   const [viewShellMinHeight, setViewShellMinHeight] = useState<number | null>(
     null,
@@ -361,6 +363,7 @@ export default function Home() {
     if (prefersReducedMotion()) {
       setOutgoingView(undefined);
       setOutgoingExiting(false);
+      setOutgoingScrollY(0);
       setIncomingVisible(true);
       setViewShellMinHeight(null);
       crossfadeIdleRef.current = true;
@@ -387,17 +390,23 @@ export default function Home() {
       setViewShellMinHeight(shellHeight);
     }
 
+    const scrollY = window.scrollY || 0;
+
     crossfadeIdleRef.current = false;
+    setOutgoingScrollY(scrollY);
     setOutgoingView(from);
     setOutgoingExiting(false);
     setIncomingVisible(false);
     setActiveServiceView(next);
     activeServiceViewRef.current = next;
 
-    // Scroll under the still-opaque outgoing cover.
-    window.scrollTo({ top: 0, behavior: "auto" });
-
+    // Paint the viewport pin before scrolling — scrollTo in the same tick would
+    // reveal the home hero on the still-uncovered live layer.
     await Promise.all([imageReady, waitFrames(2)]);
+    if (gen !== viewTransitionGen.current) return;
+
+    window.scrollTo({ top: 0, behavior: "auto" });
+    await waitFrames(1);
     if (gen !== viewTransitionGen.current) return;
 
     // Overlap: outgoing fades out while incoming fades in.
@@ -409,6 +418,7 @@ export default function Home() {
 
     setOutgoingView(undefined);
     setOutgoingExiting(false);
+    setOutgoingScrollY(0);
     setViewShellMinHeight(null);
     crossfadeIdleRef.current = true;
     focusIncomingView(next);
@@ -458,7 +468,11 @@ export default function Home() {
     })();
   }
 
-  const headerOnHero = !activeServiceView;
+  // Keep the transparent hero header while the home outgoing cover is still mounted,
+  // so the olive bar does not pop in one frame before the service view settles.
+  const headerOnHero =
+    outgoingView === null ||
+    (outgoingView === undefined && activeServiceView === null);
   const heroMediaClassName = heroZoomOnceRef.current
     ? "animate-hero-media absolute inset-0 h-full w-full object-cover object-[58%_center] sm:object-center"
     : "absolute inset-0 h-full w-full object-cover object-[58%_center] sm:object-center";
@@ -1035,21 +1049,30 @@ export default function Home() {
         >
           {outgoingView !== undefined ? (
             <div
-              className={`view-layer view-layer-out${outgoingExiting ? " is-exit" : ""}`}
+              className={`view-layer view-layer-out is-viewport-pin${outgoingExiting ? " is-exit" : ""}`}
               aria-hidden="true"
               inert
             >
-              {outgoingView ? (
-                <ServiceDetailView
-                  service={outgoingView}
-                  onBack={goHome}
-                  onBook={(categoryId) =>
-                    openOrder(outgoingView, true, categoryId ?? null)
-                  }
-                />
-              ) : (
-                renderHomeSections()
-              )}
+              <div
+                className="view-layer-out-pin"
+                style={
+                  outgoingScrollY
+                    ? { transform: `translateY(-${outgoingScrollY}px)` }
+                    : undefined
+                }
+              >
+                {outgoingView ? (
+                  <ServiceDetailView
+                    service={outgoingView}
+                    onBack={goHome}
+                    onBook={(categoryId) =>
+                      openOrder(outgoingView, true, categoryId ?? null)
+                    }
+                  />
+                ) : (
+                  renderHomeSections()
+                )}
+              </div>
             </div>
           ) : null}
           <div
