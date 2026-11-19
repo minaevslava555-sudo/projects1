@@ -133,7 +133,7 @@ function Stepper({
           aria-label={decreaseLabel}
           disabled={value <= min}
           onClick={() => onChange(Math.max(min, value - 1))}
-          className="inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
+          className="havenly-control inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
         >
           −
         </button>
@@ -142,14 +142,14 @@ function Stepper({
           type="number"
           readOnly
           value={value}
-          className="w-full border border-mist bg-white px-4 py-3 text-center text-ink outline-none"
+          className="havenly-control w-full border border-mist bg-white px-4 py-3 text-center text-ink outline-none"
         />
         <button
           type="button"
           aria-label={increaseLabel}
           disabled={value >= max}
           onClick={() => onChange(Math.min(max, value + 1))}
-          className="inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
+          className="havenly-control inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
         >
           +
         </button>
@@ -178,7 +178,7 @@ function Field({
 }
 
 const inputClass =
-  "w-full border border-mist bg-white px-4 py-3 text-ink outline-none transition placeholder:text-muted/60 focus:border-olive";
+  "havenly-control w-full border border-mist bg-white px-4 py-3 text-ink outline-none transition placeholder:text-muted/60 focus:border-olive";
 
 export default function BookingWizard({
   open,
@@ -796,7 +796,7 @@ export default function BookingWizard({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="flex max-h-[100dvh] w-full max-w-lg flex-col overflow-hidden border border-mist bg-paper shadow-2xl sm:max-h-[90svh]"
+        className="havenly-control flex max-h-[100dvh] w-full max-w-lg flex-col overflow-hidden border border-mist bg-paper shadow-2xl sm:max-h-[90svh]"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="shrink-0 border-b border-mist bg-paper px-5 py-4 sm:px-6">
@@ -820,7 +820,7 @@ export default function BookingWizard({
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex h-10 w-10 items-center justify-center border border-mist bg-white text-ink transition hover:border-olive"
+                className="havenly-control inline-flex h-10 w-10 items-center justify-center border border-mist bg-white text-ink transition hover:border-olive"
                 aria-label={t("close")}
               >
                 ×
@@ -890,7 +890,7 @@ export default function BookingWizard({
             <button
               type="button"
               onClick={onClose}
-              className="w-full bg-olive px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep"
+              className="havenly-control w-full bg-olive px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep"
             >
               {t("close")}
             </button>
@@ -904,7 +904,7 @@ export default function BookingWizard({
                     key={value}
                     type="button"
                     onClick={() => onServiceChange(value)}
-                    className={`rounded-lg px-2 py-2.5 text-xs font-semibold transition sm:text-sm ${
+                    className={`havenly-control px-2 py-2.5 text-xs font-semibold transition sm:text-sm ${
                       service === value
                         ? "bg-olive text-white shadow-sm shadow-olive/25"
                         : "border border-mist bg-white text-ink hover:border-olive/50"
@@ -968,7 +968,7 @@ export default function BookingWizard({
                             setRooms(count);
                             clearError();
                           }}
-                          className="border border-mist bg-white px-3 py-3 text-sm font-semibold text-ink transition hover:border-olive"
+                          className="havenly-control border border-mist bg-white px-3 py-3 text-sm font-semibold text-ink transition hover:border-olive"
                         >
                           {count}
                         </button>
@@ -1019,7 +1019,7 @@ export default function BookingWizard({
                         key={option.minutes}
                         type="button"
                         onClick={() => setMassageMinutes(option.minutes)}
-                        className={`flex items-center justify-between border px-4 py-3 text-left transition ${
+                        className={`havenly-control flex items-center justify-between border px-4 py-3 text-left transition ${
                           active
                             ? "border-olive bg-olive/10 text-ink"
                             : "border-mist bg-white text-ink hover:border-olive"
@@ -1076,7 +1076,7 @@ export default function BookingWizard({
                     type="button"
                     disabled={hasUploadingPhotos || occupiedPhotoSlots >= 5}
                     onClick={() => openPhotoPicker()}
-                    className="inline-flex items-center border border-mist bg-white px-4 py-3 text-sm font-semibold text-ink transition hover:border-olive disabled:opacity-50"
+                    className="havenly-control inline-flex items-center border border-mist bg-white px-4 py-3 text-sm font-semibold text-ink transition hover:border-olive disabled:opacity-50"
                   >
                     {occupiedPhotoSlots > 0 ? t("addMorePhotos") : t("choosePhotos")}
                   </button>
@@ -1191,7 +1191,7 @@ export default function BookingWizard({
                               ? t("timeSelected", { slot })
                               : t("timeOption", { slot })
                           }
-                          className={`border px-2 py-2.5 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold ${
+                          className={`havenly-control border px-2 py-2.5 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold ${
                             active
                               ? "border-olive bg-olive text-white shadow-sm ring-2 ring-olive ring-offset-2 ring-offset-paper"
                               : "border-mist bg-white text-ink hover:border-olive"
@@ -1373,7 +1373,7 @@ export default function BookingWizard({
                   <button
                     type="button"
                     onClick={goBack}
-                    className="flex-1 border border-mist bg-white px-4 py-3.5 text-sm font-semibold text-ink transition hover:border-olive"
+                    className="havenly-control flex-1 border border-mist bg-white px-4 py-3.5 text-sm font-semibold text-ink transition hover:border-olive"
                   >
                     {t("back")}
                   </button>
@@ -1386,7 +1386,7 @@ export default function BookingWizard({
                       hasUploadingPhotos ||
                       (service === "cleaning" && rooms == null && step === "configure")
                     }
-                    className="flex-1 bg-olive px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep disabled:opacity-60"
+                    className="havenly-control flex-1 bg-olive px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep disabled:opacity-60"
                   >
                     {t("continue")}
                   </button>
@@ -1401,7 +1401,7 @@ export default function BookingWizard({
                         uploadedPhotoCount === 0 &&
                         !allowWithoutPhotos)
                     }
-                    className="flex-1 bg-olive px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep disabled:opacity-60"
+                    className="havenly-control flex-1 bg-olive px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep disabled:opacity-60"
                   >
                     {sending
                       ? t("sending")

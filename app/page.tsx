@@ -98,6 +98,9 @@ export default function Home() {
   const [massageTab, setMassageTab] = useState<MassageFocusTab>("Back");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [navOpen, setNavOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileNavRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
 
   const serviceMeta = useMemo(
     () =>
@@ -199,10 +202,51 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!navOpen) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setNavOpen(false);
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const onViewport = () => {
+      if (mq.matches) setNavOpen(false);
     };
+    mq.addEventListener("change", onViewport);
+    return () => mq.removeEventListener("change", onViewport);
+  }, []);
+
+  useEffect(() => {
+    if (!navOpen) return;
+
+    const panel = mobileNavRef.current;
+    const firstItem = panel?.querySelector<HTMLElement>("a, button");
+    firstItem?.focus();
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setNavOpen(false);
+        menuButtonRef.current?.focus();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const header = headerRef.current;
+      if (!header) return;
+      const focusables = Array.from(
+        header.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => !el.closest("[inert]") && el.offsetParent !== null);
+      if (focusables.length === 0) return;
+
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [navOpen]);
@@ -254,6 +298,7 @@ export default function Home() {
   return (
     <div className="havenly-landing min-h-svh bg-paper font-sans text-ink antialiased">
       <header
+        ref={headerRef}
         className={`z-30 ${
           headerOnHero
             ? "absolute inset-x-0 top-0"
@@ -288,13 +333,14 @@ export default function Home() {
             <button
               type="button"
               onClick={() => openOrder("cleaning", false)}
-              className="header-book-cta hidden items-center rounded-[12px] border border-white/35 bg-white/10 px-3.5 py-2 text-sm font-semibold text-white backdrop-blur-sm transition hover:border-gold/60 hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold md:inline-flex"
+              className="header-book-cta hidden items-center border border-white/35 bg-white/10 px-3.5 py-2 text-sm font-semibold text-white backdrop-blur-sm transition hover:border-gold/60 hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold md:inline-flex"
             >
               {t("Nav.book")}
             </button>
             <button
+              ref={menuButtonRef}
               type="button"
-              className="inline-flex h-11 w-11 items-center justify-center rounded-[12px] border border-white/30 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold lg:hidden"
+              className="menu-toggle inline-flex h-11 w-11 items-center justify-center border border-white/30 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold lg:hidden"
               aria-expanded={navOpen}
               aria-controls="mobile-nav"
               aria-label={navOpen ? t("Nav.closeMenu") : t("Nav.openMenu")}
@@ -305,21 +351,25 @@ export default function Home() {
           </div>
         </div>
 
-        {navOpen ? (
-          <div
-            id="mobile-nav"
-            className="border-t border-white/15 bg-olive-deep/95 px-5 py-4 backdrop-blur-md lg:hidden"
-          >
+        <div
+          id="mobile-nav"
+          ref={mobileNavRef}
+          className={`mobile-nav-panel bg-olive-deep/95 px-5 backdrop-blur-md ${navOpen ? "is-open" : ""}`}
+          aria-hidden={!navOpen}
+          inert={!navOpen}
+        >
+          <div className="mobile-nav-inner">
             <nav
-              className="mobile-nav-list mx-auto flex max-w-6xl flex-col"
+              className="mobile-nav-list mx-auto flex max-w-6xl flex-col py-4"
               aria-label={t("Nav.mobile")}
             >
               {NAV_HREFS.map((link) => (
                 <button
                   key={link.href}
                   type="button"
+                  tabIndex={navOpen ? 0 : -1}
                   onClick={() => onNavClick(link.href)}
-                  className="mobile-nav-item min-h-11 rounded-[12px] px-3 py-2.5 text-left text-base font-medium text-white/90 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+                  className="mobile-nav-item min-h-11 px-3 py-2.5 text-left text-base font-medium text-white/90 hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
                 >
                   {t(`Nav.${link.key}`)}
                 </button>
@@ -328,27 +378,29 @@ export default function Home() {
                 href="https://wa.me/351920024478"
                 target="_blank"
                 rel="noopener noreferrer"
+                tabIndex={navOpen ? 0 : -1}
                 aria-label={t("Hero.whatsAppAria")}
-                className="mobile-nav-item mt-1.5 min-h-11 rounded-[12px] px-3 py-2.5 text-left text-base font-medium text-white/90 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+                className="mobile-nav-item mt-1.5 min-h-11 px-3 py-2.5 text-left text-base font-medium text-white/90 hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
               >
                 {t("Hero.whatsApp")}
               </a>
               <button
                 type="button"
+                tabIndex={navOpen ? 0 : -1}
                 onClick={() => {
                   setNavOpen(false);
                   openOrder("cleaning", false);
                 }}
-                className="mobile-nav-item mt-1.5 min-h-11 rounded-[12px] bg-olive px-3 py-2.5 text-left text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+                className="mobile-nav-item mobile-nav-cta mt-1.5 min-h-11 bg-olive px-3 py-2.5 text-left text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
               >
                 {t("Hero.bookService")}
               </button>
             </nav>
           </div>
-        ) : null}
+        </div>
       </header>
 
-      <main id="top">
+      <main id="top" inert={navOpen}>
         {activeServiceView ? (
           <ServiceDetailView
             service={activeServiceView}
@@ -385,7 +437,7 @@ export default function Home() {
                     <button
                       type="button"
                       onClick={() => openOrder("cleaning", false)}
-                      className="hero-primary-cta inline-flex items-center justify-center rounded-[12px] bg-olive px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold sm:text-base"
+                      className="hero-primary-cta inline-flex items-center justify-center bg-olive px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold sm:text-base"
                     >
                       {t("Hero.bookService")}
                     </button>
@@ -394,7 +446,7 @@ export default function Home() {
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label={t("Hero.whatsAppAria")}
-                      className="hero-secondary-cta inline-flex items-center justify-center rounded-[12px] border border-sand/80 bg-sand px-6 py-3.5 text-sm font-semibold text-olive transition hover:bg-paper focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold sm:text-base"
+                      className="hero-secondary-cta inline-flex items-center justify-center border border-sand/80 bg-sand px-6 py-3.5 text-sm font-semibold text-olive transition hover:bg-paper focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold sm:text-base"
                     >
                       {t("Hero.whatsApp")}
                     </a>
@@ -424,7 +476,7 @@ export default function Home() {
                       key={item.id}
                       type="button"
                       onClick={() => openServiceView(item.id)}
-                      className="service-card group relative aspect-[4/5] overflow-hidden rounded-[12px] text-left shadow-[0_24px_48px_rgba(27,37,33,0.16)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+                      className="service-card group relative aspect-[4/5] overflow-hidden text-left shadow-[0_24px_48px_rgba(27,37,33,0.16)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -461,7 +513,7 @@ export default function Home() {
                       key={item.id}
                       type="button"
                       onClick={() => openServiceView(item.id)}
-                      className="group relative h-[18.5rem] w-[78vw] max-w-[20rem] shrink-0 snap-center overflow-hidden rounded-[12px] text-left shadow-[0_18px_40px_rgba(27,37,33,0.2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold sm:w-[17.5rem]"
+                      className="group relative h-[18.5rem] w-[78vw] max-w-[20rem] shrink-0 snap-center overflow-hidden text-left shadow-[0_18px_40px_rgba(27,37,33,0.2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold sm:w-[17.5rem]"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -578,7 +630,7 @@ export default function Home() {
                             key={value}
                             type="button"
                             onClick={() => setIncludedService(value)}
-                            className={`px-4 py-2.5 text-sm font-semibold tracking-wide transition ${
+                            className={`havenly-control px-4 py-2.5 text-sm font-semibold tracking-wide transition ${
                               active
                                 ? "bg-olive text-white"
                                 : "border border-mist bg-white/70 text-ink hover:border-olive/40"
@@ -600,7 +652,7 @@ export default function Home() {
                                 key={tab}
                                 type="button"
                                 onClick={() => setCleaningTab(tab)}
-                                className={`px-3.5 py-2 text-sm font-medium transition ${
+                                className={`havenly-control px-3.5 py-2 text-sm font-medium transition ${
                                   active
                                     ? "bg-olive text-white"
                                     : "text-muted underline-offset-4 hover:text-ink hover:underline"
@@ -638,7 +690,7 @@ export default function Home() {
                                 key={tab}
                                 type="button"
                                 onClick={() => setMassageTab(tab)}
-                                className={`px-3.5 py-2 text-sm font-medium transition ${
+                                className={`havenly-control px-3.5 py-2 text-sm font-medium transition ${
                                   active
                                     ? "bg-olive text-white"
                                     : "text-muted underline-offset-4 hover:text-ink hover:underline"
@@ -691,7 +743,7 @@ export default function Home() {
                     <button
                       type="button"
                       onClick={() => openServiceView(includedService)}
-                      className="mt-8 inline-flex items-center bg-olive px-5 py-3 text-sm font-semibold text-white transition hover:bg-olive-deep"
+                      className="havenly-control mt-8 inline-flex items-center bg-olive px-5 py-3 text-sm font-semibold text-white transition hover:bg-olive-deep"
                     >
                       {t("Included.explore", {
                         service: serviceMeta[includedService].title,
@@ -733,7 +785,7 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={() => openServiceView("cleaning")}
-                    className="mt-8 inline-flex items-center bg-olive px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep sm:text-base"
+                    className="havenly-control mt-8 inline-flex items-center bg-olive px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep sm:text-base"
                   >
                     {t("Cta.bookCleaning")}
                   </button>

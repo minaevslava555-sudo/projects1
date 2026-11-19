@@ -24,10 +24,12 @@
   --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-fast: 160ms;
   --motion-ui: 220ms;
+  --motion-nav: 260ms;
   --motion-enter: 700ms;
   --motion-media: 1000ms;
   --motion-rise: 1rem;
   --motion-lift: 4px;
+  --radius-control: 12px;
 }
 
 .havenly-landing a {
@@ -47,6 +49,11 @@
   background: transparent !important;
 }
 
+.havenly-landing #mobile-nav button.mobile-nav-cta {
+  background-color: var(--color-olive) !important;
+  color: #fff !important;
+}
+
 .havenly-landing #mobile-nav .mobile-nav-list {
   gap: 0.125rem;
 }
@@ -55,6 +62,75 @@
   min-height: 44px;
   display: flex;
   align-items: center;
+  border-radius: var(--radius-control);
+}
+
+/* Keep panel mounted; animate open/close without layout thrash on the page. */
+.havenly-landing #mobile-nav.mobile-nav-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  border-top-width: 1px;
+  border-top-style: solid;
+  border-top-color: transparent;
+  transition:
+    grid-template-rows var(--motion-nav) var(--motion-ease),
+    opacity var(--motion-nav) var(--motion-ease),
+    border-top-color var(--motion-nav) var(--motion-ease);
+}
+
+.havenly-landing #mobile-nav.mobile-nav-panel.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  border-top-color: rgb(255 255 255 / 0.15);
+}
+
+.havenly-landing #mobile-nav .mobile-nav-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.havenly-landing #mobile-nav .mobile-nav-item {
+  opacity: 0;
+  transform: translateY(0.35rem);
+  transition:
+    opacity var(--motion-nav) var(--motion-ease),
+    transform var(--motion-nav) var(--motion-ease),
+    background-color var(--motion-fast) ease,
+    color var(--motion-fast) ease;
+}
+
+.havenly-landing #mobile-nav.is-open .mobile-nav-item {
+  opacity: 1;
+  transform: none;
+}
+
+.havenly-landing #mobile-nav.is-open .mobile-nav-item:nth-child(1) {
+  transition-delay: 0ms;
+}
+.havenly-landing #mobile-nav.is-open .mobile-nav-item:nth-child(2) {
+  transition-delay: 40ms;
+}
+.havenly-landing #mobile-nav.is-open .mobile-nav-item:nth-child(3) {
+  transition-delay: 80ms;
+}
+.havenly-landing #mobile-nav.is-open .mobile-nav-item:nth-child(4) {
+  transition-delay: 120ms;
+}
+.havenly-landing #mobile-nav.is-open .mobile-nav-item:nth-child(5) {
+  transition-delay: 160ms;
+}
+.havenly-landing #mobile-nav.is-open .mobile-nav-item:nth-child(6) {
+  transition-delay: 200ms;
+}
+.havenly-landing #mobile-nav.is-open .mobile-nav-item:nth-child(7) {
+  transition-delay: 240ms;
+}
+
+@media (min-width: 1024px) {
+  .havenly-landing #mobile-nav.mobile-nav-panel {
+    display: none !important;
+  }
 }
 
 /* Unlayered `.havenly-landing a { color: inherit }` beats Tailwind text-white/90
@@ -67,13 +143,17 @@
   color: #fff;
 }
 
+.havenly-landing .havenly-control {
+  border-radius: var(--radius-control);
+}
+
 .havenly-landing #services button.group,
 .havenly-landing .hero-service-rail button.group {
   background-color: transparent !important;
   color: inherit !important;
   width: 100%;
   padding: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   border: 0;
 }
 
@@ -83,8 +163,9 @@
 
 .havenly-landing .hero-primary-cta,
 .havenly-landing .hero-secondary-cta,
-.havenly-landing .header-book-cta {
-  border-radius: 12px;
+.havenly-landing .header-book-cta,
+.havenly-landing .menu-toggle {
+  border-radius: var(--radius-control);
 }
 
 .havenly-landing .hero-secondary-cta {
@@ -131,7 +212,7 @@
 }
 
 .havenly-landing #services button.group {
-  border-radius: 12px !important;
+  border-radius: var(--radius-control) !important;
 }
 
 .havenly-landing #services .service-card-explore {
@@ -252,6 +333,22 @@
   .havenly-landing #services .service-card:hover .service-card-image {
     transform: none;
     transition: none;
+  }
+
+  .havenly-landing #mobile-nav.mobile-nav-panel,
+  .havenly-landing #mobile-nav .mobile-nav-item {
+    transition: none;
+  }
+
+  .havenly-landing #mobile-nav .mobile-nav-item,
+  .havenly-landing #mobile-nav.is-open .mobile-nav-item {
+    opacity: 1;
+    transform: none;
+    transition-delay: 0ms;
+  }
+
+  .havenly-landing #mobile-nav.mobile-nav-panel:not(.is-open) .mobile-nav-item {
+    opacity: 0;
   }
 
   .havenly-landing .hotspot-marker-ping {
