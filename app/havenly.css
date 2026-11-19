@@ -20,6 +20,16 @@
   и ломало лендинг (особенно при data-theme=dark из localStorage агента).
   Ниже — страховка для HAVENLY primary CTA и ссылок в hero.
 */
+.havenly-landing {
+  --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-fast: 160ms;
+  --motion-ui: 220ms;
+  --motion-enter: 700ms;
+  --motion-media: 1000ms;
+  --motion-rise: 1rem;
+  --motion-lift: 4px;
+}
+
 .havenly-landing a {
   color: inherit;
 }
@@ -149,7 +159,7 @@
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(1.25rem);
+    transform: translateY(var(--motion-rise));
   }
   to {
     opacity: 1;
@@ -176,29 +186,21 @@
 }
 
 .animate-rise {
-  animation: rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.animate-rise-delay {
-  animation: rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
-}
-
-.animate-rise-late {
-  animation: rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both;
+  animation: rise var(--motion-enter) var(--motion-ease) both;
 }
 
 .animate-hero-media {
   animation:
-    soft-zoom 8s ease-out both,
-    fade-in 1.2s ease both;
+    soft-zoom calc(var(--motion-media) * 8) ease-out both,
+    fade-in var(--motion-media) ease both;
 }
 
 .reveal {
   opacity: 0;
-  transform: translateY(1.5rem);
+  transform: translateY(var(--motion-rise));
   transition:
-    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+    opacity var(--motion-enter) var(--motion-ease),
+    transform var(--motion-enter) var(--motion-ease);
 }
 
 .reveal.is-visible {
@@ -211,21 +213,48 @@
   opacity: 0.01;
 }
 
+/* Desktop service-card hover — CSS tokens; disabled under reduced motion */
+@media (hover: hover) and (pointer: fine) {
+  .havenly-landing #services .service-card {
+    transition: transform var(--motion-enter) var(--motion-ease);
+  }
+
+  .havenly-landing #services .service-card:hover {
+    transform: translateY(calc(var(--motion-lift) * -1));
+  }
+
+  .havenly-landing #services .service-card-image {
+    transition: transform var(--motion-media) ease-out;
+  }
+
+  .havenly-landing #services .service-card:hover .service-card-image {
+    transform: scale(1.04);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .animate-rise,
-  .animate-rise-delay,
-  .animate-rise-late,
-  .animate-hero-media {
+  .havenly-landing .animate-rise,
+  .havenly-landing .animate-hero-media {
     animation: none;
   }
 
-  .reveal {
+  .havenly-landing .reveal,
+  .havenly-landing .reveal:not(.is-visible),
+  .havenly-landing .reveal.is-visible {
     opacity: 1;
     transform: none;
     transition: none;
   }
 
-  .hotspot-marker-ping {
+  .havenly-landing #services .service-card,
+  .havenly-landing #services .service-card:hover,
+  .havenly-landing #services .service-card-image,
+  .havenly-landing #services .service-card:hover .service-card-image {
+    transform: none;
+    transition: none;
+  }
+
+  .havenly-landing .hotspot-marker-ping {
     animation: none;
   }
 }

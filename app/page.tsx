@@ -40,6 +40,13 @@ const NAV_HREFS = [
   { href: "#faq", key: "faq" as const },
 ] as const;
 
+function landingScrollBehavior(): ScrollBehavior {
+  if (typeof window === "undefined") return "auto";
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ? "auto"
+    : "smooth";
+}
+
 function Reveal({
   children,
   className = "",
@@ -204,7 +211,7 @@ export default function Home() {
     setNavOpen(false);
     setService(value);
     setActiveServiceView(value);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: landingScrollBehavior() });
   }
 
   function openOrder(
@@ -226,18 +233,19 @@ export default function Home() {
   function goHome() {
     setNavOpen(false);
     setActiveServiceView(null);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: landingScrollBehavior() });
   }
 
   function onNavClick(href: string) {
     setNavOpen(false);
     setActiveServiceView(null);
+    const behavior = landingScrollBehavior();
     if (href === "#top") {
-      window.setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 0);
+      window.setTimeout(() => window.scrollTo({ top: 0, behavior }), 0);
       return;
     }
     window.setTimeout(() => {
-      document.querySelector(href)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.querySelector(href)?.scrollIntoView({ behavior, block: "start" });
     }, 50);
   }
 
@@ -416,13 +424,13 @@ export default function Home() {
                       key={item.id}
                       type="button"
                       onClick={() => openServiceView(item.id)}
-                      className="group relative aspect-[4/5] overflow-hidden rounded-[12px] text-left shadow-[0_24px_48px_rgba(27,37,33,0.16)] transition duration-500 hover:-translate-y-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+                      className="service-card group relative aspect-[4/5] overflow-hidden rounded-[12px] text-left shadow-[0_24px_48px_rgba(27,37,33,0.16)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={item.image}
                         alt={item.imageAlt}
-                        className="absolute inset-0 h-full w-full object-cover transition duration-[1.1s] ease-out group-hover:scale-[1.04]"
+                        className="service-card-image absolute inset-0 h-full w-full object-cover"
                       />
                       <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_35%,rgba(27,37,33,0.55)_68%,rgba(27,37,33,0.92)_100%)]" />
                       <div className="relative flex h-full flex-col justify-end p-6">
