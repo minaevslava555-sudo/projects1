@@ -416,10 +416,9 @@
     transform: none;
   }
 
-  .havenly-landing .hotspot-marker-pulse,
-  .havenly-landing .hotspot-marker-halo {
+  .havenly-landing .hotspot-marker-pulse {
     animation: none !important;
-    opacity: 0.22;
+    opacity: 0.28;
     transform: none;
   }
 }
@@ -472,7 +471,6 @@
   border: 1px solid var(--color-mist);
   border-radius: 1.25rem;
   background: var(--color-sand);
-  min-height: 20rem;
   box-shadow: 0 12px 32px rgba(27, 37, 33, 0.08);
 }
 
@@ -481,6 +479,20 @@
   width: 100%;
   aspect-ratio: 16 / 10;
   background: var(--color-sand);
+}
+
+/* Hotspots/popups bind to this photo rectangle only — never the taller stage chrome. */
+.hotspot-photo-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.hotspot-photo-overlay .hotspot-marker,
+.hotspot-photo-overlay .hotspot-popup,
+.hotspot-photo-overlay .hotspot-hint {
+  pointer-events: auto;
 }
 
 .hotspot-image {
@@ -507,13 +519,14 @@
   --hotspot-ivory: #f4ecdf;
   position: absolute;
   z-index: 2;
+  display: grid;
+  place-items: center;
   width: 2.75rem;
   height: 2.75rem;
   margin: 0;
   padding: 0;
   border: 0;
   background: transparent;
-  transform: translate(-50%, -50%);
   cursor: pointer;
 }
 
@@ -523,31 +536,24 @@
   border-radius: 999px;
 }
 
-.hotspot-marker-halo {
-  position: absolute;
-  inset: 0.55rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--hotspot-champagne) 28%, transparent);
-  opacity: 0.55;
-  pointer-events: none;
-}
-
+/*
+  Pulse is centered with inset/margin (no translate), so scale animation stays concentric
+  and never fights Motion's x/y centering on the button.
+*/
 .hotspot-marker-pulse {
   position: absolute;
-  inset: 0.62rem;
+  inset: 0;
+  width: 1.2rem;
+  height: 1.2rem;
+  margin: auto;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--hotspot-champagne) 55%, transparent);
-  background: color-mix(in srgb, var(--hotspot-olive) 14%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--hotspot-champagne) 78%, #fff);
+  background: color-mix(in srgb, var(--hotspot-champagne) 22%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--hotspot-olive) 18%, transparent);
   pointer-events: none;
+  transform-origin: center center;
   will-change: transform, opacity;
-}
-
-.hotspot-marker-pulse-a {
-  animation: hotspot-beat-a 2.8s ease-in-out infinite;
-}
-
-.hotspot-marker-pulse-b {
-  animation: hotspot-beat-b 2.8s ease-in-out infinite;
+  animation: hotspot-radial-pulse 2.6s ease-out infinite;
 }
 
 .hotspot-marker-core {
@@ -557,7 +563,7 @@
   place-items: center;
   width: 1.2rem;
   height: 1.2rem;
-  margin: 0.775rem auto 0;
+  margin: 0;
   border-radius: 999px;
   border: 1.5px solid var(--hotspot-champagne);
   background: var(--hotspot-olive);
@@ -587,9 +593,8 @@
     0 9px 18px color-mix(in srgb, var(--hotspot-olive) 40%, transparent);
 }
 
-.hotspot-marker.is-active .hotspot-marker-pulse-a,
-.hotspot-marker.is-active .hotspot-marker-pulse-b {
-  animation-duration: 2.45s;
+.hotspot-marker.is-active .hotspot-marker-pulse {
+  animation-duration: 2.35s;
 }
 
 .hotspot-popup {
@@ -673,40 +678,18 @@
   box-shadow: 0 8px 18px rgba(27, 37, 33, 0.08);
 }
 
-/* Double heartbeat: first soft bloom, then a smaller second pulse, then rest. */
-@keyframes hotspot-beat-a {
-  0%,
-  100% {
+/* Single concentric radial pulse — scale + opacity only, origin fixed at icon center. */
+@keyframes hotspot-radial-pulse {
+  0% {
     transform: scale(1);
-    opacity: 0.5;
+    opacity: 0.62;
   }
-  14% {
-    transform: scale(1.72);
-    opacity: 0;
-  }
-  28%,
-  100% {
-    transform: scale(1);
-    opacity: 0;
-  }
-}
-
-@keyframes hotspot-beat-b {
-  0%,
-  16% {
-    transform: scale(1);
-    opacity: 0;
-  }
-  22% {
-    transform: scale(1);
-    opacity: 0.4;
-  }
-  34% {
-    transform: scale(1.38);
+  70% {
+    transform: scale(2.35);
     opacity: 0;
   }
   100% {
-    transform: scale(1);
+    transform: scale(2.35);
     opacity: 0;
   }
 }

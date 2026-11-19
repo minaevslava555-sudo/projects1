@@ -79,8 +79,13 @@ function SpotMarker({
       style={{ left: `${spot.x}%`, top: `${spot.y}%` }}
       aria-label={spot.title}
       aria-expanded={active}
-      initial={reducedMotion ? false : { opacity: 0, scale: 0.82 }}
-      animate={{ opacity: 1, scale: 1 }}
+      /* Motion x/y compose with scale — keeps marker centered while entering. */
+      initial={
+        reducedMotion
+          ? { opacity: 1, scale: 1, x: "-50%", y: "-50%" }
+          : { opacity: 0, scale: 0.82, x: "-50%", y: "-50%" }
+      }
+      animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
       transition={
         reducedMotion
           ? { duration: 0 }
@@ -96,9 +101,7 @@ function SpotMarker({
       }}
       onMouseEnter={() => onSelect(spot)}
     >
-      <span className="hotspot-marker-pulse hotspot-marker-pulse-a" aria-hidden="true" />
-      <span className="hotspot-marker-pulse hotspot-marker-pulse-b" aria-hidden="true" />
-      <span className="hotspot-marker-halo" aria-hidden="true" />
+      <span className="hotspot-marker-pulse" aria-hidden="true" />
       <span className="hotspot-marker-core" aria-hidden="true">
         <svg
           className="hotspot-sparkle"
@@ -243,6 +246,7 @@ export default function HotspotGallery({ scenes }: { scenes: TranslatedHotspotSc
       ) : null}
 
       <div className="hotspot-stage" onClick={() => setActiveSpotId(null)}>
+        {/* Photo viewport: image + hotspot overlay share this exact rectangle. */}
         <div className="hotspot-image-stack" aria-busy={swapBusy}>
           <AnimatePresence initial={false}>
             <motion.img
@@ -264,47 +268,49 @@ export default function HotspotGallery({ scenes }: { scenes: TranslatedHotspotSc
               draggable={false}
             />
           </AnimatePresence>
-        </div>
 
-        {/* Enter-only Motion; unmount instantly on room change so old/new never overlap. */}
-        {hotspotsVisible
-          ? displayScene.spots.map((spot, index) => (
-              <SpotMarker
-                key={`${displayScene.id}-${spot.id}`}
-                spot={spot}
-                index={index}
-                active={activeSpotId === spot.id}
-                reducedMotion={reducedMotion}
-                onSelect={(next) => setActiveSpotId(next.id)}
-              />
-            ))
-          : null}
+          <div className="hotspot-photo-overlay">
+            {/* Enter-only Motion; unmount instantly on room change so old/new never overlap. */}
+            {hotspotsVisible
+              ? displayScene.spots.map((spot, index) => (
+                  <SpotMarker
+                    key={`${displayScene.id}-${spot.id}`}
+                    spot={spot}
+                    index={index}
+                    active={activeSpotId === spot.id}
+                    reducedMotion={reducedMotion}
+                    onSelect={(next) => setActiveSpotId(next.id)}
+                  />
+                ))
+              : null}
 
-        {activeSpot ? (
-          <div
-            id={`${baseId}-popup`}
-            className="hotspot-popup"
-            role="dialog"
-            aria-label={activeSpot.title}
-            style={popupStyle(activeSpot)}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="hotspot-popup-head">
-              <h3 className="hotspot-popup-title">{activeSpot.title}</h3>
-              <button
-                type="button"
-                className="hotspot-popup-close"
-                aria-label={t("close")}
-                onClick={() => setActiveSpotId(null)}
+            {activeSpot ? (
+              <div
+                id={`${baseId}-popup`}
+                className="hotspot-popup"
+                role="dialog"
+                aria-label={activeSpot.title}
+                style={popupStyle(activeSpot)}
+                onClick={(event) => event.stopPropagation()}
               >
-                ×
-              </button>
-            </div>
-            <p className="hotspot-popup-text">{activeSpot.text}</p>
+                <div className="hotspot-popup-head">
+                  <h3 className="hotspot-popup-title">{activeSpot.title}</h3>
+                  <button
+                    type="button"
+                    className="hotspot-popup-close"
+                    aria-label={t("close")}
+                    onClick={() => setActiveSpotId(null)}
+                  >
+                    ×
+                  </button>
+                </div>
+                <p className="hotspot-popup-text">{activeSpot.text}</p>
+              </div>
+            ) : (
+              <p className="hotspot-hint">{t("exploreHint")}</p>
+            )}
           </div>
-        ) : (
-          <p className="hotspot-hint">{t("exploreHint")}</p>
-        )}
+        </div>
       </div>
     </div>
   );
