@@ -24,7 +24,9 @@
   --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-fast: 160ms;
   --motion-ui: 220ms;
-  --motion-nav: 260ms;
+  --motion-nav: 480ms;
+  --motion-nav-rise: 10px;
+  --motion-nav-stagger: 50ms;
   --motion-enter: 700ms;
   --motion-media: 1000ms;
   --motion-rise: 1rem;
@@ -92,12 +94,13 @@
 
 .havenly-landing #mobile-nav .mobile-nav-item {
   opacity: 0;
-  transform: translateY(0.35rem);
+  transform: translateY(var(--motion-nav-rise));
   transition:
     opacity var(--motion-nav) var(--motion-ease),
     transform var(--motion-nav) var(--motion-ease),
     background-color var(--motion-fast) ease,
     color var(--motion-fast) ease;
+  transition-delay: 0ms;
 }
 
 .havenly-landing #mobile-nav.is-open .mobile-nav-item {
@@ -109,22 +112,22 @@
   transition-delay: 0ms;
 }
 .havenly-landing #mobile-nav.is-open .mobile-nav-item:nth-child(2) {
-  transition-delay: 40ms;
+  transition-delay: calc(var(--motion-nav-stagger) * 1);
 }
 .havenly-landing #mobile-nav.is-open .mobile-nav-item:nth-child(3) {
-  transition-delay: 80ms;
+  transition-delay: calc(var(--motion-nav-stagger) * 2);
 }
 .havenly-landing #mobile-nav.is-open .mobile-nav-item:nth-child(4) {
-  transition-delay: 120ms;
+  transition-delay: calc(var(--motion-nav-stagger) * 3);
 }
 .havenly-landing #mobile-nav.is-open .mobile-nav-item:nth-child(5) {
-  transition-delay: 160ms;
+  transition-delay: calc(var(--motion-nav-stagger) * 4);
 }
 .havenly-landing #mobile-nav.is-open .mobile-nav-item:nth-child(6) {
-  transition-delay: 200ms;
+  transition-delay: calc(var(--motion-nav-stagger) * 5);
 }
 .havenly-landing #mobile-nav.is-open .mobile-nav-item:nth-child(7) {
-  transition-delay: 240ms;
+  transition-delay: calc(var(--motion-nav-stagger) * 6);
 }
 
 @media (min-width: 1024px) {
@@ -336,19 +339,22 @@
   }
 
   .havenly-landing #mobile-nav.mobile-nav-panel,
-  .havenly-landing #mobile-nav .mobile-nav-item {
-    transition: none;
+  .havenly-landing #mobile-nav .mobile-nav-item,
+  .havenly-landing #mobile-nav.is-open .mobile-nav-item,
+  .havenly-landing #mobile-nav.is-open .mobile-nav-item:nth-child(n) {
+    transition: none !important;
+    transition-delay: 0ms !important;
   }
 
-  .havenly-landing #mobile-nav .mobile-nav-item,
-  .havenly-landing #mobile-nav.is-open .mobile-nav-item {
+  .havenly-landing #mobile-nav.is-open .mobile-nav-item,
+  .havenly-landing #mobile-nav.is-open .mobile-nav-item:nth-child(n) {
     opacity: 1;
     transform: none;
-    transition-delay: 0ms;
   }
 
   .havenly-landing #mobile-nav.mobile-nav-panel:not(.is-open) .mobile-nav-item {
     opacity: 0;
+    transform: none;
   }
 
   .havenly-landing .hotspot-marker-ping {
