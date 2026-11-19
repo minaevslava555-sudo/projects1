@@ -6,8 +6,11 @@ import BookingWizard from "@/components/booking-wizard";
 import { readBookingAttempt } from "@/lib/booking-attempt";
 import LanguageSwitcher from "@/components/language-switcher";
 import ServiceDetailView from "@/components/service-detail-view";
-import type { MassageCategoryId } from "@/lib/massage-catalog";
-import type { ServiceValue } from "@/lib/service-hotspots";
+import {
+  MASSAGE_CATEGORIES,
+  type MassageCategoryId,
+} from "@/lib/massage-catalog";
+import { SERVICE_HOTSPOTS, type ServiceValue } from "@/lib/service-hotspots";
 import { useTranslations } from "next-intl";
 import {
   useEffect,
@@ -17,6 +20,10 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
+
+/** Matches `--motion-view-crossfade` in havenly.css. */
+const VIEW_CROSSFADE_MS = 400;
+const IMAGE_READY_TIMEOUT_MS = 180;
 
 type CleaningRoomTab = "Kitchen" | "Rooms" | "Bathroom" | "Hallway";
 type MassageFocusTab = "Back" | "Legs" | "Face";
@@ -45,6 +52,63 @@ function landingScrollBehavior(): ScrollBehavior {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches
     ? "auto"
     : "smooth";
+}
+
+function prefersReducedMotion(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function waitFrames(count: number): Promise<void> {
+  return new Promise((resolve) => {
+    let left = count;
+    const step = () => {
+      left -= 1;
+      if (left <= 0) resolve();
+      else requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+/** Resolve when decoded/cached, on error, or after timeout — never hang the swap. */
+function preloadImage(src: string, timeoutMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const timer = window.setTimeout(finish, timeoutMs);
+    const img = new window.Image();
+    img.onload = () => {
+      window.clearTimeout(timer);
+      finish();
+    };
+    img.onerror = () => {
+      window.clearTimeout(timer);
+      finish();
+    };
+    img.src = src;
+    if (img.complete) {
+      window.clearTimeout(timer);
+      finish();
+    }
+  });
+}
+
+function primaryServiceImage(service: ServiceValue): string {
+  if (service === "massage") {
+    return MASSAGE_CATEGORIES[0]?.image ?? LANDING_MEDIA.massage;
+  }
+  return SERVICE_HOTSPOTS[service].scenes[0]?.image ?? LANDING_MEDIA[service];
 }
 
 function Reveal({
@@ -89,6 +153,15 @@ export default function Home() {
   const [bookingSession, setBookingSession] = useState(0);
   const [service, setService] = useState<ServiceValue>("cleaning");
   const [activeServiceView, setActiveServiceView] = useState<ServiceValue | null>(null);
+  /** Previous view held for overlapping fade-out; `undefined` = no outgoing layer. */
+  const [outgoingView, setOutgoingView] = useState<
+    ServiceValue | null | undefined
+  >(undefined);
+  const [outgoingExiting, setOutgoingExiting] = useState(false);
+  const [incomingVisible, setIncomingVisible] = useState(true);
+  const [viewShellMinHeight, setViewShellMinHeight] = useState<number | null>(
+    null,
+  );
   const [lockService, setLockService] = useState(false);
   const [massageCategoryId, setMassageCategoryId] = useState<MassageCategoryId | null>(
     null,
@@ -101,6 +174,13 @@ export default function Home() {
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const mobileNavRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLElement>(null);
+  const viewTransitionGen = useRef(0);
+  const activeServiceViewRef = useRef<ServiceValue | null>(null);
+  const viewShellRef = useRef<HTMLDivElement>(null);
+  const incomingLayerRef = useRef<HTMLDivElement>(null);
+  const crossfadeIdleRef = useRef(true);
+  /** Soft-zoom hero only on the first home paint — avoids expansion on return. */
+  const heroZoomOnceRef = useRef(true);
 
   const serviceMeta = useMemo(
     () =>
@@ -251,11 +331,93 @@ export default function Home() {
     return () => window.removeEventListener("keydown", onKey);
   }, [navOpen]);
 
+  function focusIncomingView(next: ServiceValue | null) {
+    if (next !== null) {
+      const root = incomingLayerRef.current;
+      const back = root
+        ? [...root.querySelectorAll("button")].find((button) =>
+            /Voltar aos serviços|Back to services/i.test(
+              button.textContent || "",
+            ),
+          )
+        : null;
+      back?.focus({ preventScroll: true });
+      return;
+    }
+    const brand = headerRef.current?.querySelector("button");
+    if (brand instanceof HTMLElement) {
+      brand.focus({ preventScroll: true });
+    }
+  }
+
+  async function transitionTo(next: ServiceValue | null) {
+    if (next === activeServiceViewRef.current && crossfadeIdleRef.current) {
+      return;
+    }
+
+    const gen = ++viewTransitionGen.current;
+    const from = activeServiceViewRef.current;
+
+    if (prefersReducedMotion()) {
+      setOutgoingView(undefined);
+      setOutgoingExiting(false);
+      setIncomingVisible(true);
+      setViewShellMinHeight(null);
+      crossfadeIdleRef.current = true;
+      setActiveServiceView(next);
+      activeServiceViewRef.current = next;
+      window.scrollTo({ top: 0, behavior: "auto" });
+      return;
+    }
+
+    const imageSrc =
+      next === null ? LANDING_MEDIA.hero : primaryServiceImage(next);
+    const imageReady = preloadImage(imageSrc, IMAGE_READY_TIMEOUT_MS);
+
+    const focused = document.activeElement;
+    if (
+      focused instanceof HTMLElement &&
+      viewShellRef.current?.contains(focused)
+    ) {
+      focused.blur();
+    }
+
+    const shellHeight = viewShellRef.current?.offsetHeight ?? null;
+    if (shellHeight) {
+      setViewShellMinHeight(shellHeight);
+    }
+
+    crossfadeIdleRef.current = false;
+    setOutgoingView(from);
+    setOutgoingExiting(false);
+    setIncomingVisible(false);
+    setActiveServiceView(next);
+    activeServiceViewRef.current = next;
+
+    // Scroll under the still-opaque outgoing cover.
+    window.scrollTo({ top: 0, behavior: "auto" });
+
+    await Promise.all([imageReady, waitFrames(2)]);
+    if (gen !== viewTransitionGen.current) return;
+
+    // Overlap: outgoing fades out while incoming fades in.
+    setOutgoingExiting(true);
+    setIncomingVisible(true);
+
+    await wait(VIEW_CROSSFADE_MS);
+    if (gen !== viewTransitionGen.current) return;
+
+    setOutgoingView(undefined);
+    setOutgoingExiting(false);
+    setViewShellMinHeight(null);
+    crossfadeIdleRef.current = true;
+    focusIncomingView(next);
+  }
+
   function openServiceView(value: ServiceValue) {
     setNavOpen(false);
     setService(value);
-    setActiveServiceView(value);
-    window.scrollTo({ top: 0, behavior: landingScrollBehavior() });
+    void transitionTo(value);
   }
 
   function openOrder(
@@ -276,145 +438,47 @@ export default function Home() {
 
   function goHome() {
     setNavOpen(false);
-    setActiveServiceView(null);
-    window.scrollTo({ top: 0, behavior: landingScrollBehavior() });
+    void transitionTo(null);
   }
 
   function onNavClick(href: string) {
     setNavOpen(false);
-    setActiveServiceView(null);
     const behavior = landingScrollBehavior();
-    if (href === "#top") {
-      window.setTimeout(() => window.scrollTo({ top: 0, behavior }), 0);
-      return;
-    }
-    window.setTimeout(() => {
-      document.querySelector(href)?.scrollIntoView({ behavior, block: "start" });
-    }, 50);
+    void (async () => {
+      if (activeServiceViewRef.current !== null) {
+        await transitionTo(null);
+      }
+      if (href === "#top") {
+        window.setTimeout(() => window.scrollTo({ top: 0, behavior }), 0);
+        return;
+      }
+      window.setTimeout(() => {
+        document.querySelector(href)?.scrollIntoView({ behavior, block: "start" });
+      }, 50);
+    })();
   }
 
   const headerOnHero = !activeServiceView;
+  const heroMediaClassName = heroZoomOnceRef.current
+    ? "animate-hero-media absolute inset-0 h-full w-full object-cover object-[58%_center] sm:object-center"
+    : "absolute inset-0 h-full w-full object-cover object-[58%_center] sm:object-center";
 
-  return (
-    <div className="havenly-landing min-h-svh bg-paper font-sans text-ink antialiased">
-      <header
-        ref={headerRef}
-        className={`z-30 ${
-          headerOnHero
-            ? "absolute inset-x-0 top-0"
-            : "relative border-b border-mist bg-olive-deep"
-        }`}
-      >
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4 sm:px-8 lg:px-10">
-          <button
-            type="button"
-            onClick={goHome}
-            className="font-display text-xl font-medium tracking-[0.18em] text-white sm:text-2xl"
-            aria-label={t("Nav.homeAria")}
-          >
-            HAVENLY
-          </button>
+  useEffect(() => {
+    if (!activeServiceView && heroZoomOnceRef.current) {
+      // Soft-zoom already applied on this mount; skip it on later home remounts.
+      heroZoomOnceRef.current = false;
+    }
+  }, [activeServiceView]);
 
-          <nav className="hidden items-center gap-7 lg:flex" aria-label={t("Nav.primary")}>
-            {NAV_HREFS.map((link) => (
-              <button
-                key={link.href}
-                type="button"
-                onClick={() => onNavClick(link.href)}
-                className="text-sm font-medium text-white/85 transition hover:text-white"
-              >
-                {t(`Nav.${link.key}`)}
-              </button>
-            ))}
-          </nav>
-
-          <div className="flex items-center gap-2 sm:gap-3">
-            <LanguageSwitcher className="shrink-0" tone="onDark" />
-            <button
-              type="button"
-              onClick={() => openOrder("cleaning", false)}
-              className="header-book-cta hidden items-center border border-white/35 bg-white/10 px-3.5 py-2 text-sm font-semibold text-white backdrop-blur-sm transition hover:border-gold/60 hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold md:inline-flex"
-            >
-              {t("Nav.book")}
-            </button>
-            <button
-              ref={menuButtonRef}
-              type="button"
-              className="menu-toggle inline-flex h-11 w-11 items-center justify-center border border-white/30 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold lg:hidden"
-              aria-expanded={navOpen}
-              aria-controls="mobile-nav"
-              aria-label={navOpen ? t("Nav.closeMenu") : t("Nav.openMenu")}
-              onClick={() => setNavOpen((open) => !open)}
-            >
-              <span className="font-display text-lg leading-none">{navOpen ? "×" : "☰"}</span>
-            </button>
-          </div>
-        </div>
-
-        <div
-          id="mobile-nav"
-          ref={mobileNavRef}
-          className={`mobile-nav-panel bg-olive-deep/95 px-5 backdrop-blur-md ${navOpen ? "is-open" : ""}`}
-          aria-hidden={!navOpen}
-          inert={!navOpen}
-        >
-          <div className="mobile-nav-inner">
-            <nav
-              className="mobile-nav-list mx-auto flex max-w-6xl flex-col py-4"
-              aria-label={t("Nav.mobile")}
-            >
-              {NAV_HREFS.map((link) => (
-                <button
-                  key={link.href}
-                  type="button"
-                  tabIndex={navOpen ? 0 : -1}
-                  onClick={() => onNavClick(link.href)}
-                  className="mobile-nav-item min-h-11 px-3 py-2.5 text-left text-base font-medium text-white/90 hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
-                >
-                  {t(`Nav.${link.key}`)}
-                </button>
-              ))}
-              <a
-                href="https://wa.me/351920024478"
-                target="_blank"
-                rel="noopener noreferrer"
-                tabIndex={navOpen ? 0 : -1}
-                aria-label={t("Hero.whatsAppAria")}
-                className="mobile-nav-item mt-1.5 min-h-11 px-3 py-2.5 text-left text-base font-medium text-white/90 hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
-              >
-                {t("Hero.whatsApp")}
-              </a>
-              <button
-                type="button"
-                tabIndex={navOpen ? 0 : -1}
-                onClick={() => {
-                  setNavOpen(false);
-                  openOrder("cleaning", false);
-                }}
-                className="mobile-nav-item mobile-nav-cta mt-1.5 min-h-11 bg-olive px-3 py-2.5 text-left text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
-              >
-                {t("Hero.bookService")}
-              </button>
-            </nav>
-          </div>
-        </div>
-      </header>
-
-      <main id="top" inert={navOpen}>
-        {activeServiceView ? (
-          <ServiceDetailView
-            service={activeServiceView}
-            onBack={() => setActiveServiceView(null)}
-            onBook={(categoryId) => openOrder(activeServiceView, true, categoryId ?? null)}
-          />
-        ) : (
-          <>
+  function renderHomeSections() {
+    return (
+      <>
             <section className="relative min-h-[82svh] overflow-hidden sm:min-h-[90svh] lg:min-h-[100svh]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={LANDING_MEDIA.hero}
                 alt={t("Hero.heroAlt")}
-                className="animate-hero-media absolute inset-0 h-full w-full object-cover object-[58%_center] sm:object-center"
+                className={heroMediaClassName}
               />
               <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(43,32,18,0.28)_0%,rgba(27,37,33,0.4)_45%,rgba(27,37,33,0.9)_100%)]" />
               <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_20%_80%,rgba(181,154,107,0.22)_0%,transparent_55%)]" />
@@ -849,8 +913,162 @@ export default function Home() {
                 </Reveal>
               </div>
             </section>
-          </>
-        )}
+      </>
+    );
+  }
+
+  return (
+    <div className="havenly-landing min-h-svh bg-paper font-sans text-ink antialiased">
+      <header
+        ref={headerRef}
+        className={`z-30 ${
+          headerOnHero
+            ? "absolute inset-x-0 top-0"
+            : "relative border-b border-mist bg-olive-deep"
+        }`}
+      >
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4 sm:px-8 lg:px-10">
+          <button
+            type="button"
+            onClick={goHome}
+            className="font-display text-xl font-medium tracking-[0.18em] text-white sm:text-2xl"
+            aria-label={t("Nav.homeAria")}
+          >
+            HAVENLY
+          </button>
+
+          <nav className="hidden items-center gap-7 lg:flex" aria-label={t("Nav.primary")}>
+            {NAV_HREFS.map((link) => (
+              <button
+                key={link.href}
+                type="button"
+                onClick={() => onNavClick(link.href)}
+                className="text-sm font-medium text-white/85 transition hover:text-white"
+              >
+                {t(`Nav.${link.key}`)}
+              </button>
+            ))}
+          </nav>
+
+          <div className="flex items-center gap-2 sm:gap-3">
+            <LanguageSwitcher className="shrink-0" tone="onDark" />
+            <button
+              type="button"
+              onClick={() => openOrder("cleaning", false)}
+              className="header-book-cta hidden items-center border border-white/35 bg-white/10 px-3.5 py-2 text-sm font-semibold text-white backdrop-blur-sm transition hover:border-gold/60 hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold md:inline-flex"
+            >
+              {t("Nav.book")}
+            </button>
+            <button
+              ref={menuButtonRef}
+              type="button"
+              className="menu-toggle inline-flex h-11 w-11 items-center justify-center border border-white/30 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold lg:hidden"
+              aria-expanded={navOpen}
+              aria-controls="mobile-nav"
+              aria-label={navOpen ? t("Nav.closeMenu") : t("Nav.openMenu")}
+              onClick={() => setNavOpen((open) => !open)}
+            >
+              <span className="font-display text-lg leading-none">{navOpen ? "×" : "☰"}</span>
+            </button>
+          </div>
+        </div>
+
+        <div
+          id="mobile-nav"
+          ref={mobileNavRef}
+          className={`mobile-nav-panel bg-olive-deep/95 px-5 backdrop-blur-md ${navOpen ? "is-open" : ""}`}
+          aria-hidden={!navOpen}
+          inert={!navOpen}
+        >
+          <div className="mobile-nav-inner">
+            <nav
+              className="mobile-nav-list mx-auto flex max-w-6xl flex-col py-4"
+              aria-label={t("Nav.mobile")}
+            >
+              {NAV_HREFS.map((link) => (
+                <button
+                  key={link.href}
+                  type="button"
+                  tabIndex={navOpen ? 0 : -1}
+                  onClick={() => onNavClick(link.href)}
+                  className="mobile-nav-item min-h-11 px-3 py-2.5 text-left text-base font-medium text-white/90 hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+                >
+                  {t(`Nav.${link.key}`)}
+                </button>
+              ))}
+              <a
+                href="https://wa.me/351920024478"
+                target="_blank"
+                rel="noopener noreferrer"
+                tabIndex={navOpen ? 0 : -1}
+                aria-label={t("Hero.whatsAppAria")}
+                className="mobile-nav-item mt-1.5 min-h-11 px-3 py-2.5 text-left text-base font-medium text-white/90 hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+              >
+                {t("Hero.whatsApp")}
+              </a>
+              <button
+                type="button"
+                tabIndex={navOpen ? 0 : -1}
+                onClick={() => {
+                  setNavOpen(false);
+                  openOrder("cleaning", false);
+                }}
+                className="mobile-nav-item mobile-nav-cta mt-1.5 min-h-11 bg-olive px-3 py-2.5 text-left text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+              >
+                {t("Hero.bookService")}
+              </button>
+            </nav>
+          </div>
+        </div>
+      </header>
+
+      <main id="top" inert={navOpen}>
+        <div
+          ref={viewShellRef}
+          className="view-crossfade"
+          style={
+            viewShellMinHeight != null
+              ? { minHeight: viewShellMinHeight }
+              : undefined
+          }
+          aria-busy={outgoingView !== undefined}
+        >
+          {outgoingView !== undefined ? (
+            <div
+              className={`view-layer view-layer-out${outgoingExiting ? " is-exit" : ""}`}
+              aria-hidden="true"
+              inert
+            >
+              {outgoingView ? (
+                <ServiceDetailView
+                  service={outgoingView}
+                  onBack={goHome}
+                  onBook={(categoryId) =>
+                    openOrder(outgoingView, true, categoryId ?? null)
+                  }
+                />
+              ) : (
+                renderHomeSections()
+              )}
+            </div>
+          ) : null}
+          <div
+            ref={incomingLayerRef}
+            className={`view-layer view-layer-in${incomingVisible ? " is-active" : ""}`}
+          >
+            {activeServiceView ? (
+              <ServiceDetailView
+                service={activeServiceView}
+                onBack={goHome}
+                onBook={(categoryId) =>
+                  openOrder(activeServiceView, true, categoryId ?? null)
+                }
+              />
+            ) : (
+              renderHomeSections()
+            )}
+          </div>
+        </div>
       </main>
 
       <footer className="border-t border-mist bg-olive-deep py-12 text-paper/75">
@@ -899,7 +1117,7 @@ export default function Home() {
                 <a
                   href="#faq"
                   className="transition hover:text-white"
-                  onClick={() => setActiveServiceView(null)}
+                  onClick={() => void transitionTo(null)}
                 >
                   {t("Footer.faq")}
                 </a>

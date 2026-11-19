@@ -27,11 +27,52 @@
   --motion-nav: 480ms;
   --motion-nav-rise: 10px;
   --motion-nav-stagger: 50ms;
+  --motion-view-crossfade: 400ms;
+  --motion-view-rise: 10px;
   --motion-enter: 700ms;
   --motion-media: 1000ms;
   --motion-rise: 1rem;
   --motion-lift: 4px;
   --radius-control: 12px;
+}
+
+/* Home ↔ service overlapping crossfade — opacity/transform only. */
+.havenly-landing .view-crossfade {
+  position: relative;
+}
+
+.havenly-landing .view-layer {
+  transition:
+    opacity var(--motion-view-crossfade) var(--motion-ease),
+    transform var(--motion-view-crossfade) var(--motion-ease);
+}
+
+.havenly-landing .view-layer-in {
+  position: relative;
+  z-index: 1;
+  opacity: 0;
+  transform: translateY(var(--motion-view-rise));
+}
+
+.havenly-landing .view-layer-in.is-active {
+  opacity: 1;
+  transform: none;
+}
+
+.havenly-landing .view-layer-out {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  opacity: 1;
+  transform: none;
+  pointer-events: none;
+}
+
+.havenly-landing .view-layer-out.is-exit {
+  opacity: 0;
+  transform: translateY(calc(var(--motion-view-rise) * -0.4));
 }
 
 .havenly-landing a {
@@ -324,6 +365,20 @@
   .havenly-landing .animate-rise,
   .havenly-landing .animate-hero-media {
     animation: none;
+  }
+
+  .havenly-landing .view-layer,
+  .havenly-landing .view-layer-in,
+  .havenly-landing .view-layer-in.is-active,
+  .havenly-landing .view-layer-out,
+  .havenly-landing .view-layer-out.is-exit {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .havenly-landing .view-layer-out {
+    display: none;
   }
 
   .havenly-landing .reveal,
