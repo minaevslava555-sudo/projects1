@@ -1,7 +1,14 @@
 "use client";
 
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useTranslations } from "next-intl";
-import { useEffect, useId, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 
 export type TranslatedHotspotSpot = {
   id: string;
@@ -18,33 +25,81 @@ export type TranslatedHotspotScene = {
   spots: TranslatedHotspotSpot[];
 };
 
+/** Soft room crossfade — keep previous frame until the next is ready. */
+const IMAGE_CROSSFADE_S = 0.62;
+const IMAGE_READY_TIMEOUT_MS = 4500;
+/** Reveal markers once the incoming room has started to appear. */
+const HOTSPOT_REVEAL_DELAY_MS = 140;
+const HOTSPOT_STAGGER_S = 0.07;
+const HOTSPOT_ENTER_S = 0.38;
+
+function preloadImage(src: string, timeoutMs: number): Promise<"ok" | "error" | "timeout"> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (result: "ok" | "error" | "timeout") => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
+    const timer = window.setTimeout(() => finish("timeout"), timeoutMs);
+    const img = new window.Image();
+    img.onload = () => {
+      window.clearTimeout(timer);
+      finish("ok");
+    };
+    img.onerror = () => {
+      window.clearTimeout(timer);
+      finish("error");
+    };
+    img.src = src;
+    if (img.complete && img.naturalWidth > 0) {
+      window.clearTimeout(timer);
+      finish("ok");
+    }
+  });
+}
+
 function SpotMarker({
   spot,
   active,
+  index,
+  reducedMotion,
   onSelect,
 }: {
   spot: TranslatedHotspotSpot;
   active: boolean;
+  index: number;
+  reducedMotion: boolean;
   onSelect: (spot: TranslatedHotspotSpot) => void;
 }) {
   return (
-    <button
+    <motion.button
       type="button"
       className={`hotspot-marker${active ? " is-active" : ""}`}
       style={{ left: `${spot.x}%`, top: `${spot.y}%` }}
       aria-label={spot.title}
       aria-expanded={active}
+      initial={reducedMotion ? false : { opacity: 0, scale: 0.82 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={
+        reducedMotion
+          ? { duration: 0 }
+          : {
+              duration: HOTSPOT_ENTER_S,
+              delay: index * HOTSPOT_STAGGER_S,
+              ease: [0.22, 1, 0.36, 1],
+            }
+      }
       onClick={(event) => {
         event.stopPropagation();
         onSelect(spot);
       }}
       onMouseEnter={() => onSelect(spot)}
     >
+      <span className="hotspot-marker-halo" aria-hidden="true" />
       <span className="hotspot-marker-ping" aria-hidden="true" />
-      <span className="hotspot-marker-core" aria-hidden="true">
-        +
-      </span>
-    </button>
+      <span className="hotspot-marker-core" aria-hidden="true" />
+    </motion.button>
   );
 }
 
@@ -53,30 +108,51 @@ function popupStyle(spot: TranslatedHotspotSpot): CSSProperties {
   const preferTop = spot.y > 62;
   return {
     left: preferLeft ? "auto" : `min(calc(${spot.x}% + 1.1rem), calc(100% - 17.5rem))`,
-    right: preferLeft ? `min(calc(${100 - spot.x}% + 1.1rem), calc(100% - 17.5rem))` : "auto",
+    right: preferLeft
+      ? `min(calc(${100 - spot.x}% + 1.1rem), calc(100% - 17.5rem))`
+      : "auto",
     top: preferTop ? "auto" : `min(calc(${spot.y}% + 1.15rem), calc(100% - 8rem))`,
-    bottom: preferTop ? `min(calc(${100 - spot.y}% + 1.15rem), calc(100% - 8rem))` : "auto",
+    bottom: preferTop
+      ? `min(calc(${100 - spot.y}% + 1.15rem), calc(100% - 8rem))`
+      : "auto",
   };
 }
 
 export default function HotspotGallery({ scenes }: { scenes: TranslatedHotspotScene[] }) {
   const t = useTranslations("ServiceDetail");
   const baseId = useId();
-  const [sceneId, setSceneId] = useState(scenes[0]?.id ?? "");
-  const [activeSpotId, setActiveSpotId] = useState<string | null>(null);
+  const reduceMotion = useReducedMotion();
+  const reducedMotion = !!reduceMotion;
 
-  const scene = scenes.find((item) => item.id === sceneId) ?? scenes[0];
-  const activeSpot = scene?.spots.find((spot) => spot.id === activeSpotId) ?? null;
+  const [sceneId, setSceneId] = useState(scenes[0]?.id ?? "");
+  const [displaySceneId, setDisplaySceneId] = useState(scenes[0]?.id ?? "");
+  const [hotspotsVisible, setHotspotsVisible] = useState(true);
+  const [activeSpotId, setActiveSpotId] = useState<string | null>(null);
+  const [swapBusy, setSwapBusy] = useState(false);
+
+  const swapGen = useRef(0);
+  const revealTimer = useRef<number | null>(null);
+
+  const displayScene =
+    scenes.find((item) => item.id === displaySceneId) ?? scenes[0];
+  const activeSpot =
+    displayScene?.spots.find((spot) => spot.id === activeSpotId) ?? null;
 
   useEffect(() => {
     if (!scenes.some((item) => item.id === sceneId) && scenes[0]) {
       setSceneId(scenes[0].id);
+      setDisplaySceneId(scenes[0].id);
     }
   }, [scenes, sceneId]);
 
   useEffect(() => {
-    setActiveSpotId(null);
-  }, [sceneId]);
+    return () => {
+      if (revealTimer.current != null) {
+        window.clearTimeout(revealTimer.current);
+      }
+      swapGen.current += 1;
+    };
+  }, []);
 
   useEffect(() => {
     if (!activeSpot) return;
@@ -87,22 +163,63 @@ export default function HotspotGallery({ scenes }: { scenes: TranslatedHotspotSc
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [activeSpot]);
 
-  if (!scene) return null;
+  async function selectScene(nextId: string) {
+    if (!scenes.some((item) => item.id === nextId)) return;
+    if (nextId === displaySceneId && !swapBusy) return;
+
+    const gen = ++swapGen.current;
+    setSceneId(nextId);
+    setActiveSpotId(null);
+    setHotspotsVisible(false);
+    setSwapBusy(true);
+
+    if (revealTimer.current != null) {
+      window.clearTimeout(revealTimer.current);
+      revealTimer.current = null;
+    }
+
+    const nextScene = scenes.find((item) => item.id === nextId);
+    if (!nextScene) {
+      setSwapBusy(false);
+      return;
+    }
+
+    await preloadImage(nextScene.image, IMAGE_READY_TIMEOUT_MS);
+    if (gen !== swapGen.current) return;
+
+    setDisplaySceneId(nextId);
+
+    if (reducedMotion) {
+      setHotspotsVisible(true);
+      setSwapBusy(false);
+      return;
+    }
+
+    revealTimer.current = window.setTimeout(() => {
+      if (gen !== swapGen.current) return;
+      setHotspotsVisible(true);
+      setSwapBusy(false);
+      revealTimer.current = null;
+    }, HOTSPOT_REVEAL_DELAY_MS);
+  }
+
+  if (!displayScene) return null;
 
   return (
     <div className="hotspot-gallery">
       {scenes.length > 1 ? (
         <div className="hotspot-scene-tabs" role="tablist" aria-label={t("roomsAria")}>
           {scenes.map((item) => {
-            const selected = item.id === scene.id;
+            const selected = item.id === sceneId;
             return (
               <button
                 key={item.id}
                 type="button"
                 role="tab"
                 aria-selected={selected}
+                aria-busy={selected && swapBusy}
                 className={`hotspot-scene-tab${selected ? " is-active" : ""}`}
-                onClick={() => setSceneId(item.id)}
+                onClick={() => void selectScene(item.id)}
               >
                 {item.label}
               </button>
@@ -112,22 +229,42 @@ export default function HotspotGallery({ scenes }: { scenes: TranslatedHotspotSc
       ) : null}
 
       <div className="hotspot-stage" onClick={() => setActiveSpotId(null)}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={scene.image}
-          alt={scene.label}
-          className="hotspot-image"
-          loading="lazy"
-        />
+        <div className="hotspot-image-stack" aria-busy={swapBusy}>
+          <AnimatePresence initial={false}>
+            <motion.img
+              key={displayScene.id}
+              src={displayScene.image}
+              alt={displayScene.label}
+              className="hotspot-image hotspot-image-layer"
+              initial={{ opacity: reducedMotion ? 1 : 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={
+                reducedMotion
+                  ? { duration: 0 }
+                  : {
+                      duration: IMAGE_CROSSFADE_S,
+                      ease: [0.22, 1, 0.36, 1],
+                    }
+              }
+              draggable={false}
+            />
+          </AnimatePresence>
+        </div>
 
-        {scene.spots.map((spot) => (
-          <SpotMarker
-            key={spot.id}
-            spot={spot}
-            active={activeSpotId === spot.id}
-            onSelect={(next) => setActiveSpotId(next.id)}
-          />
-        ))}
+        {/* Enter-only Motion; unmount instantly on room change so old/new never overlap. */}
+        {hotspotsVisible
+          ? displayScene.spots.map((spot, index) => (
+              <SpotMarker
+                key={`${displayScene.id}-${spot.id}`}
+                spot={spot}
+                index={index}
+                active={activeSpotId === spot.id}
+                reducedMotion={reducedMotion}
+                onSelect={(next) => setActiveSpotId(next.id)}
+              />
+            ))
+          : null}
 
         {activeSpot ? (
           <div
