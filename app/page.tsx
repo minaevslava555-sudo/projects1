@@ -160,6 +160,11 @@ export default function Home() {
   const [outgoingExiting, setOutgoingExiting] = useState(false);
   /** Scroll offset baked into the outgoing pin so card-click scrollTo(0) stays covered. */
   const [outgoingScrollY, setOutgoingScrollY] = useState(0);
+  /**
+   * Header chrome follows the DESTINATION view, switched under the outgoing pin
+   * before incoming becomes visible — avoids the 74–78px absolute→relative dock jump.
+   */
+  const [headerOnHero, setHeaderOnHero] = useState(true);
   const [incomingVisible, setIncomingVisible] = useState(true);
   const [viewShellMinHeight, setViewShellMinHeight] = useState<number | null>(
     null,
@@ -364,6 +369,7 @@ export default function Home() {
       setOutgoingView(undefined);
       setOutgoingExiting(false);
       setOutgoingScrollY(0);
+      setHeaderOnHero(next === null);
       setIncomingVisible(true);
       setViewShellMinHeight(null);
       crossfadeIdleRef.current = true;
@@ -400,9 +406,14 @@ export default function Home() {
     setActiveServiceView(next);
     activeServiceViewRef.current = next;
 
-    // Paint the viewport pin before scrolling — scrollTo in the same tick would
-    // reveal the home hero on the still-uncovered live layer.
+    // Paint the viewport pin with the CURRENT header first so pin translateY(-scrollY)
+    // matches the frozen pixels. Then dock destination header under the cover before
+    // the incoming view fades in — no absolute→relative jump after reveal.
     await Promise.all([imageReady, waitFrames(2)]);
+    if (gen !== viewTransitionGen.current) return;
+
+    setHeaderOnHero(next === null);
+    await waitFrames(1);
     if (gen !== viewTransitionGen.current) return;
 
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -468,11 +479,6 @@ export default function Home() {
     })();
   }
 
-  // Keep the transparent hero header while the home outgoing cover is still mounted,
-  // so the olive bar does not pop in one frame before the service view settles.
-  const headerOnHero =
-    outgoingView === null ||
-    (outgoingView === undefined && activeServiceView === null);
   const heroMediaClassName = heroZoomOnceRef.current
     ? "animate-hero-media absolute inset-0 h-full w-full object-cover object-[58%_center] sm:object-center"
     : "absolute inset-0 h-full w-full object-cover object-[58%_center] sm:object-center";
