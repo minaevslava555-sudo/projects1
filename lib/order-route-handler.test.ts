@@ -2039,3 +2039,234 @@ test("happy-path finalize missing key stores completed result", async () => {
     telegramOk: true,
   });
 });
+
+function createCleaningVersionRejectionDeps() {
+  let claimCalls = 0;
+  let getIdemCalls = 0;
+  let saveCalls = 0;
+  let notifyCalls = 0;
+  let pricingCalls = 0;
+
+  const fakeDeps = {
+    cleanupOrphanRepairPhotos: async () => ({ drafts: 0, files: 0 }),
+    clientIpFromHeaders: () => "127.0.0.1",
+    consumeRateLimit: async () => ({ ok: true as const, remaining: 9 }),
+    verifyTurnstileToken: async () => ({ ok: true }),
+    normalizeIdempotencyKey: (value: unknown) => {
+      if (typeof value !== "string") return null;
+      const text = value.trim();
+      return text || null;
+    },
+    getIdempotentOrder: async () => {
+      getIdemCalls += 1;
+      return null;
+    },
+    claimIdempotencyKeyWithToken: async () => {
+      claimCalls += 1;
+      return {
+        status: "claimed" as const,
+        claimPayload: JSON.stringify({
+          id: "__pending__",
+          orderRef: "",
+          pricingMode: "fixed",
+          priceEuro: null,
+          telegramOk: false,
+          claimToken: "unused",
+        }),
+      };
+    },
+    releasePendingIdempotencyKey: async () => true,
+    storeIdempotentOrder: async () => undefined,
+    finalizePendingIdempotencyKey: async () => "finalized" as const,
+    verifyDraftToken: () => ({
+      ok: true as const,
+      draftId: "draft-cleaning-v1-reject",
+      exp: 1_900_000_000,
+    }),
+    isDraftConsumed: async () => false,
+    assertPhotosBelongToDraft: async () => ({ ok: true as const }),
+    markDraftConsumed: async () => undefined,
+    resolveOrderPricing: async () => {
+      pricingCalls += 1;
+      return {
+        ok: true as const,
+        priced: {
+          mode: "fixed" as const,
+          priceEuro: 120,
+          hours: 3,
+          workers: 2,
+        },
+        pricingConfigId: "cfg",
+        pricingVersion: 1,
+        hourlyRateSnapshot: 20,
+        pricingSnapshot: { service: "cleaning" },
+      };
+    },
+    generateOrderRef: () => "HV-V1-REJ",
+    saveOrderToSupabase: async () => {
+      saveCalls += 1;
+      return { id: "ord-v1-rej", orderRef: "HV-V1-REJ" };
+    },
+    findOrderByIdempotencyKey: async () => null,
+    notifyAdminAboutOrder: async () => {
+      notifyCalls += 1;
+    },
+  } satisfies OrderRouteDeps;
+
+  return {
+    fakeDeps,
+    counters: () => ({
+      claimCalls,
+      getIdemCalls,
+      saveCalls,
+      notifyCalls,
+      pricingCalls,
+    }),
+  };
+}
+
+function cleaningOrderBody(
+  idempotencyKey: string,
+  extra: Record<string, unknown> = {},
+) {
+  return {
+    turnstileToken: "test-turnstile-token",
+    idempotencyKey,
+    draftToken: "test-draft-token",
+    ...PRECLAIM_BOOKING,
+    ...extra,
+  };
+}
+
+test("legacy cleaning without version remains accepted", async () => {
+  const idempotencyKey = "idem-cleaning-legacy-ok";
+  const { fakeDeps, counters } = createCleaningVersionRejectionDeps();
+
+  const response = await handleOrderPost(
+    new Request("http://localhost/api/order", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(cleaningOrderBody(idempotencyKey)),
+    }),
+    fakeDeps,
+  );
+  const body = (await response.json()) as { ok: boolean };
+  const c = counters();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(c.saveCalls, 1);
+  assert.equal(c.notifyCalls, 1);
+  assert.equal(c.pricingCalls, 1);
+});
+
+test("cleaningPricingVersion legacy remains accepted", async () => {
+  const idempotencyKey = "idem-cleaning-legacy-explicit";
+  const { fakeDeps, counters } = createCleaningVersionRejectionDeps();
+
+  const response = await handleOrderPost(
+    new Request("http://localhost/api/order", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(
+        cleaningOrderBody(idempotencyKey, { cleaningPricingVersion: "legacy" }),
+      ),
+    }),
+    fakeDeps,
+  );
+  const body = (await response.json()) as { ok: boolean };
+  const c = counters();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(c.saveCalls, 1);
+  assert.equal(c.notifyCalls, 1);
+});
+
+test("cleaningPricingVersion v1 is rejected before save and notify", async () => {
+  const idempotencyKey = "idem-cleaning-v1-reject";
+  const { fakeDeps, counters } = createCleaningVersionRejectionDeps();
+
+  const response = await handleOrderPost(
+    new Request("http://localhost/api/order", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(
+        cleaningOrderBody(idempotencyKey, {
+          cleaningPricingVersion: "v1",
+          roomCounts: { bedrooms: 1 },
+          areaM2: 80,
+          cleaningType: "standard",
+        }),
+      ),
+    }),
+    fakeDeps,
+  );
+  const body = (await response.json()) as { ok: boolean; error?: string };
+  const c = counters();
+
+  assert.equal(response.status, 400);
+  assert.equal(body.ok, false);
+  assert.equal(body.error, "Cleaning v1 пока недоступна");
+  assert.equal(c.claimCalls, 0);
+  assert.equal(c.getIdemCalls, 0);
+  assert.equal(c.saveCalls, 0);
+  assert.equal(c.notifyCalls, 0);
+  assert.equal(c.pricingCalls, 0);
+});
+
+test("unknown cleaningPricingVersion is rejected", async () => {
+  const idempotencyKey = "idem-cleaning-unknown-version";
+  const { fakeDeps, counters } = createCleaningVersionRejectionDeps();
+
+  const response = await handleOrderPost(
+    new Request("http://localhost/api/order", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(
+        cleaningOrderBody(idempotencyKey, {
+          cleaningPricingVersion: "v2",
+        }),
+      ),
+    }),
+    fakeDeps,
+  );
+  const body = (await response.json()) as { ok: boolean; error?: string };
+  const c = counters();
+
+  assert.equal(response.status, 400);
+  assert.equal(body.ok, false);
+  assert.equal(body.error, "Неизвестная версия заказа уборки");
+  assert.equal(c.saveCalls, 0);
+  assert.equal(c.notifyCalls, 0);
+  assert.equal(c.claimCalls, 0);
+});
+
+test("legacy cleaning with v1-only fields is rejected as ambiguous", async () => {
+  const idempotencyKey = "idem-cleaning-mixed-fields";
+  const { fakeDeps, counters } = createCleaningVersionRejectionDeps();
+
+  const response = await handleOrderPost(
+    new Request("http://localhost/api/order", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(
+        cleaningOrderBody(idempotencyKey, {
+          areaM2: 90,
+          cleaningType: "deep",
+        }),
+      ),
+    }),
+    fakeDeps,
+  );
+  const body = (await response.json()) as { ok: boolean; error?: string };
+  const c = counters();
+
+  assert.equal(response.status, 400);
+  assert.equal(body.ok, false);
+  assert.equal(body.error, "Уберите поля Cleaning v1 из запроса");
+  assert.equal(c.saveCalls, 0);
+  assert.equal(c.notifyCalls, 0);
+  assert.equal(c.claimCalls, 0);
+  assert.equal(c.pricingCalls, 0);
+});

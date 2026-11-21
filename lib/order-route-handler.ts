@@ -211,6 +211,51 @@ function asPositiveInt(value: unknown, max: number) {
   return num;
 }
 
+/** Reject Cleaning v1 / mixed payloads until v1 order processing is enabled. */
+function rejectUnsupportedCleaningPricingVersion(
+  raw: Record<string, unknown>,
+): { ok: false; message: string; status: number } | null {
+  const versionRaw = raw.cleaningPricingVersion;
+  if (versionRaw != null && versionRaw !== "") {
+    if (typeof versionRaw !== "string") {
+      return {
+        ok: false,
+        message: "Неизвестная версия заказа уборки",
+        status: 400,
+      };
+    }
+    const version = versionRaw.trim();
+    if (version === "v1") {
+      return {
+        ok: false,
+        message: "Cleaning v1 пока недоступна",
+        status: 400,
+      };
+    }
+    if (version !== "" && version !== "legacy") {
+      return {
+        ok: false,
+        message: "Неизвестная версия заказа уборки",
+        status: 400,
+      };
+    }
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(raw, "roomCounts") ||
+    Object.prototype.hasOwnProperty.call(raw, "areaM2") ||
+    Object.prototype.hasOwnProperty.call(raw, "cleaningType")
+  ) {
+    return {
+      ok: false,
+      message: "Уберите поля Cleaning v1 из запроса",
+      status: 400,
+    };
+  }
+
+  return null;
+}
+
 function jsonError(message: string, status: number) {
   return Response.json({ ok: false, error: message }, { status });
 }
@@ -314,6 +359,11 @@ function parseValidatedBookingFields(
     if (!problemDescription) {
       return { ok: false, message: "Опишите проблему", status: 400 };
     }
+  }
+
+  if (service === "cleaning") {
+    const cleaningVersionError = rejectUnsupportedCleaningPricingVersion(raw);
+    if (cleaningVersionError) return cleaningVersionError;
   }
 
   return {
