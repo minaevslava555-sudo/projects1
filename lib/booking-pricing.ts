@@ -101,12 +101,109 @@ const CLEANING_V1_ADMIN_REVIEW_AREA_M2 = 180;
  */
 const CLEANING_V1_BILLABLE_ROUND_EPS = 1e-9;
 
+const CLEANING_V1_ROOM_KEYS = Object.keys(
+  CLEANING_V1_ROOM_MINUTES,
+) as Array<keyof CleaningV1RoomCounts>;
+
+const CLEANING_V1_ROOM_KEY_SET = new Set<string>(CLEANING_V1_ROOM_KEYS);
+
+const CLEANING_V1_PRICE_INPUT_KEYS = new Set([
+  "rooms",
+  "areaM2",
+  "cleaningType",
+]);
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function isNonNegativeInt(value: unknown): value is number {
-  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    Number.isInteger(value) &&
+    value >= 0
+  );
 }
 
 function isCleaningV1Type(value: unknown): value is CleaningV1Type {
   return value === "standard" || value === "deep" || value === "post_renovation";
+}
+
+export type ParseCleaningV1PriceInputResult =
+  | { ok: true; value: CleaningV1PriceInput }
+  | { ok: false; error: string };
+
+/**
+ * Strict Cleaning v1 pricing input parser. No string/number coercion.
+ * Unexpected top-level or room keys are rejected.
+ */
+export function parseCleaningV1PriceInput(
+  input: unknown,
+): ParseCleaningV1PriceInputResult {
+  if (!isPlainObject(input)) {
+    return { ok: false, error: "Invalid cleaning v1 pricing input" };
+  }
+
+  for (const key of Object.keys(input)) {
+    if (!CLEANING_V1_PRICE_INPUT_KEYS.has(key)) {
+      return { ok: false, error: `Unexpected field: ${key}` };
+    }
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(input, "cleaningType")) {
+    return { ok: false, error: "Invalid cleaning type" };
+  }
+  if (!isCleaningV1Type(input.cleaningType)) {
+    return { ok: false, error: "Invalid cleaning type" };
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(input, "areaM2")) {
+    return { ok: false, error: "Invalid area (m²)" };
+  }
+  const areaM2 = input.areaM2;
+  if (typeof areaM2 !== "number" || !Number.isFinite(areaM2) || areaM2 <= 0) {
+    return { ok: false, error: "Invalid area (m²)" };
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(input, "rooms")) {
+    return { ok: false, error: "Invalid room counts" };
+  }
+  const roomsRaw = input.rooms;
+  if (!isPlainObject(roomsRaw)) {
+    return { ok: false, error: "Invalid room counts" };
+  }
+
+  const roomKeys = Object.keys(roomsRaw);
+  if (roomKeys.length !== CLEANING_V1_ROOM_KEYS.length) {
+    return { ok: false, error: "Invalid room counts" };
+  }
+  for (const key of roomKeys) {
+    if (!CLEANING_V1_ROOM_KEY_SET.has(key)) {
+      return { ok: false, error: `Unexpected room key: ${key}` };
+    }
+  }
+
+  const rooms = {} as CleaningV1RoomCounts;
+  for (const key of CLEANING_V1_ROOM_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(roomsRaw, key)) {
+      return { ok: false, error: `Invalid room count: ${key}` };
+    }
+    const count = roomsRaw[key];
+    if (!isNonNegativeInt(count)) {
+      return { ok: false, error: `Invalid room count: ${key}` };
+    }
+    rooms[key] = count;
+  }
+
+  return {
+    ok: true,
+    value: {
+      rooms,
+      areaM2,
+      cleaningType: input.cleaningType,
+    },
+  };
 }
 
 /** Round person-minutes up to the next 30-minute billable step (float-safe). */
@@ -129,49 +226,27 @@ export function roundUpCleaningV1BillableMinutes(
 export function calculateCleaningV1Price(
   input: CleaningV1PriceInput,
 ): CleaningV1PriceResult | { error: string } {
-  if (!input || typeof input !== "object") {
-    return { error: "Invalid cleaning v1 pricing input" };
-  }
-  if (!isCleaningV1Type(input.cleaningType)) {
-    return { error: "Invalid cleaning type" };
-  }
-  if (
-    typeof input.areaM2 !== "number" ||
-    !Number.isFinite(input.areaM2) ||
-    input.areaM2 <= 0
-  ) {
-    return { error: "Invalid area (m²)" };
+  const parsed = parseCleaningV1PriceInput(input);
+  if (!parsed.ok) {
+    return { error: parsed.error };
   }
 
-  const rooms = input.rooms;
-  if (!rooms || typeof rooms !== "object") {
-    return { error: "Invalid room counts" };
-  }
-  for (const key of Object.keys(CLEANING_V1_ROOM_MINUTES) as Array<
-    keyof CleaningV1RoomCounts
-  >) {
-    if (!isNonNegativeInt(rooms[key])) {
-      return { error: `Invalid room count: ${key}` };
-    }
-  }
+  const { rooms, areaM2, cleaningType } = parsed.value;
 
   let roomMinutes = 0;
-  for (const key of Object.keys(CLEANING_V1_ROOM_MINUTES) as Array<
-    keyof CleaningV1RoomCounts
-  >) {
+  for (const key of CLEANING_V1_ROOM_KEYS) {
     roomMinutes += rooms[key] * CLEANING_V1_ROOM_MINUTES[key];
   }
 
   const areaAdjustmentMinutes =
-    Math.max(0, input.areaM2 - CLEANING_V1_AREA_FREE_M2) *
+    Math.max(0, areaM2 - CLEANING_V1_AREA_FREE_M2) *
     CLEANING_V1_AREA_MINUTES_PER_M2;
   const totalPersonMinutes =
-    (roomMinutes + areaAdjustmentMinutes) *
-    CLEANING_V1_MULTIPLIER[input.cleaningType];
+    (roomMinutes + areaAdjustmentMinutes) * CLEANING_V1_MULTIPLIER[cleaningType];
   const billablePersonMinutes =
     roundUpCleaningV1BillableMinutes(totalPersonMinutes);
   const billableHours = billablePersonMinutes / 60;
-  const adminReviewRequired = input.areaM2 > CLEANING_V1_ADMIN_REVIEW_AREA_M2;
+  const adminReviewRequired = areaM2 > CLEANING_V1_ADMIN_REVIEW_AREA_M2;
   const computedPriceEuro = Math.max(
     CLEANING_V1_MIN_PRICE_EURO,
     billableHours * CLEANING_V1_HOURLY_RATE_EURO,

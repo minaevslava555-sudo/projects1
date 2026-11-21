@@ -4,6 +4,7 @@ import {
   calculateCleaningV1Price,
   cleaningPlan,
   cleaningPriceEuro,
+  parseCleaningV1PriceInput,
   roundUpCleaningV1BillableMinutes,
   type CleaningV1PriceInput,
   type CleaningV1RoomCounts,
@@ -283,23 +284,133 @@ test("calculateCleaningV1Price is independent of assigned cleaner count", () => 
     areaM2: 100,
     cleaningType: "standard",
   };
-  const first = calculateCleaningV1Price(input);
-  const second = calculateCleaningV1Price({
-    ...input,
-    // Staffing is intentionally absent from the public input contract.
-    ...({ cleaners: 1 } as object),
-  } as CleaningV1PriceInput);
-  const third = calculateCleaningV1Price({
+  const priced = calculateCleaningV1Price(input);
+  assert.ok(!("error" in priced));
+  assert.equal(priced.customerPriceEuro, 100);
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(input, "cleaners"),
+    false,
+  );
+  // Staffing is not part of the contract; unexpected keys are rejected.
+  const withCleaners = calculateCleaningV1Price({
     ...input,
     ...({ cleaners: 3 } as object),
   } as CleaningV1PriceInput);
+  assert.ok("error" in withCleaners);
+});
 
-  assert.ok(!("error" in first) && !("error" in second) && !("error" in third));
-  assert.equal(first.customerPriceEuro, second.customerPriceEuro);
-  assert.equal(first.customerPriceEuro, third.customerPriceEuro);
-  assert.equal(first.billableHours, second.billableHours);
+test("parseCleaningV1PriceInput accepts valid shapes and rejects invalid ones", () => {
+  const valid = parseCleaningV1PriceInput({
+    rooms: roomsA,
+    areaM2: 55,
+    cleaningType: "standard",
+  });
+  assert.equal(valid.ok, true);
+  if (valid.ok) {
+    assert.deepEqual(valid.value.rooms, roomsA);
+    assert.equal(valid.value.areaM2, 55);
+    assert.equal(valid.value.cleaningType, "standard");
+  }
+
+  assert.equal(parseCleaningV1PriceInput(null).ok, false);
+  assert.equal(parseCleaningV1PriceInput([]).ok, false);
+  assert.equal(parseCleaningV1PriceInput("x").ok, false);
+
   assert.equal(
-    Object.prototype.hasOwnProperty.call(input, "cleaners"),
+    parseCleaningV1PriceInput({
+      rooms: roomsA,
+      areaM2: 55,
+      cleaningType: "standard",
+      cleaners: 2,
+    }).ok,
+    false,
+  );
+
+  assert.equal(
+    parseCleaningV1PriceInput({
+      rooms: roomsA,
+      areaM2: "55",
+      cleaningType: "standard",
+    }).ok,
+    false,
+  );
+
+  assert.equal(
+    parseCleaningV1PriceInput({
+      rooms: { ...roomsA, bedroom: "1" },
+      areaM2: 55,
+      cleaningType: "standard",
+    }).ok,
+    false,
+  );
+
+  assert.equal(
+    parseCleaningV1PriceInput({
+      rooms: { ...roomsA, balcony: 1 },
+      areaM2: 55,
+      cleaningType: "standard",
+    }).ok,
+    false,
+  );
+
+  assert.equal(
+    parseCleaningV1PriceInput({
+      rooms: {
+        bedroom: 1,
+        livingRoom: 1,
+        kitchen: 1,
+        bathroom: 1,
+        separateWc: 0,
+        hallway: 1,
+      },
+      areaM2: 55,
+      cleaningType: "standard",
+    }).ok,
+    false,
+  );
+
+  assert.equal(
+    parseCleaningV1PriceInput({
+      rooms: roomsA,
+      areaM2: 0,
+      cleaningType: "standard",
+    }).ok,
+    false,
+  );
+
+  assert.equal(
+    parseCleaningV1PriceInput({
+      rooms: roomsA,
+      areaM2: Number.NaN,
+      cleaningType: "standard",
+    }).ok,
+    false,
+  );
+
+  assert.equal(
+    parseCleaningV1PriceInput({
+      rooms: roomsA,
+      areaM2: Number.POSITIVE_INFINITY,
+      cleaningType: "standard",
+    }).ok,
+    false,
+  );
+
+  assert.equal(
+    parseCleaningV1PriceInput({
+      rooms: { ...roomsA, bedroom: 1.5 },
+      areaM2: 55,
+      cleaningType: "standard",
+    }).ok,
+    false,
+  );
+
+  assert.equal(
+    parseCleaningV1PriceInput({
+      rooms: roomsA,
+      areaM2: 55,
+      cleaningType: "express",
+    }).ok,
     false,
   );
 });
