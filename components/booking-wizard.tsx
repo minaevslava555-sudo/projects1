@@ -22,6 +22,7 @@ import {
   getMassageCategory,
   type MassageCategoryId,
 } from "@/lib/massage-catalog";
+import { motion, useReducedMotion } from "motion/react";
 import { useTranslations } from "next-intl";
 import {
   useEffect,
@@ -32,6 +33,115 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
+
+const BOOKING_EASE = [0.22, 1, 0.36, 1] as const;
+const BACKDROP_MS = 0.22;
+const PANEL_DESKTOP_MS = 0.28;
+const PANEL_MOBILE_MS = 0.3;
+
+function getDialogFocusable(container: HTMLElement): HTMLElement[] {
+  const nodes = [
+    ...container.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ),
+  ];
+  return nodes.filter((el) => {
+    if (el.getAttribute("aria-hidden") === "true") return false;
+    if (el.tabIndex < 0) return false;
+    const style = window.getComputedStyle(el);
+    if (style.visibility === "hidden" || style.display === "none") return false;
+    // Keep sr-only file inputs; skip zero-size non-inputs.
+    if (el.tagName !== "INPUT" && el.offsetParent === null && style.position !== "fixed") {
+      return false;
+    }
+    return true;
+  });
+}
+
+/** True when programmatic focus would land on a real, visible page control. */
+function isElementInteractivelyFocusable(el: HTMLElement): boolean {
+  if (!el.isConnected) return false;
+  if (el.closest("[data-booking-overlay='true']")) return false;
+  if (el.closest("[inert]")) return false;
+  if (el.closest('[aria-hidden="true"]')) return false;
+  if ((el as HTMLButtonElement).disabled) return false;
+  // Outgoing / inactive crossfade layers are not interactive targets.
+  if (el.closest(".view-layer-out")) return false;
+  const incoming = el.closest(".view-layer-in");
+  if (incoming && !incoming.classList.contains("is-active")) return false;
+
+  let node: HTMLElement | null = el;
+  while (node && node !== document.body) {
+    const style = window.getComputedStyle(node);
+    if (style.display === "none" || style.visibility === "hidden") return false;
+    if (style.pointerEvents === "none") return false;
+    if (Number.parseFloat(style.opacity) < 0.05) return false;
+    node = node.parentElement;
+  }
+
+  const rect = el.getBoundingClientRect();
+  return rect.width >= 1 && rect.height >= 1;
+}
+
+function controlAccessibleName(el: HTMLElement): string {
+  return (el.getAttribute("aria-label") || el.textContent || "").trim();
+}
+
+/**
+ * Prefer the exact opener when still interactive; otherwise a same-named
+ * control in the active view, then a visible booking CTA, then header Book.
+ */
+function resolveBookingFocusTarget(
+  opener: HTMLElement | null,
+  openerNameHint = "",
+): HTMLElement | null {
+  if (opener && isElementInteractivelyFocusable(opener)) return opener;
+
+  const landing = document.querySelector(".havenly-landing");
+  if (!(landing instanceof HTMLElement)) return null;
+
+  const activeScope =
+    landing.querySelector(".view-layer-in.is-active") ??
+    landing.querySelector("main") ??
+    landing;
+
+  const candidates = [
+    ...activeScope.querySelectorAll<HTMLElement>("button, a[href], [role='button']"),
+  ].filter((el) => !el.closest(".view-layer-out"));
+
+  const openerName =
+    openerNameHint || (opener ? controlAccessibleName(opener) : "");
+  if (openerName) {
+    const sameName = candidates.find(
+      (el) =>
+        controlAccessibleName(el) === openerName &&
+        isElementInteractivelyFocusable(el),
+    );
+    if (sameName) return sameName;
+  }
+
+  // Prefer primary service booking CTAs over generic "Book this service".
+  const ranked = candidates.filter((el) => {
+    if (!isElementInteractivelyFocusable(el)) return false;
+    return /book|reservar|reserve/i.test(controlAccessibleName(el));
+  });
+  const specific = ranked.find((el) =>
+    /book (cleaning|repairs|massage)|reservar (limpeza|repara|massagem)/i.test(
+      controlAccessibleName(el),
+    ),
+  );
+  if (specific) return specific;
+  if (ranked[0]) return ranked[0];
+
+  const headerBook = [
+    ...landing.querySelectorAll<HTMLElement>("header button"),
+  ].find(
+    (el) =>
+      /book|reservar|reserve/i.test(controlAccessibleName(el)) &&
+      isElementInteractivelyFocusable(el),
+  );
+  return headerBook ?? null;
+}
 
 type StepId = "configure" | "schedule" | "address" | "contact" | "review";
 
@@ -198,6 +308,8 @@ export default function BookingWizard({
   const t = useTranslations("BookingWizard");
   const tMassage = useTranslations("MassageCatalog");
   const titleId = useId();
+  const reduceMotion = useReducedMotion();
+  const reducedMotion = !!reduceMotion;
   const [stepIndex, setStepIndex] = useState(0);
   const [rooms, setRooms] = useState<number | null>(null);
   const [massageMinutes, setMassageMinutes] = useState<MassageMinutes>(60);
@@ -231,6 +343,24 @@ export default function BookingWizard({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const replaceTargetIdRef = useRef<string | null>(null);
   const [replaceTargetId, setReplaceTargetId] = useState<string | null>(null);
+  /** Overlay stays mounted through exit animation without remounting form state. */
+  const [overlayPresent, setOverlayPresent] = useState(open);
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== "undefined"
+      ? window.matchMedia("(min-width: 640px)").matches
+      : false,
+  );
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const backdropRef = useRef<HTMLDivElement | null>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const openerNameRef = useRef("");
+  const closingRef = useRef(false);
+  const wasOverlayPresentRef = useRef(false);
+  const openRef = useRef(open);
+  openRef.current = open;
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   const step = STEPS[stepIndex] ?? "configure";
   const cleaning = useMemo(
@@ -368,18 +498,217 @@ export default function BookingWizard({
   }, [service, massageCategoryId]);
 
   useEffect(() => {
-    if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+    const mq = window.matchMedia("(min-width: 640px)");
+    const sync = () => setIsDesktop(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  // Capture the real trigger before React opens the modal (more reliable than
+  // reading activeElement after inert/focus moves).
+  useEffect(() => {
+    if (open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const trigger = target.closest<HTMLElement>(
+        "button, a[href], [role='button']",
+      );
+      if (trigger && !trigger.closest("[data-booking-overlay='true']")) {
+        openerRef.current = trigger;
+        openerNameRef.current = controlAccessibleName(trigger);
+      }
     };
-    window.addEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [open]);
+
+  useEffect(() => {
+    if (open) {
+      // Re-open mid-exit: cancel teardown and keep the same mounted overlay.
+      closingRef.current = false;
+      setOverlayPresent(true);
+      if (
+        !openerRef.current &&
+        document.activeElement instanceof HTMLElement &&
+        document.activeElement !== document.body
+      ) {
+        openerRef.current = document.activeElement;
+        openerNameRef.current = controlAccessibleName(document.activeElement);
+      }
+    } else if (overlayPresent) {
+      // Soft-close start: drop focus from the dialog so exit can finish cleanly.
+      const active = document.activeElement;
+      if (
+        active instanceof HTMLElement &&
+        dialogRef.current?.contains(active)
+      ) {
+        active.blur();
+      }
+    }
+  }, [open, overlayPresent]);
+
+  useEffect(() => {
+    if (!overlayPresent) return;
+    const previousOverflow = document.body.style.overflow;
+    const previousPaddingRight = document.body.style.paddingRight;
+    const scrollbarGap =
+      window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.overflow = "hidden";
+    if (scrollbarGap > 0) {
+      document.body.style.paddingRight = `${scrollbarGap}px`;
+    }
+
+    const root = document.querySelector(".havenly-landing");
+    const inerted: HTMLElement[] = [];
+    if (root) {
+      for (const child of Array.from(root.children)) {
+        if (!(child instanceof HTMLElement)) continue;
+        if (child.dataset.bookingOverlay === "true") continue;
+        child.inert = true;
+        inerted.push(child);
+      }
+    }
+
     return () => {
       document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.paddingRight = previousPaddingRight;
+      for (const el of inerted) el.inert = false;
     };
-  }, [open, onClose]);
+  }, [overlayPresent]);
+
+  function focusCloseControl() {
+    closeButtonRef.current?.focus({ preventScroll: true });
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    // Wait for mount / interrupted re-enter paint before moving focus.
+    const frame = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(focusCloseControl);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [open]);
+
+  // Keyboard + focus trap only while truly open (not during exit).
+  useEffect(() => {
+    if (!open) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        requestClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+
+      // Let the browser move focus into iframes (Turnstile); only cycle when
+      // focus is on an in-document control at the ends of the dialog.
+      const active = document.activeElement;
+      if (active instanceof HTMLIFrameElement && dialog.contains(active)) {
+        return;
+      }
+      if (!(active instanceof HTMLElement) || !dialog.contains(active)) {
+        return;
+      }
+
+      const focusable = getDialogFocusable(dialog);
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialog.focus({ preventScroll: true });
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus({ preventScroll: true });
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus({ preventScroll: true });
+      }
+    };
+
+    const onFocusIn = (event: FocusEvent) => {
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (dialog.contains(target)) return;
+      const focusable = getDialogFocusable(dialog);
+      (focusable[0] ?? dialog).focus({ preventScroll: true });
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    document.addEventListener("focusin", onFocusIn);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("focusin", onFocusIn);
+    };
+  }, [open]);
+
+  function requestClose() {
+    if (closingRef.current || !openRef.current) return;
+    closingRef.current = true;
+    onCloseRef.current();
+  }
+
+  // Native backdrop listener — more reliable than Motion/React synthetic clicks.
+  useEffect(() => {
+    if (!open) return;
+    const node = backdropRef.current;
+    if (!node) return;
+    const onClick = () => requestClose();
+    node.addEventListener("click", onClick);
+    return () => node.removeEventListener("click", onClick);
+  }, [open]);
+
+  function finishCloseAnimation() {
+    // Interrupted exit (re-opened): stay mounted; do not clear chrome.
+    if (openRef.current) {
+      closingRef.current = false;
+      return;
+    }
+    setOverlayPresent(false);
+    closingRef.current = false;
+  }
+
+  // Safety net if Motion skips onAnimationComplete after interrupted cycles.
+  useEffect(() => {
+    if (open || !overlayPresent) return;
+    const durationMs =
+      (reducedMotion
+        ? 0.05
+        : isDesktop
+          ? PANEL_DESKTOP_MS
+          : PANEL_MOBILE_MS) *
+        1000 +
+      100;
+    const timer = window.setTimeout(() => {
+      if (!openRef.current) finishCloseAnimation();
+    }, durationMs);
+    return () => window.clearTimeout(timer);
+  }, [open, overlayPresent, isDesktop, reducedMotion]);
+
+  // Restore focus only after overlayPresent flips false so inert siblings are
+  // cleared first (focus into an inert ancestor is ignored by the browser).
+  useEffect(() => {
+    if (overlayPresent) {
+      wasOverlayPresentRef.current = true;
+      return;
+    }
+    if (!wasOverlayPresentRef.current) return;
+    wasOverlayPresentRef.current = false;
+    const opener = openerRef.current;
+    const openerName = openerNameRef.current;
+    openerRef.current = null;
+    openerNameRef.current = "";
+    const target = resolveBookingFocusTarget(opener, openerName);
+    target?.focus({ preventScroll: true });
+  }, [overlayPresent]);
 
   useEffect(() => {
     if (!open) return;
@@ -773,8 +1102,6 @@ export default function BookingWizard({
     }
   }
 
-  if (!open) return null;
-
   const serviceTitle = t(`services.${service}.title`);
   const rateLabel = t(`services.${service}.rateLabel`);
   const stepLabel = t(`steps.${step}`);
@@ -786,17 +1113,57 @@ export default function BookingWizard({
         ? t(`errors.${error.code}`, error.values)
         : "";
 
+  const panelDuration = reducedMotion
+    ? 0.01
+    : isDesktop
+      ? PANEL_DESKTOP_MS
+      : PANEL_MOBILE_MS;
+  const backdropDuration = reducedMotion ? 0.01 : BACKDROP_MS;
+
+  const panelOpenState = reducedMotion
+    ? { opacity: 1 }
+    : { opacity: 1, y: 0 };
+  const panelClosedState = reducedMotion
+    ? { opacity: 0 }
+    : isDesktop
+      ? { opacity: 0, y: 10 }
+      : { opacity: 1, y: "100%" };
+
+  if (!overlayPresent) return null;
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-ink/55 p-0 sm:items-center sm:p-6"
+      data-booking-overlay="true"
+      data-booking-closing={open ? undefined : "true"}
+      className="booking-overlay fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-6"
       role="presentation"
-      onClick={onClose}
+      aria-hidden={open ? undefined : true}
     >
-      <div
+      <motion.div
+        ref={backdropRef}
+        aria-hidden="true"
+        className="booking-overlay-backdrop absolute inset-0 bg-ink/55"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: open ? 1 : 0 }}
+        transition={{ duration: backdropDuration, ease: BOOKING_EASE }}
+      />
+      <motion.div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="havenly-control flex max-h-[100dvh] w-full max-w-lg flex-col overflow-hidden border border-mist bg-paper shadow-2xl sm:max-h-[90svh]"
+        tabIndex={-1}
+        className="booking-overlay-panel havenly-control relative z-10 flex max-h-[100dvh] w-full max-w-lg flex-col overflow-hidden border border-mist bg-paper shadow-2xl sm:max-h-[90svh]"
+        initial={panelClosedState}
+        animate={open ? panelOpenState : panelClosedState}
+        transition={{ duration: panelDuration, ease: BOOKING_EASE }}
+        onAnimationComplete={() => {
+          if (openRef.current) {
+            focusCloseControl();
+            return;
+          }
+          finishCloseAnimation();
+        }}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="shrink-0 border-b border-mist bg-paper px-5 py-4 sm:px-6">
@@ -818,8 +1185,9 @@ export default function BookingWizard({
             <div className="flex shrink-0 items-center gap-2">
               <LanguageSwitcher tone="onLight" />
               <button
+                ref={closeButtonRef}
                 type="button"
-                onClick={onClose}
+                onClick={requestClose}
                 className="havenly-control inline-flex h-10 w-10 items-center justify-center border border-mist bg-white text-ink transition hover:border-olive"
                 aria-label={t("close")}
               >
@@ -889,7 +1257,7 @@ export default function BookingWizard({
             )}
             <button
               type="button"
-              onClick={onClose}
+              onClick={requestClose}
               className="havenly-control w-full bg-olive px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep"
             >
               {t("close")}
@@ -1415,7 +1783,7 @@ export default function BookingWizard({
           </form>
         )}
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

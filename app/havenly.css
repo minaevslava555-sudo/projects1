@@ -382,7 +382,30 @@
   }
 }
 
+/* Booking overlay — motion is driven by Motion; keep stacking predictable. */
+.havenly-landing .booking-overlay {
+  pointer-events: auto;
+}
+
+/* Exit phase: ignore clicks so rapid reopen cannot hit a fading duplicate target. */
+.havenly-landing .booking-overlay[data-booking-closing="true"] {
+  pointer-events: none;
+}
+
+.havenly-landing .booking-overlay-backdrop {
+  cursor: pointer;
+}
+
+.havenly-landing .booking-overlay-panel {
+  pointer-events: auto;
+  will-change: transform, opacity;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .havenly-landing .booking-overlay-panel {
+    will-change: opacity;
+  }
+
   .havenly-landing .animate-rise,
   .havenly-landing .animate-hero-media {
     animation: none;
