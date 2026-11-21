@@ -11,11 +11,13 @@ import {
 import {
   MASSAGE_OPTIONS,
   buildTimeSlots,
+  calculateCleaningV1Price,
   cleaningPlan,
   cleaningPriceEuro,
   formatEuro,
   massagePriceEuro,
   type BookingService,
+  type CleaningV1PriceResult,
   type CleaningV1RoomCounts,
   type CleaningV1Type,
   type MassageMinutes,
@@ -456,6 +458,43 @@ export default function BookingWizard({
     }
     return null;
   }, [service, massageMinutes, rooms]);
+
+  type CleaningV1EstimateView =
+    | { status: "incomplete" }
+    | { status: "invalid" }
+    | { status: "fixed"; result: CleaningV1PriceResult }
+    | { status: "quote"; result: CleaningV1PriceResult };
+
+  const cleaningV1Estimate = useMemo((): CleaningV1EstimateView | null => {
+    if (!CLEANING_V1_BOOKING_ENABLED || service !== "cleaning") {
+      return null;
+    }
+    const hasRooms = CLEANING_V1_ROOM_KEYS.some((key) => roomCounts[key] > 0);
+    if (
+      cleaningType == null ||
+      areaM2 == null ||
+      !(typeof areaM2 === "number" && Number.isFinite(areaM2) && areaM2 > 0) ||
+      !hasRooms
+    ) {
+      return { status: "incomplete" };
+    }
+    try {
+      const result = calculateCleaningV1Price({
+        rooms: roomCounts,
+        areaM2,
+        cleaningType,
+      });
+      if ("error" in result) {
+        return { status: "invalid" };
+      }
+      if (result.adminReviewRequired || result.customerPriceEuro == null) {
+        return { status: "quote", result };
+      }
+      return { status: "fixed", result };
+    } catch {
+      return { status: "invalid" };
+    }
+  }, [service, roomCounts, areaM2, cleaningType]);
 
   function setErrorCode(
     code: ErrorCode,
@@ -1741,11 +1780,86 @@ export default function BookingWizard({
                       className="booking-cleaning-estimate rounded-xl border border-sand bg-sand/70 px-3 py-2.5 text-ink sm:px-4 sm:py-3"
                       aria-live="polite"
                     >
-                      <div className="booking-cleaning-estimate-idle">
-                        <p className="text-xs leading-snug text-muted sm:text-sm">
-                          {t("cleaningV1PreviewHint")}
-                        </p>
-                      </div>
+                      <AnimatePresence initial={false} mode="wait">
+                        {cleaningV1Estimate?.status === "fixed" &&
+                        cleaningV1Estimate.result.customerPriceEuro != null ? (
+                          <motion.div
+                            key="v1-estimate-fixed"
+                            initial={reducedMotion ? false : { opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={reducedMotion ? undefined : { opacity: 0 }}
+                            transition={{
+                              duration: reducedMotion ? 0 : 0.2,
+                              ease: BOOKING_EASE,
+                            }}
+                          >
+                            <div className="booking-cleaning-metrics">
+                              <div className="booking-cleaning-metric">
+                                <p className="booking-cleaning-metric-label">
+                                  {t("cleaningV1BillableHoursLabel")}
+                                </p>
+                                <p className="booking-cleaning-metric-value">
+                                  ~
+                                  {t("hourCount", {
+                                    count:
+                                      cleaningV1Estimate.result.billableHours,
+                                  })}
+                                </p>
+                              </div>
+                              <div className="booking-cleaning-metric">
+                                <p className="booking-cleaning-metric-label">
+                                  {t("total")}
+                                </p>
+                                <p className="booking-cleaning-metric-value booking-cleaning-metric-total">
+                                  {formatEuro(
+                                    cleaningV1Estimate.result.customerPriceEuro,
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                            <p className="booking-cleaning-formula mt-2 text-xs leading-snug text-olive/80 sm:text-sm">
+                              {t("cleaningV1CleanersNote")}
+                            </p>
+                          </motion.div>
+                        ) : cleaningV1Estimate?.status === "quote" ? (
+                          <motion.div
+                            key="v1-estimate-quote"
+                            initial={reducedMotion ? false : { opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={reducedMotion ? undefined : { opacity: 0 }}
+                            transition={{
+                              duration: reducedMotion ? 0 : 0.2,
+                              ease: BOOKING_EASE,
+                            }}
+                            className="booking-cleaning-estimate-idle"
+                          >
+                            <p className="text-sm font-medium text-ink">
+                              {t("cleaningV1QuoteTitle")}
+                            </p>
+                            <p className="mt-1 text-xs leading-snug text-muted sm:text-sm">
+                              {t("cleaningV1QuoteBody")}
+                            </p>
+                          </motion.div>
+                        ) : (
+                          <motion.div
+                            key="v1-estimate-idle"
+                            initial={reducedMotion ? false : { opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={reducedMotion ? undefined : { opacity: 0 }}
+                            transition={{
+                              duration: reducedMotion ? 0 : 0.2,
+                              ease: BOOKING_EASE,
+                            }}
+                            className="booking-cleaning-estimate-idle"
+                          >
+                            <p className="text-xs leading-snug text-muted sm:text-sm">
+                              {cleaningV1Estimate?.status === "invalid"
+                                ? t("cleaningV1InvalidHint")
+                                : t("cleaningV1IncompleteHint")}
+                            </p>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   </>
                 ) : (
