@@ -362,6 +362,25 @@
   border-radius: 999px;
 }
 
+/* Cleaning configure: stable total / rooms / estimate shells (no grid↔stepper swap jump). */
+.havenly-landing .booking-cleaning-total,
+.havenly-landing .booking-cleaning-estimate {
+  transition: border-color var(--motion-ui) var(--motion-ease);
+}
+
+.havenly-landing .booking-cleaning-estimate {
+  /* Keeps idle ↔ selected estimate shells from collapsing; content can grow. */
+  min-height: 5.25rem;
+}
+
+.havenly-landing .booking-room-option {
+  transition:
+    background-color var(--motion-ui) var(--motion-ease),
+    border-color var(--motion-ui) var(--motion-ease),
+    color var(--motion-ui) var(--motion-ease),
+    box-shadow var(--motion-ui) var(--motion-ease);
+}
+
 /* Room for sticky footer + soft keyboard; keep focused fields scrollable into view. */
 .havenly-landing .booking-overlay-scroll {
   scroll-padding-bottom: 7.5rem;
@@ -375,6 +394,12 @@
 
   .havenly-landing .booking-step-pane {
     will-change: opacity;
+  }
+
+  .havenly-landing .booking-cleaning-total,
+  .havenly-landing .booking-cleaning-estimate,
+  .havenly-landing .booking-room-option {
+    transition: none;
   }
 
   .havenly-landing .animate-rise,

@@ -1555,13 +1555,16 @@ export default function BookingWizard({
               </div>
             ) : null}
 
-            {step === "configure" && service === "cleaning" && total != null ? (
-              <div className="rounded-xl border border-mist bg-white px-5 py-6 text-center">
+            {step === "configure" && service === "cleaning" ? (
+              <div
+                className="booking-cleaning-total rounded-xl border border-mist bg-white px-5 py-6 text-center"
+                aria-live="polite"
+              >
                 <p className="text-xs font-medium tracking-[0.18em] text-muted uppercase">
                   {t("total")}
                 </p>
                 <p className="mt-2 font-display text-5xl font-bold tracking-tight text-olive sm:text-6xl">
-                  {formatEuro(total)}
+                  {total != null ? formatEuro(total) : "—"}
                 </p>
               </div>
             ) : null}
@@ -1574,65 +1577,148 @@ export default function BookingWizard({
             ) : null}
 
             {step === "configure" && service === "cleaning" ? (
-              <div className="space-y-4">
-                {rooms == null ? (
-                  <div>
-                    <p className="mb-2 block text-sm font-medium text-ink">
-                      {roomsLabel}
-                    </p>
-                    <p className="mb-3 text-sm leading-relaxed text-muted">
-                      {t("chooseRoomsHint")}
-                    </p>
-                    <div
-                      className="grid grid-cols-3 gap-2 sm:grid-cols-6"
-                      role="group"
-                      aria-label={roomsLabel}
-                    >
-                      {[1, 2, 3, 4, 5, 6].map((count) => (
+              <div className="booking-cleaning-rooms space-y-4">
+                <div>
+                  <p className="mb-2 block text-sm font-medium text-ink">
+                    {roomsLabel}
+                  </p>
+                  <p className="mb-3 text-sm leading-relaxed text-muted">
+                    {t("chooseRoomsHint")}
+                  </p>
+                  <div
+                    className="grid grid-cols-3 gap-2 sm:grid-cols-6"
+                    role="group"
+                    aria-label={roomsLabel}
+                  >
+                    {[1, 2, 3, 4, 5, 6].map((count) => {
+                      const selected = rooms === count;
+                      return (
                         <button
                           key={count}
                           type="button"
+                          aria-pressed={selected}
                           onClick={() => {
-                            setRooms(count);
+                            setRooms(selected ? null : count);
                             clearError();
                           }}
-                          className="havenly-control border border-mist bg-white px-3 py-3 text-sm font-semibold text-ink transition hover:border-olive"
+                          className={`booking-room-option havenly-control px-3 py-3 text-sm font-semibold transition ${
+                            selected
+                              ? "border border-olive bg-olive text-white shadow-sm shadow-olive/20"
+                              : "border border-mist bg-white text-ink hover:border-olive"
+                          }`}
                         >
                           {count}
                         </button>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
-                ) : (
-                  <Stepper
-                    id="cleaning-rooms"
-                    label={roomsLabel}
-                    value={rooms}
-                    min={1}
-                    max={6}
-                    onChange={setRooms}
-                    decreaseLabel={t("decrease", { label: roomsLabel })}
-                    increaseLabel={t("increase", { label: roomsLabel })}
-                  />
-                )}
-                {rooms != null && cleaning != null && total != null ? (
-                  <div className="rounded-xl border border-sand bg-sand/70 px-4 py-3 text-sm leading-relaxed text-ink">
-                    <p className="font-medium">
-                      {t("cleaningPlan", {
-                        rooms: t("roomCount", { count: rooms }),
-                        hours: t("hourCount", { count: cleaning.hours }),
-                        cleaners: t("cleanerCount", { count: cleaning.workers }),
-                      })}
-                    </p>
-                    <p className="mt-1 text-olive/80">
-                      {t("cleaningFormula", {
-                        hours: cleaning.hours,
-                        workers: cleaning.workers,
-                        total: formatEuro(total),
-                      })}
-                    </p>
+                </div>
+
+                <div
+                  className="booking-cleaning-qty"
+                  role="group"
+                  aria-label={roomsLabel}
+                >
+                  <label htmlFor="cleaning-rooms" className="sr-only">
+                    {roomsLabel}
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      aria-label={t("decrease", { label: roomsLabel })}
+                      disabled={rooms == null}
+                      onClick={() => {
+                        if (rooms == null) return;
+                        setRooms(rooms <= 1 ? null : rooms - 1);
+                        clearError();
+                      }}
+                      className="havenly-control inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
+                    >
+                      −
+                    </button>
+                    <input
+                      id="cleaning-rooms"
+                      type="text"
+                      inputMode="numeric"
+                      readOnly
+                      value={rooms == null ? "—" : String(rooms)}
+                      aria-valuemin={1}
+                      aria-valuemax={6}
+                      aria-valuenow={rooms ?? undefined}
+                      aria-valuetext={
+                        rooms == null
+                          ? undefined
+                          : t("roomCount", { count: rooms })
+                      }
+                      className="havenly-control w-full border border-mist bg-white px-4 py-3 text-center text-ink outline-none"
+                    />
+                    <button
+                      type="button"
+                      aria-label={t("increase", { label: roomsLabel })}
+                      disabled={rooms != null && rooms >= 6}
+                      onClick={() => {
+                        setRooms(rooms == null ? 1 : Math.min(6, rooms + 1));
+                        clearError();
+                      }}
+                      className="havenly-control inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
+                    >
+                      +
+                    </button>
                   </div>
-                ) : null}
+                </div>
+
+                <div
+                  className="booking-cleaning-estimate rounded-xl border border-sand bg-sand/70 px-4 py-3 text-sm leading-relaxed text-ink"
+                  aria-live="polite"
+                >
+                  <AnimatePresence initial={false} mode="wait">
+                    {rooms != null && cleaning != null && total != null ? (
+                      <motion.div
+                        key="estimate-active"
+                        initial={
+                          reducedMotion ? false : { opacity: 0 }
+                        }
+                        animate={{ opacity: 1 }}
+                        exit={reducedMotion ? undefined : { opacity: 0 }}
+                        transition={{
+                          duration: reducedMotion ? 0 : 0.2,
+                          ease: BOOKING_EASE,
+                        }}
+                      >
+                        <p className="font-medium">
+                          {t("cleaningPlan", {
+                            rooms: t("roomCount", { count: rooms }),
+                            hours: t("hourCount", { count: cleaning.hours }),
+                            cleaners: t("cleanerCount", {
+                              count: cleaning.workers,
+                            }),
+                          })}
+                        </p>
+                        <p className="mt-1 text-olive/80">
+                          {t("cleaningFormula", {
+                            hours: cleaning.hours,
+                            workers: cleaning.workers,
+                            total: formatEuro(total),
+                          })}
+                        </p>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="estimate-idle"
+                        initial={reducedMotion ? false : { opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={reducedMotion ? undefined : { opacity: 0 }}
+                        transition={{
+                          duration: reducedMotion ? 0 : 0.2,
+                          ease: BOOKING_EASE,
+                        }}
+                      >
+                        <p className="font-medium text-muted">—</p>
+                        <p className="mt-1 text-olive/50">—</p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
             ) : null}
 
