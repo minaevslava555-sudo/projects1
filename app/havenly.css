@@ -362,15 +362,68 @@
   border-radius: 999px;
 }
 
-/* Cleaning configure: stable total / rooms / estimate shells (no grid↔stepper swap jump). */
-.havenly-landing .booking-cleaning-total,
+/* Cleaning configure: compact estimate metrics under room controls. */
 .havenly-landing .booking-cleaning-estimate {
   transition: border-color var(--motion-ui) var(--motion-ease);
 }
 
-.havenly-landing .booking-cleaning-estimate {
-  /* Keeps idle ↔ selected estimate shells from collapsing; content can grow. */
-  min-height: 5.25rem;
+.havenly-landing .booking-cleaning-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem 0.5rem;
+  align-items: start;
+}
+
+.havenly-landing .booking-cleaning-metric {
+  min-width: 0;
+  text-align: center;
+}
+
+.havenly-landing .booking-cleaning-metric-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  line-height: 1.25;
+}
+
+.havenly-landing .booking-cleaning-metric-value {
+  margin-top: 0.2rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+
+.havenly-landing .booking-cleaning-metric-total {
+  font-family: var(--font-display), ui-serif, Georgia, serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-olive);
+}
+
+.havenly-landing .booking-cleaning-estimate-idle {
+  min-height: 0;
+}
+
+.havenly-landing .booking-cleaning-formula {
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 480px) {
+  .havenly-landing .booking-cleaning-metric-label {
+    font-size: 0.7rem;
+  }
+
+  .havenly-landing .booking-cleaning-metric-value {
+    font-size: 0.875rem;
+  }
+
+  .havenly-landing .booking-cleaning-metric-total {
+    font-size: 1.05rem;
+  }
 }
 
 .havenly-landing .booking-room-option {
@@ -396,7 +449,6 @@
     will-change: opacity;
   }
 
-  .havenly-landing .booking-cleaning-total,
   .havenly-landing .booking-cleaning-estimate,
   .havenly-landing .booking-room-option {
     transition: none;

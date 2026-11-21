@@ -1555,20 +1555,6 @@ export default function BookingWizard({
               </div>
             ) : null}
 
-            {step === "configure" && service === "cleaning" ? (
-              <div
-                className="booking-cleaning-total rounded-xl border border-mist bg-white px-5 py-6 text-center"
-                aria-live="polite"
-              >
-                <p className="text-xs font-medium tracking-[0.18em] text-muted uppercase">
-                  {t("total")}
-                </p>
-                <p className="mt-2 font-display text-5xl font-bold tracking-tight text-olive sm:text-6xl">
-                  {total != null ? formatEuro(total) : "—"}
-                </p>
-              </div>
-            ) : null}
-
             {step === "configure" && service === "repair" ? (
               <div className="rounded-xl border border-sand bg-sand/70 px-4 py-3 text-sm leading-relaxed text-ink">
                 <p className="font-medium">{t("quoteBannerTitle")}</p>
@@ -1581,9 +1567,6 @@ export default function BookingWizard({
                 <div>
                   <p className="mb-2 block text-sm font-medium text-ink">
                     {roomsLabel}
-                  </p>
-                  <p className="mb-3 text-sm leading-relaxed text-muted">
-                    {t("chooseRoomsHint")}
                   </p>
                   <div
                     className="grid grid-cols-3 gap-2 sm:grid-cols-6"
@@ -1668,16 +1651,14 @@ export default function BookingWizard({
                 </div>
 
                 <div
-                  className="booking-cleaning-estimate rounded-xl border border-sand bg-sand/70 px-4 py-3 text-sm leading-relaxed text-ink"
+                  className="booking-cleaning-estimate rounded-xl border border-sand bg-sand/70 px-3 py-2.5 text-ink sm:px-4 sm:py-3"
                   aria-live="polite"
                 >
                   <AnimatePresence initial={false} mode="wait">
                     {rooms != null && cleaning != null && total != null ? (
                       <motion.div
                         key="estimate-active"
-                        initial={
-                          reducedMotion ? false : { opacity: 0 }
-                        }
+                        initial={reducedMotion ? false : { opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={reducedMotion ? undefined : { opacity: 0 }}
                         transition={{
@@ -1685,16 +1666,36 @@ export default function BookingWizard({
                           ease: BOOKING_EASE,
                         }}
                       >
-                        <p className="font-medium">
-                          {t("cleaningPlan", {
-                            rooms: t("roomCount", { count: rooms }),
-                            hours: t("hourCount", { count: cleaning.hours }),
-                            cleaners: t("cleanerCount", {
-                              count: cleaning.workers,
-                            }),
-                          })}
-                        </p>
-                        <p className="mt-1 text-olive/80">
+                        <div className="booking-cleaning-metrics">
+                          <div className="booking-cleaning-metric">
+                            <p className="booking-cleaning-metric-label">
+                              {t("estimateCleanersLabel")}
+                            </p>
+                            <p className="booking-cleaning-metric-value">
+                              {t("cleanerCount", { count: cleaning.workers })}
+                            </p>
+                          </div>
+                          <div className="booking-cleaning-metric">
+                            <p className="booking-cleaning-metric-label">
+                              {t("estimateDurationLabel")}
+                            </p>
+                            <p className="booking-cleaning-metric-value">
+                              ~{t("hourCount", { count: cleaning.hours })}
+                            </p>
+                          </div>
+                          <div className="booking-cleaning-metric">
+                            <p className="booking-cleaning-metric-label">
+                              {t("total")}
+                            </p>
+                            <p className="booking-cleaning-metric-value booking-cleaning-metric-total">
+                              {formatEuro(total)}
+                            </p>
+                          </div>
+                        </div>
+                        <p className="booking-cleaning-formula mt-2 text-xs leading-snug text-olive/80 sm:text-sm">
+                          <span className="font-medium text-ink/70">
+                            {t("estimateFormulaLabel")}:{" "}
+                          </span>
                           {t("cleaningFormula", {
                             hours: cleaning.hours,
                             workers: cleaning.workers,
@@ -1712,9 +1713,11 @@ export default function BookingWizard({
                           duration: reducedMotion ? 0 : 0.2,
                           ease: BOOKING_EASE,
                         }}
+                        className="booking-cleaning-estimate-idle"
                       >
-                        <p className="font-medium text-muted">—</p>
-                        <p className="mt-1 text-olive/50">—</p>
+                        <p className="text-xs leading-snug text-muted sm:text-sm">
+                          {t("chooseRoomsHint")}
+                        </p>
                       </motion.div>
                     )}
                   </AnimatePresence>
