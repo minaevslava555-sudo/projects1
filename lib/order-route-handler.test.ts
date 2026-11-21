@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { buildOrderRequestFingerprint } from "./order-request-fingerprint";
 import {
   handleOrderPost,
+  parseCleaningV1OrderFields,
   type OrderRouteDeps,
 } from "./order-route-handler";
 import { OrderIdempotencyConflictError } from "./orders";
@@ -2269,4 +2270,116 @@ test("legacy cleaning with v1-only fields is rejected as ambiguous", async () =>
   assert.equal(c.notifyCalls, 0);
   assert.equal(c.claimCalls, 0);
   assert.equal(c.pricingCalls, 0);
+});
+
+const validV1RoomCounts = {
+  bedroom: 1,
+  livingRoom: 1,
+  kitchen: 1,
+  bathroom: 1,
+  separateWc: 0,
+  hallway: 1,
+  otherRoom: 0,
+};
+
+const validV1OrderFields = {
+  cleaningPricingVersion: "v1" as const,
+  roomCounts: validV1RoomCounts,
+  areaM2: 80,
+  cleaningType: "standard" as const,
+};
+
+test("parseCleaningV1OrderFields accepts a valid v1 payload", () => {
+  const parsed = parseCleaningV1OrderFields(validV1OrderFields);
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) {
+    assert.equal(parsed.value.cleaningPricingVersion, "v1");
+    assert.deepEqual(parsed.value.roomCounts, validV1RoomCounts);
+    assert.equal(parsed.value.areaM2, 80);
+    assert.equal(parsed.value.cleaningType, "standard");
+  }
+});
+
+test("parseCleaningV1OrderFields rejects missing or malformed roomCounts", () => {
+  assert.equal(
+    parseCleaningV1OrderFields({
+      ...validV1OrderFields,
+      roomCounts: undefined,
+    }).ok,
+    false,
+  );
+  assert.equal(
+    parseCleaningV1OrderFields({
+      ...validV1OrderFields,
+      roomCounts: { bedroom: 1 },
+    }).ok,
+    false,
+  );
+  assert.equal(
+    parseCleaningV1OrderFields({
+      ...validV1OrderFields,
+      roomCounts: { ...validV1RoomCounts, bedroom: "1" },
+    }).ok,
+    false,
+  );
+});
+
+test("parseCleaningV1OrderFields rejects invalid areaM2 and cleaningType", () => {
+  assert.equal(
+    parseCleaningV1OrderFields({
+      ...validV1OrderFields,
+      areaM2: "80",
+    }).ok,
+    false,
+  );
+  assert.equal(
+    parseCleaningV1OrderFields({
+      ...validV1OrderFields,
+      areaM2: 0,
+    }).ok,
+    false,
+  );
+  assert.equal(
+    parseCleaningV1OrderFields({
+      ...validV1OrderFields,
+      cleaningType: "express",
+    }).ok,
+    false,
+  );
+});
+
+test("parseCleaningV1OrderFields rejects legacy scalar rooms mixed with v1", () => {
+  const mixed = parseCleaningV1OrderFields({
+    ...validV1OrderFields,
+    rooms: 2,
+  });
+  assert.equal(mixed.ok, false);
+  if (!mixed.ok) {
+    assert.match(mixed.error, /rooms/);
+  }
+});
+
+test("parseCleaningV1OrderFields rejects unknown or missing version", () => {
+  assert.equal(
+    parseCleaningV1OrderFields({
+      roomCounts: validV1RoomCounts,
+      areaM2: 80,
+      cleaningType: "standard",
+    }).ok,
+    false,
+  );
+  assert.equal(
+    parseCleaningV1OrderFields({
+      ...validV1OrderFields,
+      cleaningPricingVersion: "v2",
+    }).ok,
+    false,
+  );
+  assert.equal(
+    parseCleaningV1OrderFields({
+      ...validV1OrderFields,
+      cleaningPricingVersion: "legacy",
+    }).ok,
+    false,
+  );
 });

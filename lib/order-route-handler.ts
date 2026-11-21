@@ -15,7 +15,10 @@ import {
 } from "@/lib/booking-idempotency";
 import {
   type BookingService,
+  type CleaningV1RoomCounts,
+  type CleaningV1Type,
   isValidPreferredTime,
+  parseCleaningV1PriceInput,
 } from "@/lib/booking-pricing";
 import { buildOrderRequestFingerprint } from "@/lib/order-request-fingerprint";
 import { resolveOrderPricing } from "@/lib/order-pricing";
@@ -254,6 +257,66 @@ function rejectUnsupportedCleaningPricingVersion(
   }
 
   return null;
+}
+
+export type CleaningV1OrderFields = {
+  cleaningPricingVersion: "v1";
+  roomCounts: CleaningV1RoomCounts;
+  areaM2: number;
+  cleaningType: CleaningV1Type;
+};
+
+export type ParseCleaningV1OrderFieldsResult =
+  | { ok: true; value: CleaningV1OrderFields }
+  | { ok: false; error: string };
+
+/**
+ * Isolated Cleaning v1 order-field parser. Not wired into handleOrderPost yet;
+ * live path still rejects v1 via rejectUnsupportedCleaningPricingVersion.
+ */
+export function parseCleaningV1OrderFields(
+  raw: unknown,
+): ParseCleaningV1OrderFieldsResult {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return { ok: false, error: "Некорректные поля Cleaning v1" };
+  }
+  const record = raw as Record<string, unknown>;
+
+  if (!Object.prototype.hasOwnProperty.call(record, "cleaningPricingVersion")) {
+    return { ok: false, error: "Укажите версию заказа уборки" };
+  }
+  if (record.cleaningPricingVersion !== "v1") {
+    return { ok: false, error: "Неизвестная версия заказа уборки" };
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(record, "rooms") &&
+    record.rooms != null
+  ) {
+    return {
+      ok: false,
+      error: "Уберите устаревшее поле rooms из запроса Cleaning v1",
+    };
+  }
+
+  const priced = parseCleaningV1PriceInput({
+    rooms: record.roomCounts,
+    areaM2: record.areaM2,
+    cleaningType: record.cleaningType,
+  });
+  if (!priced.ok) {
+    return { ok: false, error: priced.error };
+  }
+
+  return {
+    ok: true,
+    value: {
+      cleaningPricingVersion: "v1",
+      roomCounts: priced.value.rooms,
+      areaM2: priced.value.areaM2,
+      cleaningType: priced.value.cleaningType,
+    },
+  };
 }
 
 function jsonError(message: string, status: number) {
