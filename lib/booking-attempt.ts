@@ -28,6 +28,11 @@ export type BookingAttemptFingerprintInput = {
   rooms?: number | null;
   massageMinutes?: number | null;
   repairPhotoPaths?: string[] | null;
+  /** Included in hash only when === "v1" and service === "cleaning". */
+  cleaningPricingVersion?: string | null;
+  roomCounts?: Record<string, unknown> | null;
+  areaM2?: number | null;
+  cleaningType?: string | null;
 };
 
 function canonicalize(value: unknown): unknown {
@@ -63,7 +68,8 @@ export async function buildBookingAttemptFingerprint(
       ? null
       : [...input.repairPhotoPaths].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
-  const payload = {
+  // Keep in lockstep with buildOrderRequestFingerprint (v1 keys only for cleaning + "v1").
+  const payload: Record<string, unknown> = {
     accessInstructions: input.accessInstructions ?? null,
     apartmentFloor: input.apartmentFloor ?? null,
     city: input.city,
@@ -80,6 +86,13 @@ export async function buildBookingAttemptFingerprint(
     service: input.service,
     streetAddress: input.streetAddress,
   };
+
+  if (input.service === "cleaning" && input.cleaningPricingVersion === "v1") {
+    payload.areaM2 = input.areaM2 ?? null;
+    payload.cleaningPricingVersion = "v1";
+    payload.cleaningType = input.cleaningType ?? null;
+    payload.roomCounts = input.roomCounts ?? null;
+  }
 
   const json = JSON.stringify(canonicalize(payload));
   const digest = await crypto.subtle.digest(

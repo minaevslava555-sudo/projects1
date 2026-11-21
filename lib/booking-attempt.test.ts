@@ -108,3 +108,37 @@ test("fingerprint changes when booking payload changes materially", async () => 
   });
   assert.notEqual(base, changed);
 });
+
+const v1Sample = {
+  ...sampleInput,
+  rooms: null as number | null,
+  cleaningPricingVersion: "v1" as const,
+  roomCounts: {
+    bedroom: 1,
+    livingRoom: 1,
+    kitchen: 1,
+    bathroom: 1,
+    separateWc: 0,
+    hallway: 1,
+    otherRoom: 0,
+  },
+  areaM2: 80,
+  cleaningType: "standard",
+};
+
+test("client/server fingerprint parity for legacy and cleaning v1", async () => {
+  const legacyClient = await buildBookingAttemptFingerprint(sampleInput);
+  const legacyServer = buildOrderRequestFingerprint(sampleInput);
+  assert.equal(legacyClient, legacyServer);
+
+  const legacyExplicit = await buildBookingAttemptFingerprint({
+    ...sampleInput,
+    cleaningPricingVersion: "legacy",
+  });
+  assert.equal(legacyExplicit, legacyServer);
+
+  const v1Client = await buildBookingAttemptFingerprint(v1Sample);
+  const v1Server = buildOrderRequestFingerprint(v1Sample);
+  assert.equal(v1Client, v1Server);
+  assert.notEqual(v1Client, legacyClient);
+});

@@ -172,3 +172,123 @@ test("different object property insertion order yields identical fingerprint", (
   });
   assert.equal(a, b);
 });
+
+/** Pre-extension digest for baseBooking — must stay byte-identical for Redis/DB replay. */
+const LEGACY_GOLDEN_FINGERPRINT =
+  "93a241f72de638f9f1bc1414f5eed576262be4fe78dc4a721df0a3e0ba8d63e2";
+
+const v1RoomCountsA = {
+  bedroom: 1,
+  livingRoom: 1,
+  kitchen: 1,
+  bathroom: 1,
+  separateWc: 0,
+  hallway: 1,
+  otherRoom: 0,
+};
+
+const v1RoomCountsB = {
+  ...v1RoomCountsA,
+  bedroom: 2,
+};
+
+test("legacy golden fingerprint is unchanged", () => {
+  assert.equal(
+    buildOrderRequestFingerprint({ ...baseBooking }),
+    LEGACY_GOLDEN_FINGERPRINT,
+  );
+});
+
+test("explicit cleaningPricingVersion legacy matches golden fingerprint", () => {
+  assert.equal(
+    buildOrderRequestFingerprint({
+      ...baseBooking,
+      cleaningPricingVersion: "legacy",
+      roomCounts: v1RoomCountsA,
+      areaM2: 90,
+      cleaningType: "deep",
+    }),
+    LEGACY_GOLDEN_FINGERPRINT,
+  );
+});
+
+test("cleaning v1 fingerprints differ by roomCounts, areaM2 and cleaningType", () => {
+  const baseV1 = {
+    ...baseBooking,
+    rooms: null as number | null,
+    cleaningPricingVersion: "v1" as const,
+    roomCounts: v1RoomCountsA,
+    areaM2: 80,
+    cleaningType: "standard",
+  };
+  const baseFp = buildOrderRequestFingerprint(baseV1);
+  assert.notEqual(baseFp, LEGACY_GOLDEN_FINGERPRINT);
+  assert.notEqual(
+    baseFp,
+    buildOrderRequestFingerprint({ ...baseV1, roomCounts: v1RoomCountsB }),
+  );
+  assert.notEqual(
+    baseFp,
+    buildOrderRequestFingerprint({ ...baseV1, areaM2: 120 }),
+  );
+  assert.notEqual(
+    baseFp,
+    buildOrderRequestFingerprint({ ...baseV1, cleaningType: "deep" }),
+  );
+});
+
+test("equivalent roomCounts key order yields identical v1 fingerprint", () => {
+  const a = buildOrderRequestFingerprint({
+    ...baseBooking,
+    rooms: null,
+    cleaningPricingVersion: "v1",
+    areaM2: 80,
+    cleaningType: "standard",
+    roomCounts: {
+      bedroom: 1,
+      livingRoom: 1,
+      kitchen: 1,
+      bathroom: 1,
+      separateWc: 0,
+      hallway: 1,
+      otherRoom: 0,
+    },
+  });
+  const b = buildOrderRequestFingerprint({
+    ...baseBooking,
+    rooms: null,
+    cleaningPricingVersion: "v1",
+    areaM2: 80,
+    cleaningType: "standard",
+    roomCounts: {
+      otherRoom: 0,
+      hallway: 1,
+      separateWc: 0,
+      bathroom: 1,
+      kitchen: 1,
+      livingRoom: 1,
+      bedroom: 1,
+    },
+  });
+  assert.equal(a, b);
+});
+
+test("areaM2 80 and 80.0 produce identical v1 fingerprints", () => {
+  const a = buildOrderRequestFingerprint({
+    ...baseBooking,
+    rooms: null,
+    cleaningPricingVersion: "v1",
+    roomCounts: v1RoomCountsA,
+    areaM2: 80,
+    cleaningType: "standard",
+  });
+  const b = buildOrderRequestFingerprint({
+    ...baseBooking,
+    rooms: null,
+    cleaningPricingVersion: "v1",
+    roomCounts: v1RoomCountsA,
+    areaM2: 80.0,
+    cleaningType: "standard",
+  });
+  assert.equal(a, b);
+});

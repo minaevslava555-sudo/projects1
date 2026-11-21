@@ -17,6 +17,11 @@ export type OrderRequestFingerprintInput = {
   rooms?: number | null;
   massageMinutes?: number | null;
   repairPhotoPaths?: string[] | null;
+  /** Included in hash only when === "v1" and service === "cleaning". */
+  cleaningPricingVersion?: string | null;
+  roomCounts?: Record<string, unknown> | null;
+  areaM2?: number | null;
+  cleaningType?: string | null;
 };
 
 function canonicalize(value: unknown): unknown {
@@ -50,7 +55,8 @@ export function buildOrderRequestFingerprint(
       : [...input.repairPhotoPaths].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
   // Fixed key set so missing optional fields are represented as null, not omitted.
-  const payload = {
+  // Cleaning v1 keys are appended only for cleaning + version "v1" so legacy digests stay byte-identical.
+  const payload: Record<string, unknown> = {
     accessInstructions: input.accessInstructions ?? null,
     apartmentFloor: input.apartmentFloor ?? null,
     city: input.city,
@@ -67,6 +73,13 @@ export function buildOrderRequestFingerprint(
     service: input.service,
     streetAddress: input.streetAddress,
   };
+
+  if (input.service === "cleaning" && input.cleaningPricingVersion === "v1") {
+    payload.areaM2 = input.areaM2 ?? null;
+    payload.cleaningPricingVersion = "v1";
+    payload.cleaningType = input.cleaningType ?? null;
+    payload.roomCounts = input.roomCounts ?? null;
+  }
 
   const canonical = canonicalize(payload);
   return createHash("sha256")
