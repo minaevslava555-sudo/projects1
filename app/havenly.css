@@ -27,7 +27,10 @@
   --motion-nav: 480ms;
   --motion-nav-rise: 10px;
   --motion-nav-stagger: 50ms;
+  /* Sequential home↔service: short pin fade, then subtle destination reveal. */
   --motion-view-crossfade: 400ms;
+  --motion-view-out: 160ms;
+  --motion-view-in: 220ms;
   --motion-view-rise: 10px;
   --motion-enter: 700ms;
   --motion-media: 1000ms;
@@ -36,15 +39,13 @@
   --radius-control: 12px;
 }
 
-/* Home ↔ service overlapping crossfade — opacity/transform only. */
+/*
+  Home ↔ service: sequential cover → reveal (not overlapping photo crossfade).
+  Paper fill avoids a blank hole while the pin exits and before incoming starts.
+*/
 .havenly-landing .view-crossfade {
   position: relative;
-}
-
-.havenly-landing .view-layer {
-  transition:
-    opacity var(--motion-view-crossfade) var(--motion-ease),
-    transform var(--motion-view-crossfade) var(--motion-ease);
+  background-color: var(--color-paper);
 }
 
 .havenly-landing .view-layer-in {
@@ -52,11 +53,19 @@
   z-index: 1;
   opacity: 0;
   transform: translateY(var(--motion-view-rise));
+  transition:
+    opacity var(--motion-view-in) var(--motion-ease),
+    transform var(--motion-view-in) var(--motion-ease);
 }
 
 .havenly-landing .view-layer-in.is-active {
   opacity: 1;
   transform: none;
+}
+
+/* While the pin covers the viewport, snap-hide the destination (no fade-under-pin). */
+.havenly-landing .view-crossfade.is-covering .view-layer-in {
+  transition: none;
 }
 
 .havenly-landing .view-layer-out {
@@ -68,6 +77,13 @@
   opacity: 1;
   transform: none;
   pointer-events: none;
+}
+
+@keyframes havenly-view-pin-exit {
+  to {
+    opacity: 0;
+    transform: translateY(calc(var(--motion-view-rise) * -0.4));
+  }
 }
 
 /*
@@ -92,8 +108,8 @@
 }
 
 .havenly-landing .view-layer-out.is-exit {
-  opacity: 0;
-  transform: translateY(calc(var(--motion-view-rise) * -0.4));
+  /* Animation (not transition) so the pin fade always runs after class toggle. */
+  animation: havenly-view-pin-exit var(--motion-view-out) var(--motion-ease) forwards;
 }
 
 .havenly-landing a {
@@ -443,6 +459,7 @@
     opacity: 1;
     transform: none;
     transition: none;
+    animation: none;
   }
 
   .havenly-landing .view-layer-out {

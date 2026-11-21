@@ -21,8 +21,9 @@ import {
   type ReactNode,
 } from "react";
 
-/** Matches `--motion-view-crossfade` in havenly.css. */
-const VIEW_CROSSFADE_MS = 400;
+/** Matches `--motion-view-out` / `--motion-view-in` in havenly.css. */
+const VIEW_OUT_MS = 160;
+const VIEW_IN_MS = 220;
 const IMAGE_READY_TIMEOUT_MS = 180;
 
 type CleaningRoomTab = "Kitchen" | "Rooms" | "Bathroom" | "Hallway";
@@ -67,13 +68,21 @@ function wait(ms: number): Promise<void> {
 
 function waitFrames(count: number): Promise<void> {
   return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
     let left = count;
     const step = () => {
       left -= 1;
-      if (left <= 0) resolve();
+      if (left <= 0) finish();
       else requestAnimationFrame(step);
     };
     requestAnimationFrame(step);
+    // If rAF is starved (long tasks / background), don't leave the cover stuck.
+    window.setTimeout(finish, Math.max(48, count * 32));
   });
 }
 
@@ -166,6 +175,8 @@ export default function Home() {
    */
   const [headerOnHero, setHeaderOnHero] = useState(true);
   const [incomingVisible, setIncomingVisible] = useState(true);
+  /** Snap-hides the destination under the pin; cleared just before reveal. */
+  const [viewCovering, setViewCovering] = useState(false);
   const [viewShellMinHeight, setViewShellMinHeight] = useState<number | null>(
     null,
   );
@@ -369,6 +380,7 @@ export default function Home() {
       setOutgoingView(undefined);
       setOutgoingExiting(false);
       setOutgoingScrollY(0);
+      setViewCovering(false);
       setHeaderOnHero(next === null);
       setIncomingVisible(true);
       setViewShellMinHeight(null);
@@ -402,6 +414,7 @@ export default function Home() {
     setOutgoingScrollY(scrollY);
     setOutgoingView(from);
     setOutgoingExiting(false);
+    setViewCovering(true);
     setIncomingVisible(false);
     setActiveServiceView(next);
     activeServiceViewRef.current = next;
@@ -420,11 +433,19 @@ export default function Home() {
     await waitFrames(1);
     if (gen !== viewTransitionGen.current) return;
 
-    // Overlap: outgoing fades out while incoming fades in.
+    // Sequential: fade the pinned cover first (destination stays snap-hidden), then
+    // reveal the destination on paper — avoids hero/card ↔ gallery double-exposure.
     setOutgoingExiting(true);
-    setIncomingVisible(true);
+    await wait(VIEW_OUT_MS);
+    if (gen !== viewTransitionGen.current) return;
 
-    await wait(VIEW_CROSSFADE_MS);
+    // Re-enable incoming transitions, paint one frame at opacity 0, then reveal.
+    setViewCovering(false);
+    await waitFrames(2);
+    if (gen !== viewTransitionGen.current) return;
+
+    setIncomingVisible(true);
+    await wait(VIEW_IN_MS);
     if (gen !== viewTransitionGen.current) return;
 
     setOutgoingView(undefined);
@@ -1045,7 +1066,7 @@ export default function Home() {
       <main id="top" inert={navOpen}>
         <div
           ref={viewShellRef}
-          className="view-crossfade"
+          className={`view-crossfade${viewCovering ? " is-covering" : ""}`}
           style={
             viewShellMinHeight != null
               ? { minHeight: viewShellMinHeight }
