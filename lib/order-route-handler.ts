@@ -214,6 +214,11 @@ function asPositiveInt(value: unknown, max: number) {
   return num;
 }
 
+/** Server-only Preview/test gate. Default off; never set in Production by this change. */
+function isCleaningV1OrdersEnabled(): boolean {
+  return process.env.CLEANING_V1_ORDERS_ENABLED === "true";
+}
+
 /** Reject Cleaning v1 / mixed payloads until v1 order processing is enabled. */
 function rejectUnsupportedCleaningPricingVersion(
   raw: Record<string, unknown>,
@@ -363,7 +368,52 @@ type ValidatedBookingFields = {
   rooms: number | null;
   massageMinutes: number | null;
   repairPhotoPaths: string[];
+  /** Present only for gated Cleaning v1 bookings. */
+  cleaningV1?: CleaningV1OrderFields;
 };
+
+function formatCleaningV1RoomComposition(
+  roomCounts: CleaningV1OrderFields["roomCounts"],
+): string {
+  const parts: string[] = [];
+  const labels: Array<[keyof typeof roomCounts, string]> = [
+    ["bedroom", "bedroom"],
+    ["livingRoom", "living room"],
+    ["kitchen", "kitchen"],
+    ["bathroom", "bathroom"],
+    ["separateWc", "separate WC"],
+    ["hallway", "hallway"],
+    ["otherRoom", "other"],
+  ];
+  for (const [key, label] of labels) {
+    const count = roomCounts[key];
+    if (count > 0) {
+      parts.push(`${count} ${label}${count === 1 ? "" : "s"}`);
+    }
+  }
+  return parts.length > 0 ? parts.join(", ") : "no rooms";
+}
+
+function buildCleaningV1OrderDetails(
+  cleaningV1: CleaningV1OrderFields,
+  pricingSnapshot: Record<string, unknown> | null | undefined,
+  pricingMode: "fixed" | "quote",
+): string {
+  const typeLabel =
+    cleaningV1.cleaningType === "post_renovation"
+      ? "post-renovation"
+      : cleaningV1.cleaningType;
+  const composition = formatCleaningV1RoomComposition(cleaningV1.roomCounts);
+  const base = `Cleaning v1 · ${typeLabel} · ${cleaningV1.areaM2} m² · ${composition}`;
+  if (pricingMode === "quote" || pricingSnapshot?.adminReviewRequired === true) {
+    return `${base} · manual review required (area over 180 m²)`;
+  }
+  const billableHours = pricingSnapshot?.billableHours;
+  if (typeof billableHours === "number" && Number.isFinite(billableHours)) {
+    return `${base} · ${billableHours} billable person-hours`;
+  }
+  return base;
+}
 
 function parseValidatedBookingFields(
   raw: Record<string, unknown>,
@@ -424,9 +474,28 @@ function parseValidatedBookingFields(
     }
   }
 
+  let cleaningV1: CleaningV1OrderFields | undefined;
+  let validatedRooms = rooms;
+
   if (service === "cleaning") {
-    const cleaningVersionError = rejectUnsupportedCleaningPricingVersion(raw);
-    if (cleaningVersionError) return cleaningVersionError;
+    if (raw.cleaningPricingVersion === "v1") {
+      if (!isCleaningV1OrdersEnabled()) {
+        return {
+          ok: false,
+          message: "Cleaning v1 пока недоступна",
+          status: 400,
+        };
+      }
+      const parsedV1 = parseCleaningV1OrderFields(raw);
+      if (!parsedV1.ok) {
+        return { ok: false, message: parsedV1.error, status: 400 };
+      }
+      cleaningV1 = parsedV1.value;
+      validatedRooms = null;
+    } else {
+      const cleaningVersionError = rejectUnsupportedCleaningPricingVersion(raw);
+      if (cleaningVersionError) return cleaningVersionError;
+    }
   }
 
   return {
@@ -446,9 +515,10 @@ function parseValidatedBookingFields(
       problemDescription:
         problemDescription === "invalid" ? undefined : problemDescription,
       massageCategory: massageCategory === "invalid" ? undefined : massageCategory,
-      rooms,
+      rooms: validatedRooms,
       massageMinutes,
       repairPhotoPaths,
+      cleaningV1,
     },
   };
 }
@@ -516,6 +586,7 @@ export async function handleOrderPost(
       rooms,
       massageMinutes,
       repairPhotoPaths,
+      cleaningV1,
     } = validated.fields;
 
     const requestFingerprint = buildOrderRequestFingerprint({
@@ -536,6 +607,14 @@ export async function handleOrderPost(
       rooms,
       massageMinutes,
       repairPhotoPaths,
+      ...(cleaningV1
+        ? {
+            cleaningPricingVersion: "v1" as const,
+            roomCounts: cleaningV1.roomCounts,
+            areaM2: cleaningV1.areaM2,
+            cleaningType: cleaningV1.cleaningType,
+          }
+        : {}),
     });
 
     const existing = await deps.getIdempotentOrder(idempotencyKey);
@@ -641,11 +720,23 @@ export async function handleOrderPost(
       return failBeforeSave(bound.error, 400);
     }
 
-    const pricingResult = await deps.resolveOrderPricing({
-      service,
-      rooms: rooms ?? undefined,
-      massageMinutes: massageMinutes ?? undefined,
-    });
+    const pricingResult = await deps.resolveOrderPricing(
+      cleaningV1
+        ? {
+            service: "cleaning",
+            cleaningPricingVersion: "v1",
+            cleaningV1: {
+              roomCounts: cleaningV1.roomCounts,
+              areaM2: cleaningV1.areaM2,
+              cleaningType: cleaningV1.cleaningType,
+            },
+          }
+        : {
+            service,
+            rooms: rooms ?? undefined,
+            massageMinutes: massageMinutes ?? undefined,
+          },
+    );
     if (!pricingResult.ok) {
       return failBeforeSave(pricingResult.message, pricingResult.status);
     }
@@ -658,7 +749,11 @@ export async function handleOrderPost(
     } = pricingResult;
 
     let orderDetails = details ?? undefined;
-    if (service === "cleaning" && priced.mode === "fixed") {
+    if (cleaningV1) {
+      orderDetails =
+        orderDetails ??
+        buildCleaningV1OrderDetails(cleaningV1, pricingSnapshot, priced.mode);
+    } else if (service === "cleaning" && priced.mode === "fixed") {
       orderDetails =
         orderDetails ??
         `${rooms} room(s) require ~${priced.hours} hours and ${priced.workers} cleaner(s)`;
@@ -676,6 +771,7 @@ export async function handleOrderPost(
     }
 
     const orderRef = deps.generateOrderRef();
+    const isCleaningV1 = cleaningV1 != null;
 
     saveStarted = true;
     let id: string;
@@ -694,9 +790,12 @@ export async function handleOrderPost(
         apartmentFloor,
         accessInstructions,
         details: orderDetails,
-        rooms: service === "cleaning" ? rooms ?? undefined : undefined,
-        hours: priced.mode === "fixed" ? priced.hours : undefined,
-        workers: priced.mode === "fixed" ? priced.workers : undefined,
+        rooms:
+          service === "cleaning" && !isCleaningV1 ? rooms ?? undefined : undefined,
+        hours:
+          !isCleaningV1 && priced.mode === "fixed" ? priced.hours : undefined,
+        workers:
+          !isCleaningV1 && priced.mode === "fixed" ? priced.workers : undefined,
         massageMinutes: priced.mode === "fixed" ? priced.massageMinutes : undefined,
         massageCategory: service === "massage" ? massageCategory : undefined,
         problemDescription: service === "repair" ? problemDescription : undefined,
@@ -772,9 +871,12 @@ export async function handleOrderPost(
         apartmentFloor,
         accessInstructions,
         details: orderDetails,
-        rooms: service === "cleaning" ? rooms ?? undefined : undefined,
-        hours: priced.mode === "fixed" ? priced.hours : undefined,
-        workers: priced.mode === "fixed" ? priced.workers : undefined,
+        rooms:
+          service === "cleaning" && !isCleaningV1 ? rooms ?? undefined : undefined,
+        hours:
+          !isCleaningV1 && priced.mode === "fixed" ? priced.hours : undefined,
+        workers:
+          !isCleaningV1 && priced.mode === "fixed" ? priced.workers : undefined,
         massageMinutes: priced.mode === "fixed" ? priced.massageMinutes : undefined,
         massageCategory: service === "massage" ? massageCategory : undefined,
         problemDescription: service === "repair" ? problemDescription : undefined,

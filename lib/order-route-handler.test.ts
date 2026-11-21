@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildOrderRequestFingerprint } from "./order-request-fingerprint";
+import { resolveOrderPricing } from "./order-pricing";
 import {
   handleOrderPost,
   parseCleaningV1OrderFields,
@@ -2382,4 +2383,416 @@ test("parseCleaningV1OrderFields rejects unknown or missing version", () => {
     }).ok,
     false,
   );
+});
+
+const v1RoomsA = {
+  bedroom: 1,
+  livingRoom: 1,
+  kitchen: 1,
+  bathroom: 1,
+  separateWc: 0,
+  hallway: 1,
+  otherRoom: 0,
+};
+
+async function withCleaningV1Enabled<T>(run: () => Promise<T>): Promise<T> {
+  const previous = process.env.CLEANING_V1_ORDERS_ENABLED;
+  process.env.CLEANING_V1_ORDERS_ENABLED = "true";
+  try {
+    return await run();
+  } finally {
+    if (previous === undefined) {
+      delete process.env.CLEANING_V1_ORDERS_ENABLED;
+    } else {
+      process.env.CLEANING_V1_ORDERS_ENABLED = previous;
+    }
+  }
+}
+
+function cleaningV1OrderBody(
+  idempotencyKey: string,
+  extra: Record<string, unknown> = {},
+) {
+  return {
+    turnstileToken: "test-turnstile-token",
+    idempotencyKey,
+    draftToken: "test-draft-token",
+    name: PRECLAIM_BOOKING.name,
+    phone: PRECLAIM_BOOKING.phone,
+    service: "cleaning" as const,
+    date: PRECLAIM_BOOKING.date,
+    preferredTime: PRECLAIM_BOOKING.preferredTime,
+    streetAddress: PRECLAIM_BOOKING.streetAddress,
+    city: PRECLAIM_BOOKING.city,
+    cleaningPricingVersion: "v1",
+    roomCounts: v1RoomsA,
+    areaM2: 55,
+    cleaningType: "standard",
+    ...extra,
+  };
+}
+
+function v1Fingerprint(extra: Record<string, unknown> = {}) {
+  const body = cleaningV1OrderBody("unused", extra);
+  return buildOrderRequestFingerprint({
+    name: body.name,
+    phone: body.phone,
+    service: "cleaning",
+    date: body.date,
+    preferredTime: body.preferredTime,
+    streetAddress: body.streetAddress,
+    city: body.city,
+    apartmentFloor: null,
+    accessInstructions: null,
+    details: null,
+    problemDescription: null,
+    massageCategory: null,
+    rooms: null,
+    massageMinutes: null,
+    repairPhotoPaths: [],
+    cleaningPricingVersion: "v1",
+    roomCounts: body.roomCounts as Record<string, unknown>,
+    areaM2: body.areaM2 as number,
+    cleaningType: body.cleaningType as string,
+  });
+}
+
+function createCleaningV1EnabledDeps(options?: {
+  initialRedis?: {
+    id: string;
+    orderRef: string;
+    pricingMode: "fixed" | "quote";
+    priceEuro: number | null;
+    telegramOk: boolean;
+  } | null;
+  initialDbFingerprint?: string | null;
+}) {
+  const claimPayload = JSON.stringify({
+    id: "__pending__",
+    orderRef: "",
+    pricingMode: "fixed",
+    priceEuro: null,
+    telegramOk: false,
+    claimToken: "v1-enabled-token",
+  });
+  let saveCalls = 0;
+  let notifyCalls = 0;
+  let claimCalls = 0;
+  const saveArgs: unknown[] = [];
+  let redisCompleted = options?.initialRedis ?? null;
+  const dbFingerprint = options?.initialDbFingerprint ?? null;
+
+  const fakeDeps = {
+    cleanupOrphanRepairPhotos: async () => ({ drafts: 0, files: 0 }),
+    clientIpFromHeaders: () => "127.0.0.1",
+    consumeRateLimit: async () => ({ ok: true as const, remaining: 9 }),
+    verifyTurnstileToken: async () => ({ ok: true }),
+    normalizeIdempotencyKey: (value: unknown) => {
+      if (typeof value !== "string") return null;
+      const text = value.trim();
+      return text || null;
+    },
+    getIdempotentOrder: async () => redisCompleted,
+    claimIdempotencyKeyWithToken: async () => {
+      claimCalls += 1;
+      return { status: "claimed" as const, claimPayload };
+    },
+    releasePendingIdempotencyKey: async () => true,
+    storeIdempotentOrder: async (
+      _key: string,
+      value: {
+        id: string;
+        orderRef: string;
+        pricingMode: "fixed" | "quote";
+        priceEuro: number | null;
+        telegramOk: boolean;
+      },
+    ) => {
+      redisCompleted = value;
+    },
+    finalizePendingIdempotencyKey: async (
+      _key: string,
+      _claim: string,
+      value: {
+        id: string;
+        orderRef: string;
+        pricingMode: "fixed" | "quote";
+        priceEuro: number | null;
+        telegramOk: boolean;
+      },
+    ) => {
+      redisCompleted = value;
+      return "finalized" as const;
+    },
+    verifyDraftToken: () => ({
+      ok: true as const,
+      draftId: "draft-cleaning-v1-enabled",
+      exp: 1_900_000_000,
+    }),
+    isDraftConsumed: async () => false,
+    assertPhotosBelongToDraft: async () => ({ ok: true as const }),
+    markDraftConsumed: async () => undefined,
+    resolveOrderPricing,
+    generateOrderRef: () => "HV-V1-OK",
+    saveOrderToSupabase: async (order: unknown) => {
+      saveCalls += 1;
+      saveArgs.push(order);
+      return { id: "ord-v1-1", orderRef: "HV-V1-OK" };
+    },
+    findOrderByIdempotencyKey: async () => {
+      if (!redisCompleted || redisCompleted.id === "__pending__") {
+        if (dbFingerprint == null) return null;
+        return {
+          id: "ord-v1-1",
+          orderRef: "HV-V1-OK",
+          pricingMode: "fixed" as const,
+          priceEuro: 70,
+          requestFingerprint: dbFingerprint,
+        };
+      }
+      return {
+        id: redisCompleted.id,
+        orderRef: redisCompleted.orderRef,
+        pricingMode: redisCompleted.pricingMode,
+        priceEuro: redisCompleted.priceEuro,
+        requestFingerprint: dbFingerprint ?? v1Fingerprint(),
+      };
+    },
+    notifyAdminAboutOrder: async () => {
+      notifyCalls += 1;
+    },
+  } satisfies OrderRouteDeps;
+
+  return {
+    fakeDeps,
+    counters: () => ({
+      saveCalls,
+      notifyCalls,
+      claimCalls,
+      saveArgs: [...saveArgs],
+    }),
+  };
+}
+
+test("feature gate defaults to off for Cleaning v1", async () => {
+  const previous = process.env.CLEANING_V1_ORDERS_ENABLED;
+  delete process.env.CLEANING_V1_ORDERS_ENABLED;
+  try {
+    const { fakeDeps, counters } = createCleaningVersionRejectionDeps();
+    const response = await handleOrderPost(
+      new Request("http://localhost/api/order", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(cleaningV1OrderBody("idem-v1-gate-default-off")),
+      }),
+      fakeDeps,
+    );
+    const body = (await response.json()) as { ok: boolean; error?: string };
+    const c = counters();
+    assert.equal(response.status, 400);
+    assert.equal(body.error, "Cleaning v1 пока недоступна");
+    assert.equal(c.claimCalls, 0);
+    assert.equal(c.saveCalls, 0);
+    assert.equal(c.notifyCalls, 0);
+  } finally {
+    if (previous === undefined) {
+      delete process.env.CLEANING_V1_ORDERS_ENABLED;
+    } else {
+      process.env.CLEANING_V1_ORDERS_ENABLED = previous;
+    }
+  }
+});
+
+test("enabled Cleaning v1 fixed-price booking saves snapshot without legacy rooms", async () => {
+  await withCleaningV1Enabled(async () => {
+    const { fakeDeps, counters } = createCleaningV1EnabledDeps();
+    const response = await handleOrderPost(
+      new Request("http://localhost/api/order", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(cleaningV1OrderBody("idem-v1-fixed")),
+      }),
+      fakeDeps,
+    );
+    const body = (await response.json()) as {
+      ok: boolean;
+      pricingMode?: string;
+      priceEuro?: number | null;
+    };
+    const c = counters();
+    assert.equal(response.status, 200);
+    assert.equal(body.ok, true);
+    assert.equal(body.pricingMode, "fixed");
+    assert.equal(body.priceEuro, 70);
+    assert.equal(c.saveCalls, 1);
+    assert.equal(c.notifyCalls, 1);
+    const saved = c.saveArgs[0] as {
+      rooms?: number;
+      hours?: number;
+      workers?: number;
+      pricingSnapshot?: Record<string, unknown>;
+      details?: string;
+      priceEuro?: number | null;
+      pricingMode?: string;
+    };
+    assert.equal(saved.rooms, undefined);
+    assert.equal(saved.hours, undefined);
+    assert.equal(saved.workers, undefined);
+    assert.equal(saved.pricingMode, "fixed");
+    assert.equal(saved.priceEuro, 70);
+    assert.equal(saved.pricingSnapshot?.cleaningPricingVersion, "v1");
+    assert.equal(saved.pricingSnapshot?.adminReviewRequired, false);
+    assert.equal(saved.pricingSnapshot?.customerPriceEuro, 70);
+    assert.match(String(saved.details), /Cleaning v1/);
+    assert.match(String(saved.details), /billable person-hours/);
+    assert.doesNotMatch(String(saved.details), /undefined/);
+  });
+});
+
+test("enabled Cleaning v1 area 181 returns quote with null price", async () => {
+  await withCleaningV1Enabled(async () => {
+    const { fakeDeps, counters } = createCleaningV1EnabledDeps();
+    const response = await handleOrderPost(
+      new Request("http://localhost/api/order", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(
+          cleaningV1OrderBody("idem-v1-quote", { areaM2: 181 }),
+        ),
+      }),
+      fakeDeps,
+    );
+    const body = (await response.json()) as {
+      ok: boolean;
+      pricingMode?: string;
+      priceEuro?: number | null;
+    };
+    const c = counters();
+    assert.equal(response.status, 200);
+    assert.equal(body.ok, true);
+    assert.equal(body.pricingMode, "quote");
+    assert.equal(body.priceEuro, null);
+    assert.equal(c.saveCalls, 1);
+    const saved = c.saveArgs[0] as {
+      pricingMode?: string;
+      priceEuro?: number | null;
+      pricingSnapshot?: Record<string, unknown>;
+      details?: string;
+      rooms?: number;
+    };
+    assert.equal(saved.pricingMode, "quote");
+    assert.equal(saved.priceEuro, null);
+    assert.equal(saved.rooms, undefined);
+    assert.equal(saved.pricingSnapshot?.adminReviewRequired, true);
+    assert.equal(saved.pricingSnapshot?.customerPriceEuro, null);
+    assert.match(String(saved.details), /manual review required/);
+  });
+});
+
+test("enabled Cleaning v1 rejects invalid and mixed requests before side effects", async () => {
+  await withCleaningV1Enabled(async () => {
+    const { fakeDeps, counters } = createCleaningV1EnabledDeps();
+    const invalid = await handleOrderPost(
+      new Request("http://localhost/api/order", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(
+          cleaningV1OrderBody("idem-v1-invalid", { areaM2: "80" }),
+        ),
+      }),
+      fakeDeps,
+    );
+    assert.equal(invalid.status, 400);
+    assert.equal(counters().claimCalls, 0);
+    assert.equal(counters().saveCalls, 0);
+
+    const mixed = await handleOrderPost(
+      new Request("http://localhost/api/order", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(
+          cleaningV1OrderBody("idem-v1-mixed", { rooms: 2 }),
+        ),
+      }),
+      fakeDeps,
+    );
+    const mixedBody = (await mixed.json()) as { ok: boolean; error?: string };
+    assert.equal(mixed.status, 400);
+    assert.match(String(mixedBody.error), /rooms/);
+    assert.equal(counters().saveCalls, 0);
+    assert.equal(counters().notifyCalls, 0);
+  });
+});
+
+test("enabled Cleaning v1 different payload with same idempotency key returns 409", async () => {
+  await withCleaningV1Enabled(async () => {
+    const fingerprint = v1Fingerprint();
+    const { fakeDeps, counters } = createCleaningV1EnabledDeps({
+      initialRedis: {
+        id: "ord-v1-1",
+        orderRef: "HV-V1-OK",
+        pricingMode: "fixed",
+        priceEuro: 70,
+        telegramOk: true,
+      },
+      initialDbFingerprint: fingerprint,
+    });
+
+    const response = await handleOrderPost(
+      new Request("http://localhost/api/order", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(
+          cleaningV1OrderBody("idem-v1-fp-mismatch", {
+            cleaningType: "deep",
+          }),
+        ),
+      }),
+      fakeDeps,
+    );
+    const body = (await response.json()) as { ok: boolean; error?: string };
+    assert.equal(response.status, 409);
+    assert.equal(body.ok, false);
+    assert.equal(counters().saveCalls, 0);
+    assert.equal(counters().notifyCalls, 0);
+  });
+});
+
+test("enabled Cleaning v1 identical replay returns 200 without duplicate save or notify", async () => {
+  await withCleaningV1Enabled(async () => {
+    const fingerprint = v1Fingerprint();
+    const { fakeDeps, counters } = createCleaningV1EnabledDeps({
+      initialRedis: {
+        id: "ord-v1-1",
+        orderRef: "HV-V1-OK",
+        pricingMode: "fixed",
+        priceEuro: 70,
+        telegramOk: true,
+      },
+      initialDbFingerprint: fingerprint,
+    });
+
+    const response = await handleOrderPost(
+      new Request("http://localhost/api/order", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(cleaningV1OrderBody("idem-v1-replay")),
+      }),
+      fakeDeps,
+    );
+    const body = (await response.json()) as {
+      ok: boolean;
+      id?: string;
+      orderRef?: string;
+      priceEuro?: number | null;
+    };
+    assert.equal(response.status, 200);
+    assert.equal(body.ok, true);
+    assert.equal(body.id, "ord-v1-1");
+    assert.equal(body.orderRef, "HV-V1-OK");
+    assert.equal(body.priceEuro, 70);
+    assert.equal(counters().saveCalls, 0);
+    assert.equal(counters().notifyCalls, 0);
+    assert.equal(counters().claimCalls, 0);
+  });
 });
