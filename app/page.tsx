@@ -6,11 +6,8 @@ import BookingWizard from "@/components/booking-wizard";
 import { readBookingAttempt } from "@/lib/booking-attempt";
 import LanguageSwitcher from "@/components/language-switcher";
 import ServiceDetailView from "@/components/service-detail-view";
-import {
-  MASSAGE_CATEGORIES,
-  type MassageCategoryId,
-} from "@/lib/massage-catalog";
-import { SERVICE_HOTSPOTS, type ServiceValue } from "@/lib/service-hotspots";
+import { type MassageCategoryId } from "@/lib/massage-catalog";
+import { type ServiceValue } from "@/lib/service-hotspots";
 import { useTranslations } from "next-intl";
 import {
   useEffect,
@@ -20,11 +17,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-
-/** Matches `--motion-view-out` / `--motion-view-in` in havenly.css. */
-const VIEW_OUT_MS = 160;
-const VIEW_IN_MS = 220;
-const IMAGE_READY_TIMEOUT_MS = 180;
+import { flushSync } from "react-dom";
 
 type CleaningRoomTab = "Kitchen" | "Rooms" | "Bathroom" | "Hallway";
 type MassageFocusTab = "Back" | "Legs" | "Face";
@@ -53,71 +46,6 @@ function landingScrollBehavior(): ScrollBehavior {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches
     ? "auto"
     : "smooth";
-}
-
-function prefersReducedMotion(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-}
-
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, ms);
-  });
-}
-
-function waitFrames(count: number): Promise<void> {
-  return new Promise((resolve) => {
-    let settled = false;
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      resolve();
-    };
-    let left = count;
-    const step = () => {
-      left -= 1;
-      if (left <= 0) finish();
-      else requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
-    // If rAF is starved (long tasks / background), don't leave the cover stuck.
-    window.setTimeout(finish, Math.max(48, count * 32));
-  });
-}
-
-/** Resolve when decoded/cached, on error, or after timeout — never hang the swap. */
-function preloadImage(src: string, timeoutMs: number): Promise<void> {
-  return new Promise((resolve) => {
-    let settled = false;
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      resolve();
-    };
-    const timer = window.setTimeout(finish, timeoutMs);
-    const img = new window.Image();
-    img.onload = () => {
-      window.clearTimeout(timer);
-      finish();
-    };
-    img.onerror = () => {
-      window.clearTimeout(timer);
-      finish();
-    };
-    img.src = src;
-    if (img.complete) {
-      window.clearTimeout(timer);
-      finish();
-    }
-  });
-}
-
-function primaryServiceImage(service: ServiceValue): string {
-  if (service === "massage") {
-    return MASSAGE_CATEGORIES[0]?.image ?? LANDING_MEDIA.massage;
-  }
-  return SERVICE_HOTSPOTS[service].scenes[0]?.image ?? LANDING_MEDIA[service];
 }
 
 function Reveal({
@@ -162,26 +90,11 @@ export default function Home() {
   const [bookingSession, setBookingSession] = useState(0);
   const [service, setService] = useState<ServiceValue>("cleaning");
   const [activeServiceView, setActiveServiceView] = useState<ServiceValue | null>(null);
-  /** Previous view held for overlapping fade-out; `undefined` = no outgoing layer. */
-  const [outgoingView, setOutgoingView] = useState<
-    ServiceValue | null | undefined
-  >(undefined);
-  const [outgoingExiting, setOutgoingExiting] = useState(false);
-  /** Scroll offset baked into the outgoing pin so card-click scrollTo(0) stays covered. */
-  const [outgoingScrollY, setOutgoingScrollY] = useState(0);
   /**
-   * Header chrome follows the DESTINATION view, switched under the outgoing pin
-   * before incoming becomes visible — avoids the 74–78px absolute→relative dock jump.
+   * Header chrome follows the active view. Updated in the same flushSync as the
+   * view swap so absolute↔relative docking does not paint a layout jump.
    */
   const [headerOnHero, setHeaderOnHero] = useState(true);
-  const [incomingVisible, setIncomingVisible] = useState(true);
-  /** Snap-hides the destination under the pin; cleared just before reveal. */
-  const [viewCovering, setViewCovering] = useState(false);
-  /** Opaque paper over pinned home media so Cleaning cards never flash on other services. */
-  const [outgoingMediaMasked, setOutgoingMediaMasked] = useState(false);
-  const [viewShellMinHeight, setViewShellMinHeight] = useState<number | null>(
-    null,
-  );
   const [lockService, setLockService] = useState(false);
   const [massageCategoryId, setMassageCategoryId] = useState<MassageCategoryId | null>(
     null,
@@ -194,11 +107,9 @@ export default function Home() {
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const mobileNavRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLElement>(null);
-  const viewTransitionGen = useRef(0);
   const activeServiceViewRef = useRef<ServiceValue | null>(null);
   const viewShellRef = useRef<HTMLDivElement>(null);
   const incomingLayerRef = useRef<HTMLDivElement>(null);
-  const crossfadeIdleRef = useRef(true);
   /** Soft-zoom hero only on the first home paint — avoids expansion on return. */
   const heroZoomOnceRef = useRef(true);
 
@@ -370,33 +281,10 @@ export default function Home() {
     }
   }
 
-  async function transitionTo(next: ServiceValue | null) {
-    if (next === activeServiceViewRef.current && crossfadeIdleRef.current) {
+  function transitionTo(next: ServiceValue | null) {
+    if (next === activeServiceViewRef.current) {
       return;
     }
-
-    const gen = ++viewTransitionGen.current;
-    const from = activeServiceViewRef.current;
-
-    if (prefersReducedMotion()) {
-      setOutgoingView(undefined);
-      setOutgoingExiting(false);
-      setOutgoingScrollY(0);
-      setViewCovering(false);
-      setOutgoingMediaMasked(false);
-      setHeaderOnHero(next === null);
-      setIncomingVisible(true);
-      setViewShellMinHeight(null);
-      crossfadeIdleRef.current = true;
-      setActiveServiceView(next);
-      activeServiceViewRef.current = next;
-      window.scrollTo({ top: 0, behavior: "auto" });
-      return;
-    }
-
-    const imageSrc =
-      next === null ? LANDING_MEDIA.hero : primaryServiceImage(next);
-    const imageReady = preloadImage(imageSrc, IMAGE_READY_TIMEOUT_MS);
 
     const focused = document.activeElement;
     if (
@@ -406,67 +294,21 @@ export default function Home() {
       focused.blur();
     }
 
-    const shellHeight = viewShellRef.current?.offsetHeight ?? null;
-    if (shellHeight) {
-      setViewShellMinHeight(shellHeight);
-    }
-
-    const scrollY = window.scrollY || 0;
-    // Leaving home: mask pinned homepage photos (Cleaning card flashes on Massage/Repairs).
-    const maskHomeMedia = from === null && next !== null;
-
-    crossfadeIdleRef.current = false;
-    setOutgoingScrollY(scrollY);
-    setOutgoingView(from);
-    setOutgoingExiting(false);
-    setOutgoingMediaMasked(maskHomeMedia);
-    setViewCovering(true);
-    setIncomingVisible(false);
-    setActiveServiceView(next);
-    activeServiceViewRef.current = next;
-
-    // Paint the viewport pin with the CURRENT header first so pin translateY(-scrollY)
-    // matches the frozen pixels. Then dock destination header under the cover before
-    // the incoming view fades in — no absolute→relative jump after reveal.
-    await Promise.all([imageReady, waitFrames(2)]);
-    if (gen !== viewTransitionGen.current) return;
-
-    setHeaderOnHero(next === null);
-    await waitFrames(1);
-    if (gen !== viewTransitionGen.current) return;
-
+    // Commit view + header together, then scroll — all before the next paint so
+    // there is no pin/mask/cover frame and no absolute↔relative header jump.
+    flushSync(() => {
+      setHeaderOnHero(next === null);
+      setActiveServiceView(next);
+      activeServiceViewRef.current = next;
+    });
     window.scrollTo({ top: 0, behavior: "auto" });
-    await waitFrames(1);
-    if (gen !== viewTransitionGen.current) return;
-
-    // Sequential: fade the pinned cover first (destination stays snap-hidden), then
-    // reveal the destination on paper — avoids hero/card ↔ gallery double-exposure.
-    setOutgoingExiting(true);
-    await wait(VIEW_OUT_MS);
-    if (gen !== viewTransitionGen.current) return;
-
-    // Re-enable incoming transitions, paint one frame at opacity 0, then reveal.
-    setViewCovering(false);
-    await waitFrames(2);
-    if (gen !== viewTransitionGen.current) return;
-
-    setIncomingVisible(true);
-    await wait(VIEW_IN_MS);
-    if (gen !== viewTransitionGen.current) return;
-
-    setOutgoingView(undefined);
-    setOutgoingExiting(false);
-    setOutgoingScrollY(0);
-    setOutgoingMediaMasked(false);
-    setViewShellMinHeight(null);
-    crossfadeIdleRef.current = true;
     focusIncomingView(next);
   }
 
   function openServiceView(value: ServiceValue) {
     setNavOpen(false);
     setService(value);
-    void transitionTo(value);
+    transitionTo(value);
   }
 
   function openOrder(
@@ -487,24 +329,22 @@ export default function Home() {
 
   function goHome() {
     setNavOpen(false);
-    void transitionTo(null);
+    transitionTo(null);
   }
 
   function onNavClick(href: string) {
     setNavOpen(false);
     const behavior = landingScrollBehavior();
-    void (async () => {
-      if (activeServiceViewRef.current !== null) {
-        await transitionTo(null);
-      }
-      if (href === "#top") {
-        window.setTimeout(() => window.scrollTo({ top: 0, behavior }), 0);
-        return;
-      }
-      window.setTimeout(() => {
-        document.querySelector(href)?.scrollIntoView({ behavior, block: "start" });
-      }, 50);
-    })();
+    if (activeServiceViewRef.current !== null) {
+      transitionTo(null);
+    }
+    if (href === "#top") {
+      window.setTimeout(() => window.scrollTo({ top: 0, behavior }), 0);
+      return;
+    }
+    window.setTimeout(() => {
+      document.querySelector(href)?.scrollIntoView({ behavior, block: "start" });
+    }, 50);
   }
 
   const heroMediaClassName = heroZoomOnceRef.current
@@ -1071,49 +911,8 @@ export default function Home() {
       </header>
 
       <main id="top" inert={navOpen}>
-        <div
-          ref={viewShellRef}
-          className={`view-crossfade${viewCovering ? " is-covering" : ""}`}
-          style={
-            viewShellMinHeight != null
-              ? { minHeight: viewShellMinHeight }
-              : undefined
-          }
-          aria-busy={outgoingView !== undefined}
-        >
-          {outgoingView !== undefined ? (
-            <div
-              className={`view-layer view-layer-out is-viewport-pin${outgoingExiting ? " is-exit" : ""}${outgoingMediaMasked ? " is-media-masked" : ""}`}
-              aria-hidden="true"
-              inert
-            >
-              <div
-                className="view-layer-out-pin"
-                style={
-                  outgoingScrollY
-                    ? { transform: `translateY(-${outgoingScrollY}px)` }
-                    : undefined
-                }
-              >
-                {outgoingView ? (
-                  <ServiceDetailView
-                    key={outgoingView}
-                    service={outgoingView}
-                    onBack={goHome}
-                    onBook={(categoryId) =>
-                      openOrder(outgoingView, true, categoryId ?? null)
-                    }
-                  />
-                ) : (
-                  renderHomeSections()
-                )}
-              </div>
-            </div>
-          ) : null}
-          <div
-            ref={incomingLayerRef}
-            className={`view-layer view-layer-in${incomingVisible ? " is-active" : ""}`}
-          >
+        <div ref={viewShellRef} className="view-shell">
+          <div ref={incomingLayerRef} className="view-layer">
             {activeServiceView ? (
               <ServiceDetailView
                 key={activeServiceView}
@@ -1176,7 +975,7 @@ export default function Home() {
                 <a
                   href="#faq"
                   className="transition hover:text-white"
-                  onClick={() => void transitionTo(null)}
+                  onClick={() => transitionTo(null)}
                 >
                   {t("Footer.faq")}
                 </a>

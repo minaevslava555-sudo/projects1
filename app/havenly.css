@@ -27,11 +27,6 @@
   --motion-nav: 480ms;
   --motion-nav-rise: 10px;
   --motion-nav-stagger: 50ms;
-  /* Sequential home↔service: short pin fade, then subtle destination reveal. */
-  --motion-view-crossfade: 400ms;
-  --motion-view-out: 160ms;
-  --motion-view-in: 220ms;
-  --motion-view-rise: 10px;
   --motion-enter: 700ms;
   --motion-media: 1000ms;
   --motion-rise: 1rem;
@@ -39,90 +34,13 @@
   --radius-control: 12px;
 }
 
-/*
-  Home ↔ service: sequential cover → reveal (not overlapping photo crossfade).
-  Paper fill avoids a blank hole while the pin exits and before incoming starts.
-*/
-.havenly-landing .view-crossfade {
+/* Direct home ↔ service swap — no outgoing pin / cover / reveal layers. */
+.havenly-landing .view-shell {
   position: relative;
-  background-color: var(--color-paper);
 }
 
-.havenly-landing .view-layer-in {
+.havenly-landing .view-layer {
   position: relative;
-  z-index: 1;
-  opacity: 0;
-  transform: translateY(var(--motion-view-rise));
-  transition:
-    opacity var(--motion-view-in) var(--motion-ease),
-    transform var(--motion-view-in) var(--motion-ease);
-}
-
-.havenly-landing .view-layer-in.is-active {
-  opacity: 1;
-  transform: none;
-}
-
-/* While the pin covers the viewport, snap-hide the destination (no fade-under-pin). */
-.havenly-landing .view-crossfade.is-covering .view-layer-in {
-  transition: none;
-}
-
-.havenly-landing .view-layer-out {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 2;
-  opacity: 1;
-  transform: none;
-  pointer-events: none;
-}
-
-@keyframes havenly-view-pin-exit {
-  to {
-    opacity: 0;
-    transform: translateY(calc(var(--motion-view-rise) * -0.4));
-  }
-}
-
-/*
-  Viewport pin: keep the pixels under the user frozen while scrollTo(0) runs
-  underneath — prevents the home hero from jumping into view on card clicks.
-*/
-.havenly-landing .view-layer-out.is-viewport-pin {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  /* Below header (z-30), above page content. */
-  z-index: 20;
-}
-
-.havenly-landing .view-layer-out-pin {
-  will-change: transform;
-}
-
-/*
-  Home → service: hide pinned homepage photography (Cleaning card, hero, etc.)
-  under an opaque paper scrim so sibling service cards never flash.
-*/
-.havenly-landing .view-layer-out.is-viewport-pin.is-media-masked::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 6;
-  background-color: var(--color-paper);
-  pointer-events: none;
-}
-
-.havenly-landing .view-layer-out.is-exit {
-  /* Animation (not transition) so the pin fade always runs after class toggle. */
-  animation: havenly-view-pin-exit var(--motion-view-out) var(--motion-ease) forwards;
 }
 
 .havenly-landing a {
@@ -462,21 +380,6 @@
   .havenly-landing .animate-rise,
   .havenly-landing .animate-hero-media {
     animation: none;
-  }
-
-  .havenly-landing .view-layer,
-  .havenly-landing .view-layer-in,
-  .havenly-landing .view-layer-in.is-active,
-  .havenly-landing .view-layer-out,
-  .havenly-landing .view-layer-out.is-exit {
-    opacity: 1;
-    transform: none;
-    transition: none;
-    animation: none;
-  }
-
-  .havenly-landing .view-layer-out {
-    display: none;
   }
 
   .havenly-landing .reveal,
