@@ -107,6 +107,19 @@
   will-change: transform;
 }
 
+/*
+  Home → service: hide pinned homepage photography (Cleaning card, hero, etc.)
+  under an opaque paper scrim so sibling service cards never flash.
+*/
+.havenly-landing .view-layer-out.is-viewport-pin.is-media-masked::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  background-color: var(--color-paper);
+  pointer-events: none;
+}
+
 .havenly-landing .view-layer-out.is-exit {
   /* Animation (not transition) so the pin fade always runs after class toggle. */
   animation: havenly-view-pin-exit var(--motion-view-out) var(--motion-ease) forwards;

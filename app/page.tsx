@@ -177,6 +177,8 @@ export default function Home() {
   const [incomingVisible, setIncomingVisible] = useState(true);
   /** Snap-hides the destination under the pin; cleared just before reveal. */
   const [viewCovering, setViewCovering] = useState(false);
+  /** Opaque paper over pinned home media so Cleaning cards never flash on other services. */
+  const [outgoingMediaMasked, setOutgoingMediaMasked] = useState(false);
   const [viewShellMinHeight, setViewShellMinHeight] = useState<number | null>(
     null,
   );
@@ -381,6 +383,7 @@ export default function Home() {
       setOutgoingExiting(false);
       setOutgoingScrollY(0);
       setViewCovering(false);
+      setOutgoingMediaMasked(false);
       setHeaderOnHero(next === null);
       setIncomingVisible(true);
       setViewShellMinHeight(null);
@@ -409,11 +412,14 @@ export default function Home() {
     }
 
     const scrollY = window.scrollY || 0;
+    // Leaving home: mask pinned homepage photos (Cleaning card flashes on Massage/Repairs).
+    const maskHomeMedia = from === null && next !== null;
 
     crossfadeIdleRef.current = false;
     setOutgoingScrollY(scrollY);
     setOutgoingView(from);
     setOutgoingExiting(false);
+    setOutgoingMediaMasked(maskHomeMedia);
     setViewCovering(true);
     setIncomingVisible(false);
     setActiveServiceView(next);
@@ -451,6 +457,7 @@ export default function Home() {
     setOutgoingView(undefined);
     setOutgoingExiting(false);
     setOutgoingScrollY(0);
+    setOutgoingMediaMasked(false);
     setViewShellMinHeight(null);
     crossfadeIdleRef.current = true;
     focusIncomingView(next);
@@ -1076,7 +1083,7 @@ export default function Home() {
         >
           {outgoingView !== undefined ? (
             <div
-              className={`view-layer view-layer-out is-viewport-pin${outgoingExiting ? " is-exit" : ""}`}
+              className={`view-layer view-layer-out is-viewport-pin${outgoingExiting ? " is-exit" : ""}${outgoingMediaMasked ? " is-media-masked" : ""}`}
               aria-hidden="true"
               inert
             >
@@ -1090,6 +1097,7 @@ export default function Home() {
               >
                 {outgoingView ? (
                   <ServiceDetailView
+                    key={outgoingView}
                     service={outgoingView}
                     onBack={goHome}
                     onBook={(categoryId) =>
@@ -1108,6 +1116,7 @@ export default function Home() {
           >
             {activeServiceView ? (
               <ServiceDetailView
+                key={activeServiceView}
                 service={activeServiceView}
                 onBack={goHome}
                 onBook={(categoryId) =>
