@@ -401,8 +401,32 @@
   will-change: transform, opacity;
 }
 
+/* Step panes: outgoing is absolutely positioned during crossfade. */
+.havenly-landing .booking-step-stage {
+  width: 100%;
+}
+
+.havenly-landing .booking-step-pane {
+  width: 100%;
+  will-change: transform, opacity;
+}
+
+.havenly-landing .booking-step-progress-track {
+  border-radius: 999px;
+}
+
+/* Room for sticky footer + soft keyboard; keep focused fields scrollable into view. */
+.havenly-landing .booking-overlay-scroll {
+  scroll-padding-bottom: 7.5rem;
+  overflow-anchor: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .havenly-landing .booking-overlay-panel {
+    will-change: opacity;
+  }
+
+  .havenly-landing .booking-step-pane {
     will-change: opacity;
   }
 

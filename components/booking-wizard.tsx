@@ -22,11 +22,12 @@ import {
   getMassageCategory,
   type MassageCategoryId,
 } from "@/lib/massage-catalog";
-import { motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useTranslations } from "next-intl";
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -38,6 +39,20 @@ const BOOKING_EASE = [0.22, 1, 0.36, 1] as const;
 const BACKDROP_MS = 0.22;
 const PANEL_DESKTOP_MS = 0.28;
 const PANEL_MOBILE_MS = 0.3;
+const STEP_MS = 0.24;
+const STEP_OFFSET_X = 10;
+/** Shrink stage min-height a bit faster than the crossfade to limit empty space. */
+const STAGE_SHRINK_MS = 0.16;
+
+type PendingStepNav = "back" | "next" | { index: number };
+
+function isBookingTextField(el: EventTarget | null): el is HTMLElement {
+  return (
+    el instanceof HTMLInputElement ||
+    el instanceof HTMLTextAreaElement ||
+    el instanceof HTMLSelectElement
+  );
+}
 
 function getDialogFocusable(container: HTMLElement): HTMLElement[] {
   const nodes = [
@@ -308,9 +323,21 @@ export default function BookingWizard({
   const t = useTranslations("BookingWizard");
   const tMassage = useTranslations("MassageCatalog");
   const titleId = useId();
+  const stepHeadingId = useId();
   const reduceMotion = useReducedMotion();
   const reducedMotion = !!reduceMotion;
   const [stepIndex, setStepIndex] = useState(0);
+  const [stepDirection, setStepDirection] = useState(1);
+  const [stageHeight, setStageHeight] = useState<number | null>(null);
+  const [stageHeightShrinking, setStageHeightShrinking] = useState(false);
+  const stepHeadingRef = useRef<HTMLParagraphElement | null>(null);
+  const stepPaneRef = useRef<HTMLDivElement | null>(null);
+  const bookingScrollRef = useRef<HTMLDivElement | null>(null);
+  const skipStepFocusRef = useRef(true);
+  const stepTransitionLockRef = useRef(false);
+  const pendingStepNavRef = useRef<PendingStepNav | null>(null);
+  const stepTransitionGenRef = useRef(0);
+  const stageHeightValueRef = useRef<number | null>(null);
   const [rooms, setRooms] = useState<number | null>(null);
   const [massageMinutes, setMassageMinutes] = useState<MassageMinutes>(60);
   const [problemDescription, setProblemDescription] = useState("");
@@ -710,6 +737,137 @@ export default function BookingWizard({
     target?.focus({ preventScroll: true });
   }, [overlayPresent]);
 
+  // Measure active step pane so stage min-height eases between steps (never clip to 0).
+  useLayoutEffect(() => {
+    if (!open || successRef) return;
+    const pane = stepPaneRef.current;
+    if (!pane) return;
+
+    const applyHeight = () => {
+      const next = pane.offsetHeight;
+      if (next <= 0) return;
+      const prev = stageHeightValueRef.current;
+      stageHeightValueRef.current = next;
+      setStageHeightShrinking(prev != null && next < prev);
+      setStageHeight(next);
+    };
+    applyHeight();
+
+    const observer = new ResizeObserver(applyHeight);
+    observer.observe(pane);
+    return () => observer.disconnect();
+  }, [open, successRef, step, service, rooms, massageMinutes]);
+
+  // Keep focused fields visible above the sticky footer / soft keyboard.
+  useEffect(() => {
+    if (!open) return;
+    const scroller = bookingScrollRef.current;
+    if (!scroller) return;
+
+    const applyKeyboardInset = () => {
+      const viewport = window.visualViewport;
+      if (!viewport) {
+        scroller.style.paddingBottom = "";
+        return 0;
+      }
+      // Soft keyboard typically shrinks visualViewport within the layout viewport.
+      const inset = Math.max(
+        0,
+        Math.round(window.innerHeight - viewport.height - viewport.offsetTop),
+      );
+      scroller.style.paddingBottom = inset > 0 ? `${inset}px` : "";
+      return inset;
+    };
+
+    const revealFocusedField = (behavior: ScrollBehavior) => {
+      const active = document.activeElement;
+      if (!isBookingTextField(active) || !scroller.contains(active)) return;
+      active.scrollIntoView({ block: "center", behavior });
+    };
+
+    const onFocusIn = (event: FocusEvent) => {
+      if (!isBookingTextField(event.target)) return;
+      window.requestAnimationFrame(() => {
+        applyKeyboardInset();
+        revealFocusedField(reducedMotion ? "auto" : "smooth");
+      });
+    };
+
+    const onViewportChange = () => {
+      applyKeyboardInset();
+      revealFocusedField("auto");
+    };
+
+    applyKeyboardInset();
+    scroller.addEventListener("focusin", onFocusIn);
+    const viewport = window.visualViewport;
+    viewport?.addEventListener("resize", onViewportChange);
+    viewport?.addEventListener("scroll", onViewportChange);
+    return () => {
+      scroller.style.paddingBottom = "";
+      scroller.removeEventListener("focusin", onFocusIn);
+      viewport?.removeEventListener("resize", onViewportChange);
+      viewport?.removeEventListener("scroll", onViewportChange);
+    };
+  }, [open, reducedMotion]);
+
+  function settleStepTransition(expectedGen: number) {
+    if (expectedGen !== stepTransitionGenRef.current) return;
+    const wasLocked = stepTransitionLockRef.current;
+    const pending = pendingStepNavRef.current;
+    if (!wasLocked && pending == null) return;
+
+    stepTransitionLockRef.current = false;
+    pendingStepNavRef.current = null;
+
+    if (pending != null) {
+      // Apply the latest Back/Next/jump after the in-flight pane settles.
+      queueMicrotask(() => {
+        if (pending === "back") goBack();
+        else if (pending === "next") goNext();
+        else navigateToStep(pending.index);
+      });
+      return;
+    }
+
+    if (!skipStepFocusRef.current) {
+      stepHeadingRef.current?.focus({ preventScroll: true });
+    }
+  }
+
+  // Focus the step label after in-wizard navigation (not on initial modal open).
+  useEffect(() => {
+    if (!open) {
+      skipStepFocusRef.current = true;
+      stepTransitionLockRef.current = false;
+      pendingStepNavRef.current = null;
+      stepTransitionGenRef.current += 1;
+      stageHeightValueRef.current = null;
+      setStageHeight(null);
+      setStageHeightShrinking(false);
+      return;
+    }
+    if (skipStepFocusRef.current) {
+      skipStepFocusRef.current = false;
+      stepTransitionLockRef.current = false;
+      pendingStepNavRef.current = null;
+      return;
+    }
+    const expectedGen = stepTransitionGenRef.current;
+    // Fallback if Motion skips onAnimationComplete (mode=wait = exit+enter).
+    const delayMs = reducedMotion ? 40 : Math.round(STEP_MS * 1000 * 2 + 80);
+    const timer = window.setTimeout(() => {
+      settleStepTransition(expectedGen);
+    }, delayMs);
+    return () => window.clearTimeout(timer);
+  }, [step, open, reducedMotion]);
+
+  function onStepPaneAnimationComplete(definition: unknown) {
+    // Ignore exit completion (mode=wait); only settle after enter/"center".
+    if (definition === "exit") return;
+    settleStepTransition(stepTransitionGenRef.current);
+  }
+
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -769,19 +927,42 @@ export default function BookingWizard({
     return null;
   }
 
+  function navigateToStep(nextIndex: number) {
+    const clamped = Math.max(0, Math.min(STEPS.length - 1, nextIndex));
+    if (clamped === stepIndex) return;
+    if (stepTransitionLockRef.current) {
+      // Keep the latest absolute target; applied once the current pane settles.
+      pendingStepNavRef.current = { index: clamped };
+      return;
+    }
+    stepTransitionGenRef.current += 1;
+    stepTransitionLockRef.current = true;
+    pendingStepNavRef.current = null;
+    setStepDirection(clamped > stepIndex ? 1 : -1);
+    setStepIndex(clamped);
+  }
+
   function goNext() {
+    if (stepTransitionLockRef.current) {
+      pendingStepNavRef.current = "next";
+      return;
+    }
     const code = validateStep(step);
     if (code) {
       setErrorCode(code);
       return;
     }
     clearError();
-    setStepIndex((value) => Math.min(STEPS.length - 1, value + 1));
+    navigateToStep(stepIndex + 1);
   }
 
   function goBack() {
+    if (stepTransitionLockRef.current) {
+      pendingStepNavRef.current = "back";
+      return;
+    }
     clearError();
-    setStepIndex((value) => Math.max(0, value - 1));
+    navigateToStep(stepIndex - 1);
   }
 
   async function uploadOneRepairPhoto(itemId: string, file: File) {
@@ -937,14 +1118,14 @@ export default function BookingWizard({
       const code = validateStep(id);
       if (code) {
         setErrorCode(code);
-        setStepIndex(STEPS.indexOf(id));
+        navigateToStep(STEPS.indexOf(id));
         return;
       }
     }
 
     if (service === "repair" && hasFailedPhotos) {
       setErrorCode("fixFailedPhotos");
-      setStepIndex(STEPS.indexOf("configure"));
+      navigateToStep(STEPS.indexOf("configure"));
       return;
     }
 
@@ -960,7 +1141,7 @@ export default function BookingWizard({
 
     if (service === "cleaning" && rooms == null) {
       setErrorCode("chooseRooms");
-      setStepIndex(STEPS.indexOf("configure"));
+      navigateToStep(STEPS.indexOf("configure"));
       return;
     }
 
@@ -1129,6 +1310,36 @@ export default function BookingWizard({
       ? { opacity: 0, y: 10 }
       : { opacity: 1, y: "100%" };
 
+  const stepOffset = reducedMotion ? 0 : STEP_OFFSET_X;
+  const stepTransition = {
+    duration: reducedMotion ? 0.01 : STEP_MS,
+    ease: BOOKING_EASE,
+  };
+  // Grow instantly so new fields are never clipped; shrink slightly faster than crossfade.
+  const stageHeightTransition = {
+    duration: reducedMotion
+      ? 0.01
+      : stageHeightShrinking
+        ? STAGE_SHRINK_MS
+        : 0.01,
+    ease: BOOKING_EASE,
+  };
+  const stepVariants = {
+    enter: (direction: number) => ({
+      opacity: 0,
+      x: stepOffset * direction,
+    }),
+    center: {
+      opacity: 1,
+      x: 0,
+    },
+    exit: (direction: number) => ({
+      opacity: 0,
+      x: stepOffset * -direction,
+      pointerEvents: "none" as const,
+    }),
+  };
+
   if (!overlayPresent) return null;
 
   return (
@@ -1198,15 +1409,34 @@ export default function BookingWizard({
 
           {!successRef ? (
             <div className="mt-4">
-              <div className="flex gap-1" aria-hidden="true">
+              <div
+                className="flex gap-1"
+                aria-hidden="true"
+              >
                 {STEPS.map((id, index) => (
                   <div
                     key={id}
-                    className={`h-1 flex-1 ${index <= stepIndex ? "bg-olive" : "bg-mist"}`}
-                  />
+                    className="booking-step-progress-track relative h-1 flex-1 overflow-hidden bg-mist"
+                  >
+                    <motion.div
+                      className="absolute inset-y-0 left-0 bg-olive"
+                      initial={false}
+                      animate={{ width: index <= stepIndex ? "100%" : "0%" }}
+                      transition={{
+                        duration: reducedMotion ? 0.01 : STEP_MS,
+                        ease: BOOKING_EASE,
+                      }}
+                    />
+                  </div>
                 ))}
               </div>
-              <p className="mt-2 text-xs tracking-[0.14em] text-muted uppercase">
+              <p
+                ref={stepHeadingRef}
+                id={stepHeadingId}
+                tabIndex={-1}
+                className="mt-2 text-xs tracking-[0.14em] text-muted uppercase outline-none"
+                aria-live="polite"
+              >
                 {t("stepOf", {
                   current: stepIndex + 1,
                   total: STEPS.length,
@@ -1233,7 +1463,10 @@ export default function BookingWizard({
           ) : null}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
+        <div
+          ref={bookingScrollRef}
+          className="booking-overlay-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
+        >
         {successRef ? (
           <div className="space-y-4 px-5 py-8 text-center sm:px-6">
             <p className="text-xs font-medium tracking-[0.18em] text-gold uppercase">
@@ -1265,6 +1498,33 @@ export default function BookingWizard({
           </div>
         ) : (
           <form className="space-y-6 px-5 py-5 sm:px-6 sm:py-6" noValidate onSubmit={onSubmit}>
+            <motion.div
+              className="booking-step-stage relative overflow-x-hidden"
+              initial={false}
+              animate={
+                stageHeight == null ? undefined : { minHeight: stageHeight }
+              }
+              transition={stageHeightTransition}
+            >
+              <AnimatePresence
+                initial={false}
+                custom={stepDirection}
+                mode="wait"
+              >
+                <motion.div
+                  key={step}
+                  ref={stepPaneRef}
+                  role="group"
+                  aria-labelledby={stepHeadingId}
+                  custom={stepDirection}
+                  variants={stepVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={stepTransition}
+                  onAnimationComplete={onStepPaneAnimationComplete}
+                  className="booking-step-pane space-y-6"
+                >
             {!lockService && step === "configure" ? (
               <div className="grid grid-cols-3 gap-2">
                 {SERVICES.map((value) => (
@@ -1716,6 +1976,9 @@ export default function BookingWizard({
                 </div>
               </div>
             ) : null}
+                </motion.div>
+              </AnimatePresence>
+            </motion.div>
 
             {errorText ? (
               <p className="text-sm font-medium text-danger" role="alert">
