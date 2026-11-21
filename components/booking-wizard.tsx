@@ -16,6 +16,8 @@ import {
   formatEuro,
   massagePriceEuro,
   type BookingService,
+  type CleaningV1RoomCounts,
+  type CleaningV1Type,
   type MassageMinutes,
 } from "@/lib/booking-pricing";
 import {
@@ -199,7 +201,8 @@ type ErrorCode =
   | "orderProcessing"
   | "temporaryUnavailable"
   | "tooManyRequests"
-  | "attemptPayloadChanged";
+  | "attemptPayloadChanged"
+  | "cleaningV1PreviewOnly";
 
 type WizardError =
   | { kind: "code"; code: ErrorCode; values?: Record<string, string | number> }
@@ -227,6 +230,36 @@ function revokePreview(url: string | undefined) {
 const STEPS: StepId[] = ["configure", "schedule", "address", "contact", "review"];
 const SERVICES: BookingService[] = ["cleaning", "repair", "massage"];
 const TIME_SLOTS = buildTimeSlots();
+
+/** Client Preview gate — default off; independent of server CLEANING_V1_ORDERS_ENABLED. */
+const CLEANING_V1_BOOKING_ENABLED =
+  process.env.NEXT_PUBLIC_CLEANING_V1_BOOKING_ENABLED === "true";
+
+const EMPTY_CLEANING_V1_ROOMS: CleaningV1RoomCounts = {
+  bedroom: 0,
+  livingRoom: 0,
+  kitchen: 0,
+  bathroom: 0,
+  separateWc: 0,
+  hallway: 0,
+  otherRoom: 0,
+};
+
+const CLEANING_V1_ROOM_KEYS: Array<keyof CleaningV1RoomCounts> = [
+  "bedroom",
+  "livingRoom",
+  "kitchen",
+  "bathroom",
+  "separateWc",
+  "hallway",
+  "otherRoom",
+];
+
+const CLEANING_V1_TYPES: CleaningV1Type[] = [
+  "standard",
+  "deep",
+  "post_renovation",
+];
 
 function Stepper({
   id,
@@ -339,6 +372,11 @@ export default function BookingWizard({
   const stepTransitionGenRef = useRef(0);
   const stageHeightValueRef = useRef<number | null>(null);
   const [rooms, setRooms] = useState<number | null>(null);
+  const [roomCounts, setRoomCounts] = useState<CleaningV1RoomCounts>(
+    EMPTY_CLEANING_V1_ROOMS,
+  );
+  const [areaM2, setAreaM2] = useState<number | null>(null);
+  const [cleaningType, setCleaningType] = useState<CleaningV1Type | null>(null);
   const [massageMinutes, setMassageMinutes] = useState<MassageMinutes>(60);
   const [problemDescription, setProblemDescription] = useState("");
   const [draftId, setDraftId] = useState<string | null>(null);
@@ -903,8 +941,14 @@ export default function BookingWizard({
 
   function validateStep(current: StepId): ErrorCode | null {
     if (current === "configure") {
-      if (service === "cleaning" && rooms == null) {
-        return "chooseRooms";
+      if (service === "cleaning") {
+        // Stage A: v1 UI only — block leaving configure until Stage C wires submit.
+        if (CLEANING_V1_BOOKING_ENABLED) {
+          return "cleaningV1PreviewOnly";
+        }
+        if (rooms == null) {
+          return "chooseRooms";
+        }
       }
       if (service === "repair" && problemDescription.trim().length < 10) {
         return "repairDetail";
@@ -1136,6 +1180,12 @@ export default function BookingWizard({
 
     if (!turnstileToken) {
       setErrorCode("turnstileRequired");
+      return;
+    }
+
+    if (service === "cleaning" && CLEANING_V1_BOOKING_ENABLED) {
+      setErrorCode("cleaningV1PreviewOnly");
+      navigateToStep(STEPS.indexOf("configure"));
       return;
     }
 
@@ -1564,164 +1614,302 @@ export default function BookingWizard({
 
             {step === "configure" && service === "cleaning" ? (
               <div className="booking-cleaning-rooms space-y-4">
-                <div>
-                  <p className="mb-2 block text-sm font-medium text-ink">
-                    {roomsLabel}
-                  </p>
-                  <div
-                    className="grid grid-cols-3 gap-2 sm:grid-cols-6"
-                    role="group"
-                    aria-label={roomsLabel}
-                  >
-                    {[1, 2, 3, 4, 5, 6].map((count) => {
-                      const selected = rooms === count;
-                      return (
+                {CLEANING_V1_BOOKING_ENABLED ? (
+                  <>
+                    <div>
+                      <p className="mb-2 block text-sm font-medium text-ink">
+                        {t("cleaningV1RoomsHeading")}
+                      </p>
+                      <div className="space-y-2">
+                        {CLEANING_V1_ROOM_KEYS.map((key) => {
+                          const label = t(`cleaningV1RoomLabels.${key}`);
+                          const count = roomCounts[key];
+                          return (
+                            <div
+                              key={key}
+                              className="booking-cleaning-qty"
+                              role="group"
+                              aria-label={label}
+                            >
+                              <div className="mb-1 text-xs font-medium text-ink/80">
+                                {label}
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  aria-label={t("decrease", { label })}
+                                  disabled={count <= 0}
+                                  onClick={() => {
+                                    setRoomCounts((prev) => ({
+                                      ...prev,
+                                      [key]: Math.max(0, prev[key] - 1),
+                                    }));
+                                    clearError();
+                                  }}
+                                  className="havenly-control inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
+                                >
+                                  −
+                                </button>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  readOnly
+                                  value={String(count)}
+                                  aria-valuemin={0}
+                                  aria-valuenow={count}
+                                  className="havenly-control w-full border border-mist bg-white px-4 py-3 text-center text-ink outline-none"
+                                />
+                                <button
+                                  type="button"
+                                  aria-label={t("increase", { label })}
+                                  onClick={() => {
+                                    setRoomCounts((prev) => ({
+                                      ...prev,
+                                      [key]: prev[key] + 1,
+                                    }));
+                                    clearError();
+                                  }}
+                                  className="havenly-control inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <Field id="cleaning-v1-area" label={t("cleaningV1AreaLabel")}>
+                      <input
+                        id="cleaning-v1-area"
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        step="any"
+                        value={areaM2 ?? ""}
+                        placeholder={t("cleaningV1AreaPlaceholder")}
+                        onChange={(event) => {
+                          const raw = event.target.value;
+                          if (raw === "") {
+                            setAreaM2(null);
+                            clearError();
+                            return;
+                          }
+                          const next = Number(raw);
+                          setAreaM2(Number.isFinite(next) ? next : null);
+                          clearError();
+                        }}
+                        className={inputClass}
+                      />
+                    </Field>
+
+                    <div>
+                      <p className="mb-2 block text-sm font-medium text-ink">
+                        {t("cleaningV1TypeLabel")}
+                      </p>
+                      <div
+                        className="grid grid-cols-1 gap-2 sm:grid-cols-3"
+                        role="group"
+                        aria-label={t("cleaningV1TypeLabel")}
+                      >
+                        {CLEANING_V1_TYPES.map((type) => {
+                          const selected = cleaningType === type;
+                          return (
+                            <button
+                              key={type}
+                              type="button"
+                              aria-pressed={selected}
+                              onClick={() => {
+                                setCleaningType(selected ? null : type);
+                                clearError();
+                              }}
+                              className={`booking-room-option havenly-control px-3 py-3 text-sm font-semibold transition ${
+                                selected
+                                  ? "border border-olive bg-olive text-white shadow-sm shadow-olive/20"
+                                  : "border border-mist bg-white text-ink hover:border-olive"
+                              }`}
+                            >
+                              {t(`cleaningV1Types.${type}`)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div
+                      className="booking-cleaning-estimate rounded-xl border border-sand bg-sand/70 px-3 py-2.5 text-ink sm:px-4 sm:py-3"
+                      aria-live="polite"
+                    >
+                      <div className="booking-cleaning-estimate-idle">
+                        <p className="text-xs leading-snug text-muted sm:text-sm">
+                          {t("cleaningV1PreviewHint")}
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <p className="mb-2 block text-sm font-medium text-ink">
+                        {roomsLabel}
+                      </p>
+                      <div
+                        className="grid grid-cols-3 gap-2 sm:grid-cols-6"
+                        role="group"
+                        aria-label={roomsLabel}
+                      >
+                        {[1, 2, 3, 4, 5, 6].map((count) => {
+                          const selected = rooms === count;
+                          return (
+                            <button
+                              key={count}
+                              type="button"
+                              aria-pressed={selected}
+                              onClick={() => {
+                                setRooms(selected ? null : count);
+                                clearError();
+                              }}
+                              className={`booking-room-option havenly-control px-3 py-3 text-sm font-semibold transition ${
+                                selected
+                                  ? "border border-olive bg-olive text-white shadow-sm shadow-olive/20"
+                                  : "border border-mist bg-white text-ink hover:border-olive"
+                              }`}
+                            >
+                              {count}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div
+                      className="booking-cleaning-qty"
+                      role="group"
+                      aria-label={roomsLabel}
+                    >
+                      <label htmlFor="cleaning-rooms" className="sr-only">
+                        {roomsLabel}
+                      </label>
+                      <div className="flex items-center gap-3">
                         <button
-                          key={count}
                           type="button"
-                          aria-pressed={selected}
+                          aria-label={t("decrease", { label: roomsLabel })}
+                          disabled={rooms == null}
                           onClick={() => {
-                            setRooms(selected ? null : count);
+                            if (rooms == null) return;
+                            setRooms(rooms <= 1 ? null : rooms - 1);
                             clearError();
                           }}
-                          className={`booking-room-option havenly-control px-3 py-3 text-sm font-semibold transition ${
-                            selected
-                              ? "border border-olive bg-olive text-white shadow-sm shadow-olive/20"
-                              : "border border-mist bg-white text-ink hover:border-olive"
-                          }`}
+                          className="havenly-control inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
                         >
-                          {count}
+                          −
                         </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                        <input
+                          id="cleaning-rooms"
+                          type="text"
+                          inputMode="numeric"
+                          readOnly
+                          value={rooms == null ? "—" : String(rooms)}
+                          aria-valuemin={1}
+                          aria-valuemax={6}
+                          aria-valuenow={rooms ?? undefined}
+                          aria-valuetext={
+                            rooms == null
+                              ? undefined
+                              : t("roomCount", { count: rooms })
+                          }
+                          className="havenly-control w-full border border-mist bg-white px-4 py-3 text-center text-ink outline-none"
+                        />
+                        <button
+                          type="button"
+                          aria-label={t("increase", { label: roomsLabel })}
+                          disabled={rooms != null && rooms >= 6}
+                          onClick={() => {
+                            setRooms(rooms == null ? 1 : Math.min(6, rooms + 1));
+                            clearError();
+                          }}
+                          className="havenly-control inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
 
-                <div
-                  className="booking-cleaning-qty"
-                  role="group"
-                  aria-label={roomsLabel}
-                >
-                  <label htmlFor="cleaning-rooms" className="sr-only">
-                    {roomsLabel}
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      aria-label={t("decrease", { label: roomsLabel })}
-                      disabled={rooms == null}
-                      onClick={() => {
-                        if (rooms == null) return;
-                        setRooms(rooms <= 1 ? null : rooms - 1);
-                        clearError();
-                      }}
-                      className="havenly-control inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
+                    <div
+                      className="booking-cleaning-estimate rounded-xl border border-sand bg-sand/70 px-3 py-2.5 text-ink sm:px-4 sm:py-3"
+                      aria-live="polite"
                     >
-                      −
-                    </button>
-                    <input
-                      id="cleaning-rooms"
-                      type="text"
-                      inputMode="numeric"
-                      readOnly
-                      value={rooms == null ? "—" : String(rooms)}
-                      aria-valuemin={1}
-                      aria-valuemax={6}
-                      aria-valuenow={rooms ?? undefined}
-                      aria-valuetext={
-                        rooms == null
-                          ? undefined
-                          : t("roomCount", { count: rooms })
-                      }
-                      className="havenly-control w-full border border-mist bg-white px-4 py-3 text-center text-ink outline-none"
-                    />
-                    <button
-                      type="button"
-                      aria-label={t("increase", { label: roomsLabel })}
-                      disabled={rooms != null && rooms >= 6}
-                      onClick={() => {
-                        setRooms(rooms == null ? 1 : Math.min(6, rooms + 1));
-                        clearError();
-                      }}
-                      className="havenly-control inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-
-                <div
-                  className="booking-cleaning-estimate rounded-xl border border-sand bg-sand/70 px-3 py-2.5 text-ink sm:px-4 sm:py-3"
-                  aria-live="polite"
-                >
-                  <AnimatePresence initial={false} mode="wait">
-                    {rooms != null && cleaning != null && total != null ? (
-                      <motion.div
-                        key="estimate-active"
-                        initial={reducedMotion ? false : { opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={reducedMotion ? undefined : { opacity: 0 }}
-                        transition={{
-                          duration: reducedMotion ? 0 : 0.2,
-                          ease: BOOKING_EASE,
-                        }}
-                      >
-                        <div className="booking-cleaning-metrics">
-                          <div className="booking-cleaning-metric">
-                            <p className="booking-cleaning-metric-label">
-                              {t("estimateCleanersLabel")}
+                      <AnimatePresence initial={false} mode="wait">
+                        {rooms != null && cleaning != null && total != null ? (
+                          <motion.div
+                            key="estimate-active"
+                            initial={reducedMotion ? false : { opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={reducedMotion ? undefined : { opacity: 0 }}
+                            transition={{
+                              duration: reducedMotion ? 0 : 0.2,
+                              ease: BOOKING_EASE,
+                            }}
+                          >
+                            <div className="booking-cleaning-metrics">
+                              <div className="booking-cleaning-metric">
+                                <p className="booking-cleaning-metric-label">
+                                  {t("estimateCleanersLabel")}
+                                </p>
+                                <p className="booking-cleaning-metric-value">
+                                  {t("cleanerCount", { count: cleaning.workers })}
+                                </p>
+                              </div>
+                              <div className="booking-cleaning-metric">
+                                <p className="booking-cleaning-metric-label">
+                                  {t("estimateDurationLabel")}
+                                </p>
+                                <p className="booking-cleaning-metric-value">
+                                  ~{t("hourCount", { count: cleaning.hours })}
+                                </p>
+                              </div>
+                              <div className="booking-cleaning-metric">
+                                <p className="booking-cleaning-metric-label">
+                                  {t("total")}
+                                </p>
+                                <p className="booking-cleaning-metric-value booking-cleaning-metric-total">
+                                  {formatEuro(total)}
+                                </p>
+                              </div>
+                            </div>
+                            <p className="booking-cleaning-formula mt-2 text-xs leading-snug text-olive/80 sm:text-sm">
+                              <span className="font-medium text-ink/70">
+                                {t("estimateFormulaLabel")}:{" "}
+                              </span>
+                              {t("cleaningFormula", {
+                                hours: cleaning.hours,
+                                workers: cleaning.workers,
+                                total: formatEuro(total),
+                              })}
                             </p>
-                            <p className="booking-cleaning-metric-value">
-                              {t("cleanerCount", { count: cleaning.workers })}
+                          </motion.div>
+                        ) : (
+                          <motion.div
+                            key="estimate-idle"
+                            initial={reducedMotion ? false : { opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={reducedMotion ? undefined : { opacity: 0 }}
+                            transition={{
+                              duration: reducedMotion ? 0 : 0.2,
+                              ease: BOOKING_EASE,
+                            }}
+                            className="booking-cleaning-estimate-idle"
+                          >
+                            <p className="text-xs leading-snug text-muted sm:text-sm">
+                              {t("chooseRoomsHint")}
                             </p>
-                          </div>
-                          <div className="booking-cleaning-metric">
-                            <p className="booking-cleaning-metric-label">
-                              {t("estimateDurationLabel")}
-                            </p>
-                            <p className="booking-cleaning-metric-value">
-                              ~{t("hourCount", { count: cleaning.hours })}
-                            </p>
-                          </div>
-                          <div className="booking-cleaning-metric">
-                            <p className="booking-cleaning-metric-label">
-                              {t("total")}
-                            </p>
-                            <p className="booking-cleaning-metric-value booking-cleaning-metric-total">
-                              {formatEuro(total)}
-                            </p>
-                          </div>
-                        </div>
-                        <p className="booking-cleaning-formula mt-2 text-xs leading-snug text-olive/80 sm:text-sm">
-                          <span className="font-medium text-ink/70">
-                            {t("estimateFormulaLabel")}:{" "}
-                          </span>
-                          {t("cleaningFormula", {
-                            hours: cleaning.hours,
-                            workers: cleaning.workers,
-                            total: formatEuro(total),
-                          })}
-                        </p>
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        key="estimate-idle"
-                        initial={reducedMotion ? false : { opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={reducedMotion ? undefined : { opacity: 0 }}
-                        transition={{
-                          duration: reducedMotion ? 0 : 0.2,
-                          ease: BOOKING_EASE,
-                        }}
-                        className="booking-cleaning-estimate-idle"
-                      >
-                        <p className="text-xs leading-snug text-muted sm:text-sm">
-                          {t("chooseRoomsHint")}
-                        </p>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </>
+                )}
               </div>
             ) : null}
 
@@ -2104,7 +2292,10 @@ export default function BookingWizard({
                     onClick={goNext}
                     disabled={
                       hasUploadingPhotos ||
-                      (service === "cleaning" && rooms == null && step === "configure")
+                      (service === "cleaning" &&
+                        !CLEANING_V1_BOOKING_ENABLED &&
+                        rooms == null &&
+                        step === "configure")
                     }
                     className="havenly-control flex-1 bg-olive px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep disabled:opacity-60"
                   >

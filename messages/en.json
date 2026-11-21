@@ -216,6 +216,25 @@
     "quoteBannerBody": "Describe the issue and add optional photos. Final price after we review.",
     "roomsLabel": "Number of rooms",
     "chooseRoomsHint": "Select how many rooms need cleaning to see hours, cleaners and price.",
+    "cleaningV1RoomsHeading": "Rooms to clean",
+    "cleaningV1RoomLabels": {
+      "bedroom": "Bedroom",
+      "livingRoom": "Living room",
+      "kitchen": "Kitchen",
+      "bathroom": "Bathroom",
+      "separateWc": "Separate WC",
+      "hallway": "Hallway",
+      "otherRoom": "Other room"
+    },
+    "cleaningV1AreaLabel": "Area (m²)",
+    "cleaningV1AreaPlaceholder": "e.g. 85",
+    "cleaningV1TypeLabel": "Cleaning type",
+    "cleaningV1Types": {
+      "standard": "Standard",
+      "deep": "Deep",
+      "post_renovation": "Post-renovation"
+    },
+    "cleaningV1PreviewHint": "Price preview and booking for Cleaning v1 are not available yet. You can explore the new options here; submission stays disabled.",
     "decrease": "Decrease {label}",
     "increase": "Increase {label}",
     "cleaningPlan": "{rooms} require ~{hours} and {cleaners}",
@@ -284,6 +303,7 @@
       "draftOpenFailed": "Could not open booking",
       "repairDetail": "Describe the repair in a bit more detail",
       "chooseRooms": "Select the number of rooms to continue",
+      "cleaningV1PreviewOnly": "Cleaning v1 booking is in preview only. Submission is not available yet — please use the standard room booking for now, or check back later.",
       "chooseDate": "Choose a date",
       "chooseTime": "Choose a preferred time",
       "addressRequired": "Enter street address and city",

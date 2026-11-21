@@ -216,6 +216,25 @@
     "quoteBannerBody": "Descreva o problema e adicione fotografias opcionais. O preço final é definido após a nossa análise.",
     "roomsLabel": "Número de divisões",
     "chooseRoomsHint": "Escolha o número de divisões a limpar para ver as horas, os profissionais e o preço.",
+    "cleaningV1RoomsHeading": "Divisões a limpar",
+    "cleaningV1RoomLabels": {
+      "bedroom": "Quarto",
+      "livingRoom": "Sala",
+      "kitchen": "Cozinha",
+      "bathroom": "Casa de banho",
+      "separateWc": "WC separado",
+      "hallway": "Corredor",
+      "otherRoom": "Outra divisão"
+    },
+    "cleaningV1AreaLabel": "Área (m²)",
+    "cleaningV1AreaPlaceholder": "ex.: 85",
+    "cleaningV1TypeLabel": "Tipo de limpeza",
+    "cleaningV1Types": {
+      "standard": "Standard",
+      "deep": "Profunda",
+      "post_renovation": "Pós-obra"
+    },
+    "cleaningV1PreviewHint": "A pré-visualização de preço e a reserva Cleaning v1 ainda não estão disponíveis. Pode explorar as novas opções aqui; o envio permanece desactivado.",
     "decrease": "Diminuir {label}",
     "increase": "Aumentar {label}",
     "cleaningPlan": "{rooms} — cerca de {hours} e {cleaners}",
@@ -284,6 +303,7 @@
       "draftOpenFailed": "Não foi possível abrir a reserva",
       "repairDetail": "Descreva a reparação com um pouco mais de detalhe",
       "chooseRooms": "Seleccione o número de divisões para continuar",
+      "cleaningV1PreviewOnly": "A reserva Cleaning v1 está apenas em pré-visualização. O envio ainda não está disponível — use a reserva por número de divisões por agora, ou volte mais tarde.",
       "chooseDate": "Escolha uma data",
       "chooseTime": "Escolha uma hora preferida",
       "addressRequired": "Introduza a morada e a cidade",
