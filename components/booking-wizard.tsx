@@ -204,6 +204,7 @@ type ErrorCode =
   | "temporaryUnavailable"
   | "tooManyRequests"
   | "attemptPayloadChanged"
+  | "cleaningV1Incomplete"
   | "cleaningV1PreviewOnly";
 
 type WizardError =
@@ -495,6 +496,12 @@ export default function BookingWizard({
       return { status: "invalid" };
     }
   }, [service, roomCounts, areaM2, cleaningType]);
+
+  const isCleaningV1Booking =
+    CLEANING_V1_BOOKING_ENABLED && service === "cleaning";
+  const cleaningV1ConfigReady =
+    cleaningV1Estimate?.status === "fixed" ||
+    cleaningV1Estimate?.status === "quote";
 
   function setErrorCode(
     code: ErrorCode,
@@ -981,9 +988,11 @@ export default function BookingWizard({
   function validateStep(current: StepId): ErrorCode | null {
     if (current === "configure") {
       if (service === "cleaning") {
-        // Stage A: v1 UI only — block leaving configure until Stage C wires submit.
         if (CLEANING_V1_BOOKING_ENABLED) {
-          return "cleaningV1PreviewOnly";
+          if (!cleaningV1ConfigReady) {
+            return "cleaningV1Incomplete";
+          }
+          return null;
         }
         if (rooms == null) {
           return "chooseRooms";
@@ -1222,13 +1231,13 @@ export default function BookingWizard({
       return;
     }
 
-    if (service === "cleaning" && CLEANING_V1_BOOKING_ENABLED) {
-      setErrorCode("cleaningV1PreviewOnly");
-      navigateToStep(STEPS.indexOf("configure"));
-      return;
-    }
-
-    if (service === "cleaning" && rooms == null) {
+    if (isCleaningV1Booking) {
+      if (!cleaningV1ConfigReady || cleaningType == null || areaM2 == null) {
+        setErrorCode("cleaningV1Incomplete");
+        navigateToStep(STEPS.indexOf("configure"));
+        return;
+      }
+    } else if (service === "cleaning" && rooms == null) {
       setErrorCode("chooseRooms");
       navigateToStep(STEPS.indexOf("configure"));
       return;
@@ -1257,9 +1266,21 @@ export default function BookingWizard({
         problemDescription:
           service === "repair" ? problemDescription.trim() : null,
         massageCategory: massageCategoryValue,
-        rooms: service === "cleaning" ? rooms : null,
+        rooms: isCleaningV1Booking
+          ? null
+          : service === "cleaning"
+            ? rooms
+            : null,
         massageMinutes: service === "massage" ? massageMinutes : null,
         repairPhotoPaths: service === "repair" ? repairPhotoPaths : null,
+        ...(isCleaningV1Booking && cleaningType != null && areaM2 != null
+          ? {
+              cleaningPricingVersion: "v1" as const,
+              roomCounts,
+              areaM2,
+              cleaningType,
+            }
+          : {}),
       });
 
       const persisted = readBookingAttempt();
@@ -1301,7 +1322,16 @@ export default function BookingWizard({
           city: city.trim(),
           apartmentFloor: apartmentFloor.trim() || undefined,
           accessInstructions: accessInstructions.trim() || undefined,
-          rooms: service === "cleaning" ? rooms : undefined,
+          ...(isCleaningV1Booking && cleaningType != null && areaM2 != null
+            ? {
+                cleaningPricingVersion: "v1",
+                roomCounts,
+                areaM2,
+                cleaningType,
+              }
+            : {
+                rooms: service === "cleaning" ? rooms : undefined,
+              }),
           massageMinutes: service === "massage" ? massageMinutes : undefined,
           massageCategory: massageCategoryValue || undefined,
           problemDescription:
@@ -1570,11 +1600,24 @@ export default function BookingWizard({
                 ),
               })}
             </p>
-            {service === "repair" ? (
-              <p className="text-sm text-muted">{t("successRepairNote")}</p>
+            {service === "repair" ||
+            (isCleaningV1Booking && cleaningV1Estimate?.status === "quote") ? (
+              <p className="text-sm text-muted">
+                {service === "repair"
+                  ? t("successRepairNote")
+                  : t("successCleaningV1QuoteNote")}
+              </p>
             ) : (
               <p className="text-sm text-muted">
-                {t("successEstimatedTotal", { total: formatEuro(total ?? 0) })}
+                {t("successEstimatedTotal", {
+                  total: formatEuro(
+                    isCleaningV1Booking &&
+                      cleaningV1Estimate?.status === "fixed" &&
+                      cleaningV1Estimate.result.customerPriceEuro != null
+                      ? cleaningV1Estimate.result.customerPriceEuro
+                      : (total ?? 0),
+                  ),
+                })}
               </p>
             )}
             <button
@@ -2313,15 +2356,61 @@ export default function BookingWizard({
                       {tMassage(`categories.${massageCategory.id}.title`)}
                     </p>
                   ) : null}
-                  {service === "cleaning" &&
-                  rooms != null &&
-                  cleaning != null &&
-                  total != null ? (
+                  {isCleaningV1Booking &&
+                  cleaningV1ConfigReady &&
+                  cleaningType != null &&
+                  areaM2 != null ? (
+                    <div className="mt-2 space-y-1">
+                      <p>
+                        {t("cleaningV1SummaryType", {
+                          type: t(`cleaningV1Types.${cleaningType}`),
+                        })}
+                      </p>
+                      <p>
+                        {t("cleaningV1SummaryArea", {
+                          area: areaM2,
+                        })}
+                      </p>
+                      <p>
+                        {t("cleaningV1SummaryRooms", {
+                          rooms: CLEANING_V1_ROOM_KEYS.filter(
+                            (key) => roomCounts[key] > 0,
+                          )
+                            .map(
+                              (key) =>
+                                `${roomCounts[key]} ${t(`cleaningV1RoomLabels.${key}`)}`,
+                            )
+                            .join(", "),
+                        })}
+                      </p>
+                      {cleaningV1Estimate?.status === "quote" ? (
+                        <p className="text-olive">{t("cleaningV1QuoteTitle")}</p>
+                      ) : cleaningV1Estimate?.status === "fixed" &&
+                        cleaningV1Estimate.result.customerPriceEuro != null ? (
+                        <p>
+                          {t("cleaningV1SummaryPrice", {
+                            hours: cleaningV1Estimate.result.billableHours,
+                            total: formatEuro(
+                              cleaningV1Estimate.result.customerPriceEuro,
+                            ),
+                          })}
+                        </p>
+                      ) : null}
+                      <p className="text-xs text-muted">
+                        {t("cleaningV1CleanersNote")}
+                      </p>
+                    </div>
+                  ) : service === "cleaning" &&
+                    rooms != null &&
+                    cleaning != null &&
+                    total != null ? (
                     <p className="mt-2">
                       {t("cleaningSummary", {
                         rooms: t("roomCount", { count: rooms }),
                         hours: cleaning.hours,
-                        cleaners: t("cleanerCount", { count: cleaning.workers }),
+                        cleaners: t("cleanerCount", {
+                          count: cleaning.workers,
+                        }),
                         total: formatEuro(total),
                       })}
                     </p>
@@ -2407,9 +2496,10 @@ export default function BookingWizard({
                     disabled={
                       hasUploadingPhotos ||
                       (service === "cleaning" &&
-                        !CLEANING_V1_BOOKING_ENABLED &&
-                        rooms == null &&
-                        step === "configure")
+                        step === "configure" &&
+                        (CLEANING_V1_BOOKING_ENABLED
+                          ? !cleaningV1ConfigReady
+                          : rooms == null))
                     }
                     className="havenly-control flex-1 bg-olive px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep disabled:opacity-60"
                   >
@@ -2430,9 +2520,20 @@ export default function BookingWizard({
                   >
                     {sending
                       ? t("sending")
-                      : service === "repair"
+                      : service === "repair" ||
+                          (isCleaningV1Booking &&
+                            cleaningV1Estimate?.status === "quote")
                         ? t("requestQuote")
-                        : t("confirmPrice", { price: formatEuro(total ?? 0) })}
+                        : t("confirmPrice", {
+                            price: formatEuro(
+                              isCleaningV1Booking &&
+                                cleaningV1Estimate?.status === "fixed" &&
+                                cleaningV1Estimate.result.customerPriceEuro !=
+                                  null
+                                ? cleaningV1Estimate.result.customerPriceEuro
+                                : (total ?? 0),
+                            ),
+                          })}
                   </button>
                 )}
               </div>
