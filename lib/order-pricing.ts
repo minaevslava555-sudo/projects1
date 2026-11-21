@@ -3,17 +3,32 @@
  * Default loader is lazy-imported so node:test can import this module without server-only.
  */
 
-import { isMassageMinutes } from "@/lib/booking-pricing";
+import {
+  calculateCleaningV1Price,
+  isMassageMinutes,
+  parseCleaningV1PriceInput,
+  type CleaningV1RoomCounts,
+  type CleaningV1Type,
+} from "@/lib/booking-pricing";
 import {
   resolveBookingPricingFromBook,
   type ResolvedPricingFromBook,
 } from "@/lib/booking-pricing-from-book";
 import type { ActivePricingBook } from "@/lib/pricing-book-validation";
 
+export type ResolveOrderPricingCleaningV1 = {
+  roomCounts: CleaningV1RoomCounts;
+  areaM2: number;
+  cleaningType: CleaningV1Type;
+};
+
 export type ResolveOrderPricingInput = {
   service: "cleaning" | "massage" | "repair";
   rooms?: number;
   massageMinutes?: number;
+  /** Isolated Cleaning v1 branch — not wired from the HTTP handler yet. */
+  cleaningPricingVersion?: "v1";
+  cleaningV1?: ResolveOrderPricingCleaningV1;
 };
 
 export type ResolveOrderPricingSuccess = {
@@ -40,6 +55,88 @@ async function defaultLoadBook(): Promise<ActivePricingBook> {
   return getActivePricingBook();
 }
 
+function resolveCleaningV1Pricing(
+  input: ResolveOrderPricingInput,
+): ResolveOrderPricingSuccess | ResolveOrderPricingFailure {
+  if (input.rooms != null) {
+    return {
+      ok: false,
+      status: 400,
+      message: "Уберите устаревшее поле rooms из запроса Cleaning v1",
+    };
+  }
+
+  const cleaningV1 = input.cleaningV1;
+  if (cleaningV1 == null || typeof cleaningV1 !== "object") {
+    return {
+      ok: false,
+      status: 400,
+      message: "Некорректные поля Cleaning v1",
+    };
+  }
+
+  const parsed = parseCleaningV1PriceInput({
+    rooms: cleaningV1.roomCounts,
+    areaM2: cleaningV1.areaM2,
+    cleaningType: cleaningV1.cleaningType,
+  });
+  if (!parsed.ok) {
+    return { ok: false, status: 400, message: parsed.error };
+  }
+
+  const calculated = calculateCleaningV1Price(parsed.value);
+  if ("error" in calculated) {
+    return { ok: false, status: 400, message: calculated.error };
+  }
+
+  const {
+    roomMinutes,
+    areaAdjustmentMinutes,
+    totalPersonMinutes,
+    billablePersonMinutes,
+    billableHours,
+    customerPriceEuro,
+    adminReviewRequired,
+  } = calculated;
+
+  const pricingSnapshot: Record<string, unknown> = {
+    service: "cleaning",
+    cleaningPricingVersion: "v1",
+    roomCounts: parsed.value.rooms,
+    areaM2: parsed.value.areaM2,
+    cleaningType: parsed.value.cleaningType,
+    roomMinutes,
+    areaAdjustmentMinutes,
+    totalPersonMinutes,
+    billablePersonMinutes,
+    billableHours,
+    customerPriceEuro,
+    adminReviewRequired,
+  };
+
+  if (adminReviewRequired) {
+    return {
+      ok: true,
+      priced: { mode: "quote", priceEuro: null },
+      pricingSnapshot,
+    };
+  }
+
+  if (customerPriceEuro == null || typeof customerPriceEuro !== "number") {
+    return {
+      ok: false,
+      status: 400,
+      message: "Некорректная цена Cleaning v1",
+    };
+  }
+
+  return {
+    ok: true,
+    priced: { mode: "fixed", priceEuro: customerPriceEuro },
+    pricingSnapshot,
+  };
+}
+
 export async function resolveOrderPricing(
   input: ResolveOrderPricingInput,
   loadBook: LoadActivePricingBook = defaultLoadBook,
@@ -52,6 +149,10 @@ export async function resolveOrderPricing(
   }
 
   if (input.service === "cleaning") {
+    if (input.cleaningPricingVersion === "v1") {
+      return resolveCleaningV1Pricing(input);
+    }
+
     const rooms = input.rooms;
     if (
       rooms == null ||

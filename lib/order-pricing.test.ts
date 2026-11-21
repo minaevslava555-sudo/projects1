@@ -1,7 +1,56 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import type { CleaningV1RoomCounts } from "@/lib/booking-pricing";
 import type { ActivePricingBook } from "@/lib/pricing-book-validation";
 import { resolveOrderPricing } from "@/lib/order-pricing";
+
+const emptyV1Rooms: CleaningV1RoomCounts = {
+  bedroom: 0,
+  livingRoom: 0,
+  kitchen: 0,
+  bathroom: 0,
+  separateWc: 0,
+  hallway: 0,
+  otherRoom: 0,
+};
+
+const roomsA: CleaningV1RoomCounts = {
+  ...emptyV1Rooms,
+  bedroom: 1,
+  livingRoom: 1,
+  kitchen: 1,
+  bathroom: 1,
+  hallway: 1,
+};
+
+const roomsB: CleaningV1RoomCounts = {
+  ...emptyV1Rooms,
+  bedroom: 2,
+  livingRoom: 1,
+  kitchen: 1,
+  bathroom: 2,
+  hallway: 1,
+};
+
+const roomsC: CleaningV1RoomCounts = {
+  ...emptyV1Rooms,
+  bedroom: 4,
+  livingRoom: 1,
+  kitchen: 1,
+  bathroom: 3,
+  hallway: 2,
+};
+
+async function assertBookNotLoaded(
+  run: (loadBook: () => Promise<ActivePricingBook>) => Promise<unknown>,
+) {
+  let loadCount = 0;
+  await run(async () => {
+    loadCount += 1;
+    throw new Error("Pricing book must not load for Cleaning v1");
+  });
+  assert.equal(loadCount, 0);
+}
 
 test("resolveOrderPricing prepares cleaning price and snapshots", async () => {
   const book: ActivePricingBook = {
@@ -210,4 +259,213 @@ test("resolveOrderPricing rejects invalid inputs before loading book", async () 
     assert.equal(loadCount, 0);
     assert.equal("priced" in result, false);
   }
+});
+
+test("resolveOrderPricing Cleaning v1 matches all 9 approved prices without loading book", async () => {
+  const cases = [
+    { rooms: roomsA, areaM2: 55, cleaningType: "standard" as const, price: 70 },
+    { rooms: roomsA, areaM2: 55, cleaningType: "deep" as const, price: 100 },
+    {
+      rooms: roomsA,
+      areaM2: 55,
+      cleaningType: "post_renovation" as const,
+      price: 130,
+    },
+    { rooms: roomsB, areaM2: 100, cleaningType: "standard" as const, price: 100 },
+    { rooms: roomsB, areaM2: 100, cleaningType: "deep" as const, price: 150 },
+    {
+      rooms: roomsB,
+      areaM2: 100,
+      cleaningType: "post_renovation" as const,
+      price: 190,
+    },
+    { rooms: roomsC, areaM2: 170, cleaningType: "standard" as const, price: 150 },
+    { rooms: roomsC, areaM2: 170, cleaningType: "deep" as const, price: 230 },
+    {
+      rooms: roomsC,
+      areaM2: 170,
+      cleaningType: "post_renovation" as const,
+      price: 300,
+    },
+  ];
+
+  for (const row of cases) {
+    let loadCount = 0;
+    const result = await resolveOrderPricing(
+      {
+        service: "cleaning",
+        cleaningPricingVersion: "v1",
+        cleaningV1: {
+          roomCounts: row.rooms,
+          areaM2: row.areaM2,
+          cleaningType: row.cleaningType,
+        },
+      },
+      async () => {
+        loadCount += 1;
+        throw new Error("Pricing book must not load for Cleaning v1");
+      },
+    );
+
+    assert.equal(loadCount, 0);
+    assert.equal(result.ok, true);
+    if (!result.ok) {
+      assert.fail("expected v1 success");
+    }
+    assert.equal(result.priced.mode, "fixed");
+    if (result.priced.mode !== "fixed") {
+      return;
+    }
+    assert.equal(result.priced.priceEuro, row.price);
+    assert.equal(result.priced.hours, undefined);
+    assert.equal(result.priced.workers, undefined);
+    assert.equal(result.pricingConfigId, undefined);
+    assert.equal(result.pricingSnapshot?.cleaningPricingVersion, "v1");
+    assert.equal(result.pricingSnapshot?.customerPriceEuro, row.price);
+    assert.equal(result.pricingSnapshot?.adminReviewRequired, false);
+    assert.deepEqual(result.pricingSnapshot?.roomCounts, row.rooms);
+    assert.equal(result.pricingSnapshot?.areaM2, row.areaM2);
+    assert.equal(result.pricingSnapshot?.cleaningType, row.cleaningType);
+    assert.equal(typeof result.pricingSnapshot?.roomMinutes, "number");
+    assert.equal(typeof result.pricingSnapshot?.areaAdjustmentMinutes, "number");
+    assert.equal(typeof result.pricingSnapshot?.totalPersonMinutes, "number");
+    assert.equal(typeof result.pricingSnapshot?.billablePersonMinutes, "number");
+    assert.equal(typeof result.pricingSnapshot?.billableHours, "number");
+  }
+});
+
+test("resolveOrderPricing Cleaning v1 area 181 returns quote with null price", async () => {
+  let loadCount = 0;
+  const result = await resolveOrderPricing(
+    {
+      service: "cleaning",
+      cleaningPricingVersion: "v1",
+      cleaningV1: {
+        roomCounts: roomsA,
+        areaM2: 181,
+        cleaningType: "standard",
+      },
+    },
+    async () => {
+      loadCount += 1;
+      throw new Error("Pricing book must not load for Cleaning v1");
+    },
+  );
+
+  assert.equal(loadCount, 0);
+  assert.equal(result.ok, true);
+  if (!result.ok) {
+    return;
+  }
+  assert.equal(result.priced.mode, "quote");
+  assert.equal(result.priced.priceEuro, null);
+  assert.equal(result.pricingSnapshot?.adminReviewRequired, true);
+  assert.equal(result.pricingSnapshot?.customerPriceEuro, null);
+  assert.equal(result.pricingSnapshot?.areaM2, 181);
+  assert.equal(result.pricingSnapshot?.cleaningPricingVersion, "v1");
+});
+
+test("resolveOrderPricing Cleaning v1 rejects invalid or missing payload without legacy fallback", async () => {
+  const cases = [
+    {
+      service: "cleaning" as const,
+      cleaningPricingVersion: "v1" as const,
+    },
+    {
+      service: "cleaning" as const,
+      cleaningPricingVersion: "v1" as const,
+      cleaningV1: {
+        roomCounts: { bedroom: 1 } as CleaningV1RoomCounts,
+        areaM2: 55,
+        cleaningType: "standard" as const,
+      },
+    },
+    {
+      service: "cleaning" as const,
+      cleaningPricingVersion: "v1" as const,
+      cleaningV1: {
+        roomCounts: roomsA,
+        areaM2: "55" as unknown as number,
+        cleaningType: "standard" as const,
+      },
+    },
+    {
+      service: "cleaning" as const,
+      cleaningPricingVersion: "v1" as const,
+      cleaningV1: {
+        roomCounts: roomsA,
+        areaM2: 55,
+        cleaningType: "express" as "standard",
+      },
+    },
+  ];
+
+  for (const input of cases) {
+    let loadCount = 0;
+    const result = await resolveOrderPricing(input, async () => {
+      loadCount += 1;
+      throw new Error("Pricing book must not load for Cleaning v1");
+    });
+
+    assert.equal(result.ok, false);
+    if (result.ok) {
+      assert.fail("expected v1 validation failure");
+    }
+    assert.equal(result.status, 400);
+    assert.equal(loadCount, 0);
+    assert.equal("priced" in result, false);
+  }
+});
+
+test("resolveOrderPricing Cleaning v1 rejects mixed legacy rooms", async () => {
+  let loadCount = 0;
+  const result = await resolveOrderPricing(
+    {
+      service: "cleaning",
+      rooms: 2,
+      cleaningPricingVersion: "v1",
+      cleaningV1: {
+        roomCounts: roomsA,
+        areaM2: 55,
+        cleaningType: "standard",
+      },
+    },
+    async () => {
+      loadCount += 1;
+      throw new Error("Pricing book must not load for Cleaning v1");
+    },
+  );
+
+  assert.equal(loadCount, 0);
+  assert.equal(result.ok, false);
+  if (result.ok) {
+    return;
+  }
+  assert.equal(result.status, 400);
+  assert.match(result.message, /rooms/);
+  assert.equal("priced" in result, false);
+});
+
+test("resolveOrderPricing Cleaning v1 does not fall back to legacy rooms pricing", async () => {
+  await assertBookNotLoaded(async (loadBook) => {
+    const result = await resolveOrderPricing(
+      {
+        service: "cleaning",
+        cleaningPricingVersion: "v1",
+        // Valid legacy rooms alone would price at €60 — must not be used.
+        rooms: 2,
+        cleaningV1: {
+          roomCounts: roomsA,
+          areaM2: "bad" as unknown as number,
+          cleaningType: "standard",
+        },
+      },
+      loadBook,
+    );
+    assert.equal(result.ok, false);
+    if (result.ok) {
+      assert.fail("must not succeed via legacy fallback");
+    }
+    assert.equal(result.status, 400);
+  });
 });
