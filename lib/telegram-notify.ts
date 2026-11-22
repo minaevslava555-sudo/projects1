@@ -231,6 +231,10 @@ async function sendMediaGroup(
 
 /** Лёгкая отправка без импорта bot/ — безопаснее для Vercel serverless. */
 export async function notifyAdminAboutOrder(order: OrderNotification) {
+  if (process.env.TELEGRAM_NOTIFY_DISABLED === "1") {
+    return;
+  }
+
   const token = process.env.TOKEN_TELEGRAM?.trim();
   const chatIds = adminChatIdsFromEnv();
 
