@@ -1,4 +1,4 @@
-import { redisCommand, redisCreds } from "@/lib/redis-rest";
+import { redisCreds } from "@/lib/redis-rest";
 
 export const runtime = "nodejs";
 
@@ -7,16 +7,34 @@ const EXPECTED_REF = "feature/85h-gallery-motion-prototype";
 
 const NO_STORE = { "Cache-Control": "no-store" } as const;
 
-function jsonBooleans(
-  body: {
-    ok: boolean;
-    redisConfigured: boolean;
-    hostMatch: boolean;
-    readOk: boolean;
-  },
-  status = 200,
-) {
+type PingBooleans = {
+  ok: boolean;
+  redisConfigured: boolean;
+  hostMatch: boolean;
+  readOk: boolean;
+  failAuth: boolean;
+  failHttp: boolean;
+  failShape: boolean;
+  failOther: boolean;
+};
+
+function jsonBooleans(body: PingBooleans, status = 200) {
   return Response.json(body, { status, headers: NO_STORE });
+}
+
+function closed(
+  partial: Pick<PingBooleans, "redisConfigured" | "hostMatch">,
+): PingBooleans {
+  return {
+    ok: false,
+    redisConfigured: partial.redisConfigured,
+    hostMatch: partial.hostMatch,
+    readOk: false,
+    failAuth: false,
+    failHttp: false,
+    failShape: false,
+    failOther: false,
+  };
 }
 
 function previewGateOpen(): boolean {
@@ -35,6 +53,10 @@ function hostMatchesExpected(url: string): boolean {
   }
 }
 
+function isPong(result: unknown): boolean {
+  return result === "PONG" || result === true;
+}
+
 /** Temporary Preview-only read-only Redis ping. Remove after Cleaning v1 isolation check. */
 export async function GET() {
   if (!previewGateOpen()) {
@@ -42,34 +64,89 @@ export async function GET() {
   }
 
   const creds = redisCreds();
-  const redisConfigured = creds != null;
-  if (!redisConfigured) {
-    return jsonBooleans({
-      ok: false,
-      redisConfigured: false,
-      hostMatch: false,
-      readOk: false,
-    });
+  if (creds == null) {
+    return jsonBooleans(closed({ redisConfigured: false, hostMatch: false }));
   }
 
-  const hostMatch = hostMatchesExpected(creds.url);
-  if (!hostMatch) {
-    return jsonBooleans({
-      ok: false,
-      redisConfigured: true,
-      hostMatch: false,
-      readOk: false,
-    });
+  if (!hostMatchesExpected(creds.url)) {
+    return jsonBooleans(closed({ redisConfigured: true, hostMatch: false }));
   }
 
   try {
-    const result = await redisCommand(["PING"]);
-    const readOk = result === "PONG" || result === true;
+    const response = await fetch(creds.url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${creds.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(["PING"]),
+      cache: "no-store",
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      return jsonBooleans({
+        ok: false,
+        redisConfigured: true,
+        hostMatch: true,
+        readOk: false,
+        failAuth: true,
+        failHttp: false,
+        failShape: false,
+        failOther: false,
+      });
+    }
+
+    if (!response.ok) {
+      return jsonBooleans({
+        ok: false,
+        redisConfigured: true,
+        hostMatch: true,
+        readOk: false,
+        failAuth: false,
+        failHttp: true,
+        failShape: false,
+        failOther: false,
+      });
+    }
+
+    let payload: { result?: unknown; error?: string };
+    try {
+      payload = (await response.json()) as { result?: unknown; error?: string };
+    } catch {
+      return jsonBooleans({
+        ok: false,
+        redisConfigured: true,
+        hostMatch: true,
+        readOk: false,
+        failAuth: false,
+        failHttp: false,
+        failShape: false,
+        failOther: true,
+      });
+    }
+
+    if (payload.error || !isPong(payload.result)) {
+      return jsonBooleans({
+        ok: false,
+        redisConfigured: true,
+        hostMatch: true,
+        readOk: false,
+        failAuth: false,
+        failHttp: false,
+        failShape: true,
+        failOther: false,
+      });
+    }
+
     return jsonBooleans({
-      ok: readOk,
+      ok: true,
       redisConfigured: true,
       hostMatch: true,
-      readOk,
+      readOk: true,
+      failAuth: false,
+      failHttp: false,
+      failShape: false,
+      failOther: false,
     });
   } catch {
     return jsonBooleans({
@@ -77,6 +154,10 @@ export async function GET() {
       redisConfigured: true,
       hostMatch: true,
       readOk: false,
+      failAuth: false,
+      failHttp: false,
+      failShape: false,
+      failOther: true,
     });
   }
 }
