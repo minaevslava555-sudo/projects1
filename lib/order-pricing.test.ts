@@ -327,11 +327,51 @@ test("resolveOrderPricing Cleaning v1 matches all 9 approved prices without load
     assert.equal(result.pricingSnapshot?.areaM2, row.areaM2);
     assert.equal(result.pricingSnapshot?.cleaningType, row.cleaningType);
     assert.equal(typeof result.pricingSnapshot?.roomMinutes, "number");
+    assert.equal(typeof result.pricingSnapshot?.addonMinutes, "number");
+    assert.equal(result.pricingSnapshot?.addonMinutes, 0);
     assert.equal(typeof result.pricingSnapshot?.areaAdjustmentMinutes, "number");
     assert.equal(typeof result.pricingSnapshot?.totalPersonMinutes, "number");
     assert.equal(typeof result.pricingSnapshot?.billablePersonMinutes, "number");
     assert.equal(typeof result.pricingSnapshot?.billableHours, "number");
+    assert.equal("addons" in (result.pricingSnapshot ?? {}), false);
   }
+});
+
+test("resolveOrderPricing Cleaning v1 snapshots non-zero addons", async () => {
+  const result = await resolveOrderPricing(
+    {
+      service: "cleaning",
+      cleaningPricingVersion: "v1",
+      cleaningV1: {
+        roomCounts: roomsA,
+        areaM2: 55,
+        cleaningType: "standard",
+        addons: {
+          oven: 1,
+          fridge: 0,
+          windows: 0,
+          balcony: 0,
+          ironing: 0,
+        },
+      },
+    },
+    async () => {
+      throw new Error("Pricing book must not load for Cleaning v1");
+    },
+  );
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.priced.mode, "fixed");
+  if (result.priced.mode !== "fixed") return;
+  assert.equal(result.priced.priceEuro, 80);
+  assert.equal(result.pricingSnapshot?.addonMinutes, 30);
+  assert.deepEqual(result.pricingSnapshot?.addons, {
+    oven: 1,
+    fridge: 0,
+    windows: 0,
+    balcony: 0,
+    ironing: 0,
+  });
 });
 
 test("resolveOrderPricing Cleaning v1 area 181 returns quote with null price", async () => {

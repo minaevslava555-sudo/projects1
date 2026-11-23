@@ -5,8 +5,10 @@
 
 import {
   calculateCleaningV1Price,
+  cleaningV1AddonsHaveWork,
   isMassageMinutes,
   parseCleaningV1PriceInput,
+  type CleaningV1AddonCounts,
   type CleaningV1RoomCounts,
   type CleaningV1Type,
 } from "@/lib/booking-pricing";
@@ -20,13 +22,14 @@ export type ResolveOrderPricingCleaningV1 = {
   roomCounts: CleaningV1RoomCounts;
   areaM2: number;
   cleaningType: CleaningV1Type;
+  addons?: CleaningV1AddonCounts;
 };
 
 export type ResolveOrderPricingInput = {
   service: "cleaning" | "massage" | "repair";
   rooms?: number;
   massageMinutes?: number;
-  /** Isolated Cleaning v1 branch — not wired from the HTTP handler yet. */
+  /** Cleaning v1 branch — gated by CLEANING_V1_ORDERS_ENABLED in the HTTP handler. */
   cleaningPricingVersion?: "v1";
   cleaningV1?: ResolveOrderPricingCleaningV1;
 };
@@ -79,6 +82,7 @@ function resolveCleaningV1Pricing(
     rooms: cleaningV1.roomCounts,
     areaM2: cleaningV1.areaM2,
     cleaningType: cleaningV1.cleaningType,
+    ...(cleaningV1.addons != null ? { addons: cleaningV1.addons } : {}),
   });
   if (!parsed.ok) {
     return { ok: false, status: 400, message: parsed.error };
@@ -91,6 +95,7 @@ function resolveCleaningV1Pricing(
 
   const {
     roomMinutes,
+    addonMinutes,
     areaAdjustmentMinutes,
     totalPersonMinutes,
     billablePersonMinutes,
@@ -99,6 +104,7 @@ function resolveCleaningV1Pricing(
     adminReviewRequired,
   } = calculated;
 
+  const addons = parsed.value.addons;
   const pricingSnapshot: Record<string, unknown> = {
     service: "cleaning",
     cleaningPricingVersion: "v1",
@@ -106,6 +112,7 @@ function resolveCleaningV1Pricing(
     areaM2: parsed.value.areaM2,
     cleaningType: parsed.value.cleaningType,
     roomMinutes,
+    addonMinutes,
     areaAdjustmentMinutes,
     totalPersonMinutes,
     billablePersonMinutes,
@@ -113,6 +120,9 @@ function resolveCleaningV1Pricing(
     customerPriceEuro,
     adminReviewRequired,
   };
+  if (addons != null && cleaningV1AddonsHaveWork(addons)) {
+    pricingSnapshot.addons = addons;
+  }
 
   if (adminReviewRequired) {
     return {

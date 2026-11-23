@@ -141,4 +141,19 @@ test("client/server fingerprint parity for legacy and cleaning v1", async () => 
   const v1Server = buildOrderRequestFingerprint(v1Sample);
   assert.equal(v1Client, v1Server);
   assert.notEqual(v1Client, legacyClient);
+
+  const v1WithAddons = {
+    ...v1Sample,
+    addons: {
+      oven: 1,
+      fridge: 0,
+      windows: 0,
+      balcony: 0,
+      ironing: 0,
+    },
+  };
+  const addonsClient = await buildBookingAttemptFingerprint(v1WithAddons);
+  const addonsServer = buildOrderRequestFingerprint(v1WithAddons);
+  assert.equal(addonsClient, addonsServer);
+  assert.notEqual(addonsClient, v1Client);
 });

@@ -217,6 +217,17 @@
     "roomsLabel": "Number of rooms",
     "chooseRoomsHint": "Select how many rooms need cleaning to see hours, cleaners and price.",
     "cleaningV1RoomsHeading": "Rooms to clean",
+    "cleaningV1PresetsHeading": "Typical home",
+    "cleaningV1PresetsHint": "Start from a typical layout, then adjust rooms if needed.",
+    "cleaningV1Presets": {
+      "t1": "T1",
+      "t2": "T2",
+      "t3": "T3"
+    },
+    "cleaningV1ShowAdvancedRooms": "More rooms (living room, WC, hallway…)",
+    "cleaningV1HideAdvancedRooms": "Hide extra rooms",
+    "cleaningV1ShowAddons": "Extra tasks (oven, windows…)",
+    "cleaningV1HideAddons": "Hide extra tasks",
     "cleaningV1RoomLabels": {
       "bedroom": "Bedroom",
       "livingRoom": "Living room",
@@ -226,8 +237,16 @@
       "hallway": "Hallway",
       "otherRoom": "Other room"
     },
+    "cleaningV1AddonLabels": {
+      "oven": "Oven clean",
+      "fridge": "Fridge clean",
+      "windows": "Windows",
+      "balcony": "Balcony",
+      "ironing": "Ironing hour"
+    },
     "cleaningV1AreaLabel": "Area (m²)",
     "cleaningV1AreaPlaceholder": "e.g. 85",
+    "cleaningV1AreaHint": "No area surcharge up to {freeArea} m². Over {reviewArea} m² needs a manual quote.",
     "cleaningV1TypeLabel": "Cleaning type",
     "cleaningV1Types": {
       "standard": "Standard",
@@ -237,15 +256,18 @@
     "cleaningV1IncompleteHint": "Add at least one room, enter the area in m² and choose a cleaning type to see the estimate.",
     "cleaningV1InvalidHint": "Check the room counts, area and cleaning type — the estimate could not be calculated.",
     "cleaningV1BillableHoursLabel": "Billable hours",
+    "cleaningV1EstimateNote": "Estimate from rooms, area and cleaning type. Cleaner count is set by HAVENLY after review.",
     "cleaningV1CleanersNote": "Final cleaner count is assigned by HAVENLY after reviewing your booking.",
     "cleaningV1QuoteTitle": "Manual quote required",
     "cleaningV1QuoteBody": "Homes over 180 m² need a HAVENLY review. We will confirm the price after assessing the request — no fixed price is shown here.",
     "cleaningV1SummaryType": "Type: {type}",
     "cleaningV1SummaryArea": "Area: {area} m²",
     "cleaningV1SummaryRooms": "Rooms: {rooms}",
+    "cleaningV1SummaryAddons": "Extras: {addons}",
     "cleaningV1SummaryPrice": "~{hours} billable hours · {total}",
     "successCleaningV1QuoteNote": "This request needs a HAVENLY review — no fixed price was confirmed at booking.",
     "cleaningV1PreviewHint": "Cleaning v1 submission stays disabled while you preview the new options.",
+    "cleaningV1PreviewSubmitDisabled": "Preview only — submit disabled",
     "decrease": "Decrease {label}",
     "increase": "Increase {label}",
     "cleaningPlan": "{rooms} require ~{hours} and {cleaners}",

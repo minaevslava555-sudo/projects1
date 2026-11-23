@@ -33,6 +33,8 @@ export type BookingAttemptFingerprintInput = {
   roomCounts?: Record<string, unknown> | null;
   areaM2?: number | null;
   cleaningType?: string | null;
+  /** Included only when at least one add-on count is > 0 (keeps legacy v1 digests stable). */
+  addons?: Record<string, unknown> | null;
 };
 
 function canonicalize(value: unknown): unknown {
@@ -92,6 +94,17 @@ export async function buildBookingAttemptFingerprint(
     payload.cleaningPricingVersion = "v1";
     payload.cleaningType = input.cleaningType ?? null;
     payload.roomCounts = input.roomCounts ?? null;
+    const addons = input.addons;
+    if (
+      addons != null &&
+      typeof addons === "object" &&
+      !Array.isArray(addons) &&
+      Object.values(addons).some(
+        (count) => typeof count === "number" && count > 0,
+      )
+    ) {
+      payload.addons = addons;
+    }
   }
 
   const json = JSON.stringify(canonicalize(payload));

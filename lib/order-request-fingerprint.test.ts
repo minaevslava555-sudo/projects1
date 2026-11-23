@@ -292,3 +292,46 @@ test("areaM2 80 and 80.0 produce identical v1 fingerprints", () => {
   });
   assert.equal(a, b);
 });
+
+test("zero addons leave v1 fingerprint unchanged; non-zero addons change it", () => {
+  const base = buildOrderRequestFingerprint({
+    ...baseBooking,
+    rooms: null,
+    cleaningPricingVersion: "v1",
+    roomCounts: v1RoomCountsA,
+    areaM2: 80,
+    cleaningType: "standard",
+  });
+  const withZero = buildOrderRequestFingerprint({
+    ...baseBooking,
+    rooms: null,
+    cleaningPricingVersion: "v1",
+    roomCounts: v1RoomCountsA,
+    areaM2: 80,
+    cleaningType: "standard",
+    addons: {
+      oven: 0,
+      fridge: 0,
+      windows: 0,
+      balcony: 0,
+      ironing: 0,
+    },
+  });
+  const withOven = buildOrderRequestFingerprint({
+    ...baseBooking,
+    rooms: null,
+    cleaningPricingVersion: "v1",
+    roomCounts: v1RoomCountsA,
+    areaM2: 80,
+    cleaningType: "standard",
+    addons: {
+      oven: 1,
+      fridge: 0,
+      windows: 0,
+      balcony: 0,
+      ironing: 0,
+    },
+  });
+  assert.equal(base, withZero);
+  assert.notEqual(base, withOven);
+});

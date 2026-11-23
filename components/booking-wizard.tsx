@@ -9,14 +9,29 @@ import {
   writeBookingAttempt,
 } from "@/lib/booking-attempt";
 import {
+  CLEANING_V1_ADDON_KEYS,
+  CLEANING_V1_ADMIN_REVIEW_AREA_M2,
+  CLEANING_V1_ADVANCED_ROOM_KEYS,
+  CLEANING_V1_AREA_FREE_M2,
+  CLEANING_V1_MAX_ADDON_COUNT,
+  CLEANING_V1_MAX_ROOMS_PER_TYPE,
+  CLEANING_V1_PRESETS,
+  CLEANING_V1_PRIMARY_ROOM_KEYS,
+  CLEANING_V1_ROOM_KEYS,
+  EMPTY_CLEANING_V1_ADDONS,
+  EMPTY_CLEANING_V1_ROOMS,
   MASSAGE_OPTIONS,
   buildTimeSlots,
   calculateCleaningV1Price,
   cleaningPlan,
   cleaningPriceEuro,
+  cleaningV1AddonsHaveWork,
   formatEuro,
   massagePriceEuro,
   type BookingService,
+  type CleaningV1AddonCounts,
+  type CleaningV1AddonId,
+  type CleaningV1PresetId,
   type CleaningV1PriceResult,
   type CleaningV1RoomCounts,
   type CleaningV1Type,
@@ -238,25 +253,14 @@ const TIME_SLOTS = buildTimeSlots();
 const CLEANING_V1_BOOKING_ENABLED =
   process.env.NEXT_PUBLIC_CLEANING_V1_BOOKING_ENABLED === "true";
 
-const EMPTY_CLEANING_V1_ROOMS: CleaningV1RoomCounts = {
-  bedroom: 0,
-  livingRoom: 0,
-  kitchen: 0,
-  bathroom: 0,
-  separateWc: 0,
-  hallway: 0,
-  otherRoom: 0,
-};
+/**
+ * Client submit gate — set together with server CLEANING_V1_ORDERS_ENABLED.
+ * When booking UI is on but this is off, show preview-only and block Confirm.
+ */
+const CLEANING_V1_ORDERS_CLIENT_ENABLED =
+  process.env.NEXT_PUBLIC_CLEANING_V1_ORDERS_ENABLED === "true";
 
-const CLEANING_V1_ROOM_KEYS: Array<keyof CleaningV1RoomCounts> = [
-  "bedroom",
-  "livingRoom",
-  "kitchen",
-  "bathroom",
-  "separateWc",
-  "hallway",
-  "otherRoom",
-];
+const CLEANING_V1_PRESET_IDS: CleaningV1PresetId[] = ["t1", "t2", "t3"];
 
 const CLEANING_V1_TYPES: CleaningV1Type[] = [
   "standard",
@@ -378,8 +382,16 @@ export default function BookingWizard({
   const [roomCounts, setRoomCounts] = useState<CleaningV1RoomCounts>(
     EMPTY_CLEANING_V1_ROOMS,
   );
+  const [addonCounts, setAddonCounts] = useState<CleaningV1AddonCounts>(
+    EMPTY_CLEANING_V1_ADDONS,
+  );
   const [areaM2, setAreaM2] = useState<number | null>(null);
   const [cleaningType, setCleaningType] = useState<CleaningV1Type | null>(null);
+  const [showAdvancedRooms, setShowAdvancedRooms] = useState(false);
+  const [showAddons, setShowAddons] = useState(false);
+  const [activePreset, setActivePreset] = useState<CleaningV1PresetId | null>(
+    null,
+  );
   const [massageMinutes, setMassageMinutes] = useState<MassageMinutes>(60);
   const [problemDescription, setProblemDescription] = useState("");
   const [draftId, setDraftId] = useState<string | null>(null);
@@ -484,6 +496,7 @@ export default function BookingWizard({
         rooms: roomCounts,
         areaM2,
         cleaningType,
+        addons: addonCounts,
       });
       if ("error" in result) {
         return { status: "invalid" };
@@ -495,10 +508,12 @@ export default function BookingWizard({
     } catch {
       return { status: "invalid" };
     }
-  }, [service, roomCounts, areaM2, cleaningType]);
+  }, [service, roomCounts, addonCounts, areaM2, cleaningType]);
 
   const isCleaningV1Booking =
     CLEANING_V1_BOOKING_ENABLED && service === "cleaning";
+  const isCleaningV1PreviewOnly =
+    isCleaningV1Booking && !CLEANING_V1_ORDERS_CLIENT_ENABLED;
   const cleaningV1ConfigReady =
     cleaningV1Estimate?.status === "fixed" ||
     cleaningV1Estimate?.status === "quote";
@@ -528,6 +543,13 @@ export default function BookingWizard({
   function resetWizardFields(options?: { preserveAttempt?: boolean }) {
     setStepIndex(0);
     setRooms(null);
+    setRoomCounts(EMPTY_CLEANING_V1_ROOMS);
+    setAddonCounts(EMPTY_CLEANING_V1_ADDONS);
+    setAreaM2(null);
+    setCleaningType(null);
+    setShowAdvancedRooms(false);
+    setShowAddons(false);
+    setActivePreset(null);
     setMassageMinutes(60);
     setProblemDescription("");
     setDraftId(null);
@@ -1237,6 +1259,11 @@ export default function BookingWizard({
         navigateToStep(STEPS.indexOf("configure"));
         return;
       }
+      if (isCleaningV1PreviewOnly) {
+        setErrorCode("cleaningV1PreviewOnly");
+        navigateToStep(STEPS.indexOf("configure"));
+        return;
+      }
     } else if (service === "cleaning" && rooms == null) {
       setErrorCode("chooseRooms");
       navigateToStep(STEPS.indexOf("configure"));
@@ -1279,6 +1306,9 @@ export default function BookingWizard({
               roomCounts,
               areaM2,
               cleaningType,
+              ...(cleaningV1AddonsHaveWork(addonCounts)
+                ? { addons: addonCounts }
+                : {}),
             }
           : {}),
       });
@@ -1328,6 +1358,9 @@ export default function BookingWizard({
                 roomCounts,
                 areaM2,
                 cleaningType,
+                ...(cleaningV1AddonsHaveWork(addonCounts)
+                  ? { addons: addonCounts }
+                  : {}),
               }
             : {
                 rooms: service === "cleaning" ? rooms : undefined,
@@ -1698,12 +1731,58 @@ export default function BookingWizard({
               <div className="booking-cleaning-rooms space-y-4">
                 {CLEANING_V1_BOOKING_ENABLED ? (
                   <>
+                    {isCleaningV1PreviewOnly ? (
+                      <div
+                        className="rounded-xl border border-gold/40 bg-gold/10 px-3 py-3 text-sm text-ink"
+                        role="status"
+                      >
+                        {t("cleaningV1PreviewHint")}
+                      </div>
+                    ) : null}
+
+                    <div>
+                      <p className="mb-2 block text-sm font-medium text-ink">
+                        {t("cleaningV1PresetsHeading")}
+                      </p>
+                      <div
+                        className="grid grid-cols-3 gap-2"
+                        role="group"
+                        aria-label={t("cleaningV1PresetsHeading")}
+                      >
+                        {CLEANING_V1_PRESET_IDS.map((presetId) => {
+                          const selected = activePreset === presetId;
+                          return (
+                            <button
+                              key={presetId}
+                              type="button"
+                              aria-pressed={selected}
+                              onClick={() => {
+                                setRoomCounts({ ...CLEANING_V1_PRESETS[presetId] });
+                                setActivePreset(presetId);
+                                clearError();
+                              }}
+                              className={`booking-room-option havenly-control px-3 py-3 text-sm font-semibold transition ${
+                                selected
+                                  ? "border border-olive bg-olive text-white shadow-sm shadow-olive/20"
+                                  : "border border-mist bg-white text-ink hover:border-olive"
+                              }`}
+                            >
+                              {t(`cleaningV1Presets.${presetId}`)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-2 text-xs text-muted">
+                        {t("cleaningV1PresetsHint")}
+                      </p>
+                    </div>
+
                     <div>
                       <p className="mb-2 block text-sm font-medium text-ink">
                         {t("cleaningV1RoomsHeading")}
                       </p>
                       <div className="space-y-2">
-                        {CLEANING_V1_ROOM_KEYS.map((key) => {
+                        {CLEANING_V1_PRIMARY_ROOM_KEYS.map((key) => {
                           const label = t(`cleaningV1RoomLabels.${key}`);
                           const count = roomCounts[key];
                           return (
@@ -1726,6 +1805,7 @@ export default function BookingWizard({
                                       ...prev,
                                       [key]: Math.max(0, prev[key] - 1),
                                     }));
+                                    setActivePreset(null);
                                     clearError();
                                   }}
                                   className="havenly-control inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
@@ -1738,17 +1818,23 @@ export default function BookingWizard({
                                   readOnly
                                   value={String(count)}
                                   aria-valuemin={0}
+                                  aria-valuemax={CLEANING_V1_MAX_ROOMS_PER_TYPE}
                                   aria-valuenow={count}
                                   className="havenly-control w-full border border-mist bg-white px-4 py-3 text-center text-ink outline-none"
                                 />
                                 <button
                                   type="button"
                                   aria-label={t("increase", { label })}
+                                  disabled={count >= CLEANING_V1_MAX_ROOMS_PER_TYPE}
                                   onClick={() => {
                                     setRoomCounts((prev) => ({
                                       ...prev,
-                                      [key]: prev[key] + 1,
+                                      [key]: Math.min(
+                                        CLEANING_V1_MAX_ROOMS_PER_TYPE,
+                                        prev[key] + 1,
+                                      ),
                                     }));
+                                    setActivePreset(null);
                                     clearError();
                                   }}
                                   className="havenly-control inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
@@ -1760,6 +1846,85 @@ export default function BookingWizard({
                           );
                         })}
                       </div>
+                      <button
+                        type="button"
+                        className="mt-3 text-sm font-semibold text-olive underline-offset-2 hover:underline"
+                        aria-expanded={showAdvancedRooms}
+                        onClick={() => setShowAdvancedRooms((value) => !value)}
+                      >
+                        {showAdvancedRooms
+                          ? t("cleaningV1HideAdvancedRooms")
+                          : t("cleaningV1ShowAdvancedRooms")}
+                      </button>
+                      {showAdvancedRooms ? (
+                        <div className="mt-3 space-y-2">
+                          {CLEANING_V1_ADVANCED_ROOM_KEYS.map((key) => {
+                            const label = t(`cleaningV1RoomLabels.${key}`);
+                            const count = roomCounts[key];
+                            return (
+                              <div
+                                key={key}
+                                className="booking-cleaning-qty"
+                                role="group"
+                                aria-label={label}
+                              >
+                                <div className="mb-1 text-xs font-medium text-ink/80">
+                                  {label}
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    type="button"
+                                    aria-label={t("decrease", { label })}
+                                    disabled={count <= 0}
+                                    onClick={() => {
+                                      setRoomCounts((prev) => ({
+                                        ...prev,
+                                        [key]: Math.max(0, prev[key] - 1),
+                                      }));
+                                      setActivePreset(null);
+                                      clearError();
+                                    }}
+                                    className="havenly-control inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
+                                  >
+                                    −
+                                  </button>
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    readOnly
+                                    value={String(count)}
+                                    aria-valuemin={0}
+                                    aria-valuemax={CLEANING_V1_MAX_ROOMS_PER_TYPE}
+                                    aria-valuenow={count}
+                                    className="havenly-control w-full border border-mist bg-white px-4 py-3 text-center text-ink outline-none"
+                                  />
+                                  <button
+                                    type="button"
+                                    aria-label={t("increase", { label })}
+                                    disabled={
+                                      count >= CLEANING_V1_MAX_ROOMS_PER_TYPE
+                                    }
+                                    onClick={() => {
+                                      setRoomCounts((prev) => ({
+                                        ...prev,
+                                        [key]: Math.min(
+                                          CLEANING_V1_MAX_ROOMS_PER_TYPE,
+                                          prev[key] + 1,
+                                        ),
+                                      }));
+                                      setActivePreset(null);
+                                      clearError();
+                                    }}
+                                    className="havenly-control inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : null}
                     </div>
 
                     <Field id="cleaning-v1-area" label={t("cleaningV1AreaLabel")}>
@@ -1784,6 +1949,12 @@ export default function BookingWizard({
                         }}
                         className={inputClass}
                       />
+                      <p className="mt-2 text-xs text-muted">
+                        {t("cleaningV1AreaHint", {
+                          freeArea: CLEANING_V1_AREA_FREE_M2,
+                          reviewArea: CLEANING_V1_ADMIN_REVIEW_AREA_M2,
+                        })}
+                      </p>
                     </Field>
 
                     <div>
@@ -1819,6 +1990,84 @@ export default function BookingWizard({
                       </div>
                     </div>
 
+                    <div>
+                      <button
+                        type="button"
+                        className="text-sm font-semibold text-olive underline-offset-2 hover:underline"
+                        aria-expanded={showAddons}
+                        onClick={() => setShowAddons((value) => !value)}
+                      >
+                        {showAddons
+                          ? t("cleaningV1HideAddons")
+                          : t("cleaningV1ShowAddons")}
+                      </button>
+                      {showAddons ? (
+                        <div className="mt-3 space-y-2">
+                          {CLEANING_V1_ADDON_KEYS.map((key: CleaningV1AddonId) => {
+                            const label = t(`cleaningV1AddonLabels.${key}`);
+                            const count = addonCounts[key];
+                            return (
+                              <div
+                                key={key}
+                                className="booking-cleaning-qty"
+                                role="group"
+                                aria-label={label}
+                              >
+                                <div className="mb-1 text-xs font-medium text-ink/80">
+                                  {label}
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    type="button"
+                                    aria-label={t("decrease", { label })}
+                                    disabled={count <= 0}
+                                    onClick={() => {
+                                      setAddonCounts((prev) => ({
+                                        ...prev,
+                                        [key]: Math.max(0, prev[key] - 1),
+                                      }));
+                                      clearError();
+                                    }}
+                                    className="havenly-control inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
+                                  >
+                                    −
+                                  </button>
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    readOnly
+                                    value={String(count)}
+                                    aria-valuemin={0}
+                                    aria-valuemax={CLEANING_V1_MAX_ADDON_COUNT}
+                                    aria-valuenow={count}
+                                    className="havenly-control w-full border border-mist bg-white px-4 py-3 text-center text-ink outline-none"
+                                  />
+                                  <button
+                                    type="button"
+                                    aria-label={t("increase", { label })}
+                                    disabled={count >= CLEANING_V1_MAX_ADDON_COUNT}
+                                    onClick={() => {
+                                      setAddonCounts((prev) => ({
+                                        ...prev,
+                                        [key]: Math.min(
+                                          CLEANING_V1_MAX_ADDON_COUNT,
+                                          prev[key] + 1,
+                                        ),
+                                      }));
+                                      clearError();
+                                    }}
+                                    className="havenly-control inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                    </div>
+
                     <div
                       className="booking-cleaning-estimate rounded-xl border border-sand bg-sand/70 px-3 py-2.5 text-ink sm:px-4 sm:py-3"
                       aria-live="polite"
@@ -1839,18 +2088,6 @@ export default function BookingWizard({
                             <div className="booking-cleaning-metrics">
                               <div className="booking-cleaning-metric">
                                 <p className="booking-cleaning-metric-label">
-                                  {t("cleaningV1BillableHoursLabel")}
-                                </p>
-                                <p className="booking-cleaning-metric-value">
-                                  ~
-                                  {t("hourCount", {
-                                    count:
-                                      cleaningV1Estimate.result.billableHours,
-                                  })}
-                                </p>
-                              </div>
-                              <div className="booking-cleaning-metric">
-                                <p className="booking-cleaning-metric-label">
                                   {t("total")}
                                 </p>
                                 <p className="booking-cleaning-metric-value booking-cleaning-metric-total">
@@ -1861,7 +2098,7 @@ export default function BookingWizard({
                               </div>
                             </div>
                             <p className="booking-cleaning-formula mt-2 text-xs leading-snug text-olive/80 sm:text-sm">
-                              {t("cleaningV1CleanersNote")}
+                              {t("cleaningV1EstimateNote")}
                             </p>
                           </motion.div>
                         ) : cleaningV1Estimate?.status === "quote" ? (
@@ -2383,6 +2620,20 @@ export default function BookingWizard({
                             .join(", "),
                         })}
                       </p>
+                      {cleaningV1AddonsHaveWork(addonCounts) ? (
+                        <p>
+                          {t("cleaningV1SummaryAddons", {
+                            addons: CLEANING_V1_ADDON_KEYS.filter(
+                              (key) => addonCounts[key] > 0,
+                            )
+                              .map(
+                                (key) =>
+                                  `${addonCounts[key]} ${t(`cleaningV1AddonLabels.${key}`)}`,
+                              )
+                              .join(", "),
+                          })}
+                        </p>
+                      ) : null}
                       {cleaningV1Estimate?.status === "quote" ? (
                         <p className="text-olive">{t("cleaningV1QuoteTitle")}</p>
                       ) : cleaningV1Estimate?.status === "fixed" &&
@@ -2511,6 +2762,7 @@ export default function BookingWizard({
                     disabled={
                       sending ||
                       hasUploadingPhotos ||
+                      isCleaningV1PreviewOnly ||
                       (service === "repair" && hasFailedPhotos) ||
                       (service === "repair" &&
                         uploadedPhotoCount === 0 &&
@@ -2520,20 +2772,22 @@ export default function BookingWizard({
                   >
                     {sending
                       ? t("sending")
-                      : service === "repair" ||
-                          (isCleaningV1Booking &&
-                            cleaningV1Estimate?.status === "quote")
-                        ? t("requestQuote")
-                        : t("confirmPrice", {
-                            price: formatEuro(
-                              isCleaningV1Booking &&
-                                cleaningV1Estimate?.status === "fixed" &&
-                                cleaningV1Estimate.result.customerPriceEuro !=
-                                  null
-                                ? cleaningV1Estimate.result.customerPriceEuro
-                                : (total ?? 0),
-                            ),
-                          })}
+                      : isCleaningV1PreviewOnly
+                        ? t("cleaningV1PreviewSubmitDisabled")
+                        : service === "repair" ||
+                            (isCleaningV1Booking &&
+                              cleaningV1Estimate?.status === "quote")
+                          ? t("requestQuote")
+                          : t("confirmPrice", {
+                              price: formatEuro(
+                                isCleaningV1Booking &&
+                                  cleaningV1Estimate?.status === "fixed" &&
+                                  cleaningV1Estimate.result.customerPriceEuro !=
+                                    null
+                                  ? cleaningV1Estimate.result.customerPriceEuro
+                                  : (total ?? 0),
+                              ),
+                            })}
                   </button>
                 )}
               </div>

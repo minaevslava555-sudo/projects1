@@ -217,6 +217,17 @@
     "roomsLabel": "Número de divisões",
     "chooseRoomsHint": "Escolha o número de divisões a limpar para ver as horas, os profissionais e o preço.",
     "cleaningV1RoomsHeading": "Divisões a limpar",
+    "cleaningV1PresetsHeading": "Casa típica",
+    "cleaningV1PresetsHint": "Comece por um layout típico e ajuste as divisões se necessário.",
+    "cleaningV1Presets": {
+      "t1": "T1",
+      "t2": "T2",
+      "t3": "T3"
+    },
+    "cleaningV1ShowAdvancedRooms": "Mais divisões (sala, WC, corredor…)",
+    "cleaningV1HideAdvancedRooms": "Ocultar divisões extra",
+    "cleaningV1ShowAddons": "Tarefas extra (forno, janelas…)",
+    "cleaningV1HideAddons": "Ocultar tarefas extra",
     "cleaningV1RoomLabels": {
       "bedroom": "Quarto",
       "livingRoom": "Sala",
@@ -226,8 +237,16 @@
       "hallway": "Corredor",
       "otherRoom": "Outra divisão"
     },
+    "cleaningV1AddonLabels": {
+      "oven": "Limpeza do forno",
+      "fridge": "Limpeza do frigorífico",
+      "windows": "Janelas",
+      "balcony": "Varanda",
+      "ironing": "Hora de engomar"
+    },
     "cleaningV1AreaLabel": "Área (m²)",
     "cleaningV1AreaPlaceholder": "ex.: 85",
+    "cleaningV1AreaHint": "Sem acréscimo de área até {freeArea} m². Acima de {reviewArea} m² é necessário orçamento manual.",
     "cleaningV1TypeLabel": "Tipo de limpeza",
     "cleaningV1Types": {
       "standard": "Standard",
@@ -237,15 +256,18 @@
     "cleaningV1IncompleteHint": "Adicione pelo menos uma divisão, indique a área em m² e escolha o tipo de limpeza para ver a estimativa.",
     "cleaningV1InvalidHint": "Verifique as divisões, a área e o tipo de limpeza — não foi possível calcular a estimativa.",
     "cleaningV1BillableHoursLabel": "Horas facturáveis",
+    "cleaningV1EstimateNote": "Estimativa com base nas divisões, área e tipo de limpeza. O número de profissionais é definido pela HAVENLY após análise.",
     "cleaningV1CleanersNote": "O número final de profissionais é definido pela HAVENLY após analisar a reserva.",
     "cleaningV1QuoteTitle": "Orçamento manual necessário",
     "cleaningV1QuoteBody": "Habitações com mais de 180 m² precisam de revisão pela HAVENLY. Confirmaremos o preço após avaliar o pedido — aqui não é mostrado um preço fixo.",
     "cleaningV1SummaryType": "Tipo: {type}",
     "cleaningV1SummaryArea": "Área: {area} m²",
     "cleaningV1SummaryRooms": "Divisões: {rooms}",
+    "cleaningV1SummaryAddons": "Extras: {addons}",
     "cleaningV1SummaryPrice": "~{hours} horas facturáveis · {total}",
     "successCleaningV1QuoteNote": "Este pedido precisa de revisão pela HAVENLY — não foi confirmado um preço fixo na reserva.",
     "cleaningV1PreviewHint": "O envio Cleaning v1 permanece desactivado enquanto pré-visualiza as novas opções.",
+    "cleaningV1PreviewSubmitDisabled": "Apenas pré-visualização — envio desactivado",
     "decrease": "Diminuir {label}",
     "increase": "Aumentar {label}",
     "cleaningPlan": "{rooms} — cerca de {hours} e {cleaners}",

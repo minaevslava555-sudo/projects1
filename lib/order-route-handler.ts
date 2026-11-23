@@ -15,8 +15,10 @@ import {
 } from "@/lib/booking-idempotency";
 import {
   type BookingService,
+  type CleaningV1AddonCounts,
   type CleaningV1RoomCounts,
   type CleaningV1Type,
+  cleaningV1AddonsHaveWork,
   isValidPreferredTime,
   parseCleaningV1PriceInput,
 } from "@/lib/booking-pricing";
@@ -252,7 +254,8 @@ function rejectUnsupportedCleaningPricingVersion(
   if (
     Object.prototype.hasOwnProperty.call(raw, "roomCounts") ||
     Object.prototype.hasOwnProperty.call(raw, "areaM2") ||
-    Object.prototype.hasOwnProperty.call(raw, "cleaningType")
+    Object.prototype.hasOwnProperty.call(raw, "cleaningType") ||
+    Object.prototype.hasOwnProperty.call(raw, "addons")
   ) {
     return {
       ok: false,
@@ -269,6 +272,7 @@ export type CleaningV1OrderFields = {
   roomCounts: CleaningV1RoomCounts;
   areaM2: number;
   cleaningType: CleaningV1Type;
+  addons?: CleaningV1AddonCounts;
 };
 
 export type ParseCleaningV1OrderFieldsResult =
@@ -308,11 +312,15 @@ export function parseCleaningV1OrderFields(
     rooms: record.roomCounts,
     areaM2: record.areaM2,
     cleaningType: record.cleaningType,
+    ...(Object.prototype.hasOwnProperty.call(record, "addons")
+      ? { addons: record.addons }
+      : {}),
   });
   if (!priced.ok) {
     return { ok: false, error: priced.error };
   }
 
+  const addons = priced.value.addons;
   return {
     ok: true,
     value: {
@@ -320,6 +328,9 @@ export function parseCleaningV1OrderFields(
       roomCounts: priced.value.rooms,
       areaM2: priced.value.areaM2,
       cleaningType: priced.value.cleaningType,
+      ...(addons != null && cleaningV1AddonsHaveWork(addons)
+        ? { addons }
+        : {}),
     },
   };
 }
@@ -613,6 +624,10 @@ export async function handleOrderPost(
             roomCounts: cleaningV1.roomCounts,
             areaM2: cleaningV1.areaM2,
             cleaningType: cleaningV1.cleaningType,
+            ...(cleaningV1.addons != null &&
+            cleaningV1AddonsHaveWork(cleaningV1.addons)
+              ? { addons: cleaningV1.addons }
+              : {}),
           }
         : {}),
     });
@@ -729,6 +744,9 @@ export async function handleOrderPost(
               roomCounts: cleaningV1.roomCounts,
               areaM2: cleaningV1.areaM2,
               cleaningType: cleaningV1.cleaningType,
+              ...(cleaningV1.addons != null
+                ? { addons: cleaningV1.addons }
+                : {}),
             },
           }
         : {

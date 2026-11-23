@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  CLEANING_V1_MAX_ADDON_COUNT,
+  CLEANING_V1_MAX_ROOMS_PER_TYPE,
+  CLEANING_V1_PRESETS,
+  EMPTY_CLEANING_V1_ADDONS,
   calculateCleaningV1Price,
   cleaningPlan,
   cleaningPriceEuro,
   parseCleaningV1PriceInput,
   roundUpCleaningV1BillableMinutes,
+  type CleaningV1AddonCounts,
   type CleaningV1PriceInput,
   type CleaningV1RoomCounts,
 } from "@/lib/booking-pricing";
@@ -430,4 +435,99 @@ test("cleaningPlan legacy room tiers remain unchanged", () => {
     assert.deepEqual(plan, { hours: row.hours, workers: row.workers });
     assert.equal(cleaningPriceEuro(row.rooms), row.priceEuro);
   }
+});
+
+test("parseCleaningV1PriceInput enforces room and add-on caps", () => {
+  assert.equal(
+    parseCleaningV1PriceInput({
+      rooms: { ...roomsA, bedroom: CLEANING_V1_MAX_ROOMS_PER_TYPE },
+      areaM2: 55,
+      cleaningType: "standard",
+    }).ok,
+    true,
+  );
+  assert.equal(
+    parseCleaningV1PriceInput({
+      rooms: { ...roomsA, bedroom: CLEANING_V1_MAX_ROOMS_PER_TYPE + 1 },
+      areaM2: 55,
+      cleaningType: "standard",
+    }).ok,
+    false,
+  );
+
+  const validAddons: CleaningV1AddonCounts = {
+    ...EMPTY_CLEANING_V1_ADDONS,
+    oven: CLEANING_V1_MAX_ADDON_COUNT,
+  };
+  assert.equal(
+    parseCleaningV1PriceInput({
+      rooms: roomsA,
+      areaM2: 55,
+      cleaningType: "standard",
+      addons: validAddons,
+    }).ok,
+    true,
+  );
+  assert.equal(
+    parseCleaningV1PriceInput({
+      rooms: roomsA,
+      areaM2: 55,
+      cleaningType: "standard",
+      addons: { ...validAddons, oven: CLEANING_V1_MAX_ADDON_COUNT + 1 },
+    }).ok,
+    false,
+  );
+});
+
+test("calculateCleaningV1Price adds catalog add-on person-minutes before type multiplier", () => {
+  const base = calculateCleaningV1Price({
+    rooms: roomsA,
+    areaM2: 55,
+    cleaningType: "standard",
+  });
+  assert.ok(!("error" in base));
+  assert.equal(base.addonMinutes, 0);
+  assert.equal(base.customerPriceEuro, 70);
+
+  const withOven = calculateCleaningV1Price({
+    rooms: roomsA,
+    areaM2: 55,
+    cleaningType: "standard",
+    addons: { ...EMPTY_CLEANING_V1_ADDONS, oven: 1 },
+  });
+  assert.ok(!("error" in withOven));
+  assert.equal(withOven.addonMinutes, 30);
+  assert.equal(withOven.roomMinutes, base.roomMinutes);
+  // 195 + 30 = 225 → billable 240 → 4h × €20 = €80
+  assert.equal(withOven.totalPersonMinutes, 225);
+  assert.equal(withOven.billablePersonMinutes, 240);
+  assert.equal(withOven.customerPriceEuro, 80);
+
+  const deepOven = calculateCleaningV1Price({
+    rooms: roomsA,
+    areaM2: 55,
+    cleaningType: "deep",
+    addons: { ...EMPTY_CLEANING_V1_ADDONS, oven: 1 },
+  });
+  assert.ok(!("error" in deepOven));
+  // (195 + 30) × 1.5 = 337.5 → 360 → €120
+  assert.equal(deepOven.totalPersonMinutes, 337.5);
+  assert.equal(deepOven.customerPriceEuro, 120);
+});
+
+test("CLEANING_V1_PRESETS stay within room caps and match known shapes", () => {
+  for (const preset of Object.values(CLEANING_V1_PRESETS)) {
+    for (const count of Object.values(preset)) {
+      assert.ok(count >= 0 && count <= CLEANING_V1_MAX_ROOMS_PER_TYPE);
+    }
+    const parsed = parseCleaningV1PriceInput({
+      rooms: preset,
+      areaM2: 70,
+      cleaningType: "standard",
+    });
+    assert.equal(parsed.ok, true);
+  }
+  assert.equal(CLEANING_V1_PRESETS.t1.bedroom, 1);
+  assert.equal(CLEANING_V1_PRESETS.t2.bedroom, 2);
+  assert.equal(CLEANING_V1_PRESETS.t3.bedroom, 3);
 });
