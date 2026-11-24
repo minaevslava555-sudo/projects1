@@ -11,14 +11,17 @@ import {
 } from "@/lib/booking-attempt";
 import {
   CLEANING_V1_ADDON_KEYS,
-  CLEANING_V1_ADVANCED_ROOM_KEYS,
+  CLEANING_V1_ADDON_MINUTES,
   CLEANING_V1_HOURLY_RATE_EURO,
   CLEANING_V1_MAX_ROOMS_PER_TYPE,
   CLEANING_V1_MIN_PRICE_EURO,
   CLEANING_V1_QUOTE_REVISION,
+  cleaningV1CleaningTypeMultiplier,
+  cleaningV1CustomerPriceDeltaEuro,
+  clampCleaningV1ExtraRoomsForPreset,
   cleaningV1MaxAddonCount,
+  cleaningV1RoomUnitMinutes,
   CLEANING_V1_PRESETS,
-  CLEANING_V1_PRIMARY_ROOM_KEYS,
   CLEANING_V1_ROOM_KEYS,
   EMPTY_CLEANING_V1_ADDONS,
   EMPTY_CLEANING_V1_ROOMS,
@@ -348,6 +351,20 @@ function Field({
 const inputClass =
   "havenly-control w-full border border-mist bg-white px-4 py-3 text-ink outline-none transition placeholder:text-muted/60 focus:border-olive";
 
+function mergeCleaningV1BaseAndExtra(
+  base: CleaningV1RoomCounts,
+  extra: CleaningV1RoomCounts,
+): CleaningV1RoomCounts {
+  const merged = { ...EMPTY_CLEANING_V1_ROOMS };
+  for (const key of CLEANING_V1_ROOM_KEYS) {
+    merged[key] = Math.min(
+      CLEANING_V1_MAX_ROOMS_PER_TYPE,
+      base[key] + extra[key],
+    );
+  }
+  return merged;
+}
+
 export default function BookingWizard({
   open,
   service,
@@ -385,15 +402,20 @@ export default function BookingWizard({
   const [roomCounts, setRoomCounts] = useState<CleaningV1RoomCounts>(
     EMPTY_CLEANING_V1_ROOMS,
   );
+  /** Extra rooms beyond the selected typical-home preset (server still gets totals). */
+  const [extraRoomCounts, setExtraRoomCounts] = useState<CleaningV1RoomCounts>(
+    EMPTY_CLEANING_V1_ROOMS,
+  );
   const [addonCounts, setAddonCounts] = useState<CleaningV1AddonCounts>(
     EMPTY_CLEANING_V1_ADDONS,
   );
   const [cleaningType, setCleaningType] = useState<CleaningV1Type | null>(null);
-  const [showAdvancedRooms, setShowAdvancedRooms] = useState(false);
-  const [showAddons, setShowAddons] = useState(false);
   const [activePreset, setActivePreset] = useState<CleaningV1PresetId | null>(
     null,
   );
+  const [extraRoomsCapNoticeKeys, setExtraRoomsCapNoticeKeys] = useState<
+    Array<keyof CleaningV1RoomCounts>
+  >([]);
   const [massageMinutes, setMassageMinutes] = useState<MassageMinutes>(60);
   const [problemDescription, setProblemDescription] = useState("");
   const [draftId, setDraftId] = useState<string | null>(null);
@@ -515,6 +537,28 @@ export default function BookingWizard({
     }
   }, [service, roomCounts, addonCounts, cleaningType]);
 
+  const cleaningV1PresetFromPrices = useMemo(() => {
+    if (cleaningType == null) {
+      return null;
+    }
+    const out = {} as Record<CleaningV1PresetId, number | null>;
+    for (const presetId of CLEANING_V1_PRESET_IDS) {
+      const priced = calculateCleaningV1Price({
+        rooms: CLEANING_V1_PRESETS[presetId],
+        cleaningType,
+      });
+      out[presetId] =
+        "error" in priced || priced.customerPriceEuro == null
+          ? null
+          : priced.customerPriceEuro;
+    }
+    return out;
+  }, [cleaningType]);
+
+  const cleaningV1BaseRooms = activePreset
+    ? CLEANING_V1_PRESETS[activePreset]
+    : EMPTY_CLEANING_V1_ROOMS;
+
   const isCleaningV1Booking =
     CLEANING_V1_BOOKING_ENABLED && service === "cleaning";
   const isCleaningV1PreviewOnly =
@@ -549,10 +593,10 @@ export default function BookingWizard({
     setStepIndex(0);
     setRooms(null);
     setRoomCounts(EMPTY_CLEANING_V1_ROOMS);
+    setExtraRoomCounts(EMPTY_CLEANING_V1_ROOMS);
+    setExtraRoomsCapNoticeKeys([]);
     setAddonCounts(EMPTY_CLEANING_V1_ADDONS);
     setCleaningType(null);
-    setShowAdvancedRooms(false);
-    setShowAddons(false);
     setActivePreset(null);
     setMassageMinutes(60);
     setProblemDescription("");
@@ -1802,193 +1846,6 @@ export default function BookingWizard({
 
                     <div>
                       <p className="mb-2 block text-sm font-medium text-ink">
-                        {t("cleaningV1PresetsHeading")}
-                      </p>
-                      <div
-                        className="grid grid-cols-3 gap-2"
-                        role="group"
-                        aria-label={t("cleaningV1PresetsHeading")}
-                      >
-                        {CLEANING_V1_PRESET_IDS.map((presetId) => {
-                          const selected = activePreset === presetId;
-                          return (
-                            <button
-                              key={presetId}
-                              type="button"
-                              aria-pressed={selected}
-                              onClick={() => {
-                                setRoomCounts({ ...CLEANING_V1_PRESETS[presetId] });
-                                setActivePreset(presetId);
-                                clearError();
-                              }}
-                              className={`booking-room-option havenly-control px-3 py-3 text-sm font-semibold transition ${
-                                selected
-                                  ? "border border-olive bg-olive text-white shadow-sm shadow-olive/20"
-                                  : "border border-mist bg-white text-ink hover:border-olive"
-                              }`}
-                            >
-                              {t(`cleaningV1Presets.${presetId}`)}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <p className="mt-2 text-xs text-muted">
-                        {t("cleaningV1PresetsHint")}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="mb-2 block text-sm font-medium text-ink">
-                        {t("cleaningV1RoomsHeading")}
-                      </p>
-                      <div className="space-y-2">
-                        {CLEANING_V1_PRIMARY_ROOM_KEYS.map((key) => {
-                          const label = t(`cleaningV1RoomLabels.${key}`);
-                          const count = roomCounts[key];
-                          return (
-                            <div
-                              key={key}
-                              className="booking-cleaning-qty"
-                              role="group"
-                              aria-label={label}
-                            >
-                              <div className="mb-1 text-xs font-medium text-ink/80">
-                                {label}
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <button
-                                  type="button"
-                                  aria-label={t("decrease", { label })}
-                                  disabled={count <= 0}
-                                  onClick={() => {
-                                    setRoomCounts((prev) => ({
-                                      ...prev,
-                                      [key]: Math.max(0, prev[key] - 1),
-                                    }));
-                                    setActivePreset(null);
-                                    clearError();
-                                  }}
-                                  className="havenly-control inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
-                                >
-                                  −
-                                </button>
-                                <input
-                                  type="text"
-                                  inputMode="numeric"
-                                  readOnly
-                                  value={String(count)}
-                                  aria-valuemin={0}
-                                  aria-valuemax={CLEANING_V1_MAX_ROOMS_PER_TYPE}
-                                  aria-valuenow={count}
-                                  className="havenly-control w-full border border-mist bg-white px-4 py-3 text-center text-ink outline-none"
-                                />
-                                <button
-                                  type="button"
-                                  aria-label={t("increase", { label })}
-                                  disabled={count >= CLEANING_V1_MAX_ROOMS_PER_TYPE}
-                                  onClick={() => {
-                                    setRoomCounts((prev) => ({
-                                      ...prev,
-                                      [key]: Math.min(
-                                        CLEANING_V1_MAX_ROOMS_PER_TYPE,
-                                        prev[key] + 1,
-                                      ),
-                                    }));
-                                    setActivePreset(null);
-                                    clearError();
-                                  }}
-                                  className="havenly-control inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
-                                >
-                                  +
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <button
-                        type="button"
-                        className="mt-3 text-sm font-semibold text-olive underline-offset-2 hover:underline"
-                        aria-expanded={showAdvancedRooms}
-                        onClick={() => setShowAdvancedRooms((value) => !value)}
-                      >
-                        {showAdvancedRooms
-                          ? t("cleaningV1HideAdvancedRooms")
-                          : t("cleaningV1ShowAdvancedRooms")}
-                      </button>
-                      {showAdvancedRooms ? (
-                        <div className="mt-3 space-y-2">
-                          {CLEANING_V1_ADVANCED_ROOM_KEYS.map((key) => {
-                            const label = t(`cleaningV1RoomLabels.${key}`);
-                            const count = roomCounts[key];
-                            return (
-                              <div
-                                key={key}
-                                className="booking-cleaning-qty"
-                                role="group"
-                                aria-label={label}
-                              >
-                                <div className="mb-1 text-xs font-medium text-ink/80">
-                                  {label}
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <button
-                                    type="button"
-                                    aria-label={t("decrease", { label })}
-                                    disabled={count <= 0}
-                                    onClick={() => {
-                                      setRoomCounts((prev) => ({
-                                        ...prev,
-                                        [key]: Math.max(0, prev[key] - 1),
-                                      }));
-                                      setActivePreset(null);
-                                      clearError();
-                                    }}
-                                    className="havenly-control inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
-                                  >
-                                    −
-                                  </button>
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    readOnly
-                                    value={String(count)}
-                                    aria-valuemin={0}
-                                    aria-valuemax={CLEANING_V1_MAX_ROOMS_PER_TYPE}
-                                    aria-valuenow={count}
-                                    className="havenly-control w-full border border-mist bg-white px-4 py-3 text-center text-ink outline-none"
-                                  />
-                                  <button
-                                    type="button"
-                                    aria-label={t("increase", { label })}
-                                    disabled={
-                                      count >= CLEANING_V1_MAX_ROOMS_PER_TYPE
-                                    }
-                                    onClick={() => {
-                                      setRoomCounts((prev) => ({
-                                        ...prev,
-                                        [key]: Math.min(
-                                          CLEANING_V1_MAX_ROOMS_PER_TYPE,
-                                          prev[key] + 1,
-                                        ),
-                                      }));
-                                      setActivePreset(null);
-                                      clearError();
-                                    }}
-                                    className="havenly-control inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
-                                  >
-                                    +
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : null}
-                    </div>
-
-                    <div>
-                      <p className="mb-2 block text-sm font-medium text-ink">
                         {t("cleaningV1TypeLabel")}
                       </p>
                       <div
@@ -2004,7 +1861,7 @@ export default function BookingWizard({
                               type="button"
                               aria-pressed={selected}
                               onClick={() => {
-                                setCleaningType(selected ? null : type);
+                                setCleaningType(type);
                                 clearError();
                               }}
                               className={`booking-room-option havenly-control px-3 py-3 text-sm font-semibold transition ${
@@ -2021,25 +1878,139 @@ export default function BookingWizard({
                     </div>
 
                     <div>
-                      <button
-                        type="button"
-                        className="text-sm font-semibold text-olive underline-offset-2 hover:underline"
-                        aria-expanded={showAddons}
-                        onClick={() => setShowAddons((value) => !value)}
+                      <p className="mb-2 block text-sm font-medium text-ink">
+                        {t("cleaningV1PresetsHeading")}
+                      </p>
+                      <div
+                        className="grid grid-cols-3 gap-2"
+                        role="group"
+                        aria-label={t("cleaningV1PresetsHeading")}
                       >
-                        {showAddons
-                          ? t("cleaningV1HideAddons")
-                          : t("cleaningV1ShowAddons")}
-                      </button>
-                      {showAddons ? (
-                        <div className="mt-3 space-y-2">
-                          {CLEANING_V1_ADDON_KEYS.map((key: CleaningV1AddonId) => {
-                            const label = t(`cleaningV1AddonLabels.${key}`);
-                            const count = addonCounts[key];
-                            const maxCount = cleaningV1MaxAddonCount(key);
-                            const unitHint =
-                              key === "windows"
-                                ? t("cleaningV1AddonHints.windows")
+                        {CLEANING_V1_PRESET_IDS.map((presetId) => {
+                          const selected = activePreset === presetId;
+                          const fromPrice =
+                            cleaningV1PresetFromPrices?.[presetId] ?? null;
+                          return (
+                            <button
+                              key={presetId}
+                              type="button"
+                              aria-pressed={selected}
+                              disabled={cleaningType == null}
+                              onClick={() => {
+                                const base = CLEANING_V1_PRESETS[presetId];
+                                const applied = clampCleaningV1ExtraRoomsForPreset(
+                                  base,
+                                  extraRoomCounts,
+                                );
+                                setActivePreset(presetId);
+                                setExtraRoomCounts(applied.extras);
+                                setRoomCounts(applied.totals);
+                                setExtraRoomsCapNoticeKeys(applied.reducedKeys);
+                                clearError();
+                              }}
+                              className={`booking-room-option havenly-control flex flex-col items-center gap-1 px-2 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${
+                                selected
+                                  ? "border border-olive bg-olive text-white shadow-sm shadow-olive/20"
+                                  : "border border-mist bg-white text-ink hover:border-olive"
+                              }`}
+                            >
+                              <span>{t(`cleaningV1Presets.${presetId}`)}</span>
+                              <span
+                                className={`text-[0.7rem] font-medium tracking-wide ${
+                                  selected ? "text-white/85" : "text-muted"
+                                }`}
+                              >
+                                {fromPrice != null
+                                  ? t("cleaningV1PresetFrom", {
+                                      price: formatEuro(fromPrice),
+                                    })
+                                  : t("cleaningV1PresetFromPending")}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-2 text-xs text-muted">
+                        {t("cleaningV1PresetsHint")}
+                      </p>
+                      {extraRoomsCapNoticeKeys.length > 0 ? (
+                        <p
+                          className="mt-2 text-xs leading-snug text-olive"
+                          role="status"
+                        >
+                          {t("cleaningV1ExtraRoomsCapped", {
+                            rooms: extraRoomsCapNoticeKeys
+                              .map((key) => t(`cleaningV1RoomLabels.${key}`))
+                              .join(", "),
+                          })}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    {activePreset != null ? (
+                      <div>
+                        <p className="mb-2 block text-sm font-medium text-ink">
+                          {t("cleaningV1IncludedHeading")}
+                        </p>
+                        <ul className="space-y-1.5 text-sm text-ink/85">
+                          {CLEANING_V1_ROOM_KEYS.filter(
+                            (key) => cleaningV1BaseRooms[key] > 0,
+                          ).map((key) => (
+                            <li
+                              key={key}
+                              className="flex items-baseline justify-between gap-3 border-b border-mist/70 pb-1.5 last:border-b-0 last:pb-0"
+                            >
+                              <span>{t(`cleaningV1RoomLabels.${key}`)}</span>
+                              <span className="shrink-0 text-olive">
+                                {cleaningV1BaseRooms[key]}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+
+                    {activePreset != null && cleaningType != null ? (
+                      <div>
+                        <p className="mb-1 block text-sm font-medium text-ink">
+                          {t("cleaningV1ExtraRoomsHeading")}
+                        </p>
+                        <p className="mb-3 text-xs text-muted">
+                          {t("cleaningV1ExtraRoomsHint")}
+                        </p>
+                        <div className="space-y-3">
+                          {CLEANING_V1_ROOM_KEYS.map((key) => {
+                            const label = t(`cleaningV1RoomLabels.${key}`);
+                            const extra = extraRoomCounts[key];
+                            const maxExtra = Math.max(
+                              0,
+                              CLEANING_V1_MAX_ROOMS_PER_TYPE -
+                                cleaningV1BaseRooms[key],
+                            );
+                            const unitMinutes =
+                              cleaningV1RoomUnitMinutes(key) *
+                              cleaningV1CleaningTypeMultiplier(cleaningType);
+                            const nextRooms = {
+                              ...roomCounts,
+                              [key]: Math.min(
+                                CLEANING_V1_MAX_ROOMS_PER_TYPE,
+                                roomCounts[key] + 1,
+                              ),
+                            };
+                            const deltaEuro =
+                              maxExtra > 0
+                                ? cleaningV1CustomerPriceDeltaEuro(
+                                    {
+                                      rooms: roomCounts,
+                                      cleaningType,
+                                      addons: addonCounts,
+                                    },
+                                    {
+                                      rooms: nextRooms,
+                                      cleaningType,
+                                      addons: addonCounts,
+                                    },
+                                  )
                                 : null;
                             return (
                               <div
@@ -2048,8 +2019,156 @@ export default function BookingWizard({
                                 role="group"
                                 aria-label={label}
                               >
-                                <div className="mb-1 text-xs font-medium text-ink/80">
-                                  {label}
+                                <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                                  <span className="text-xs font-medium text-ink/80">
+                                    {label}
+                                  </span>
+                                  <span className="text-[0.7rem] text-muted">
+                                    {t("cleaningV1AddUnitMeta", {
+                                      time:
+                                        Math.round(unitMinutes) % 60 === 0
+                                          ? t("cleaningV1UnitHours", {
+                                              count:
+                                                Math.round(unitMinutes) / 60,
+                                            })
+                                          : t("cleaningV1UnitMinutes", {
+                                              count: Math.round(unitMinutes),
+                                            }),
+                                      price:
+                                        deltaEuro == null
+                                          ? "—"
+                                          : deltaEuro === 0
+                                            ? t("cleaningV1AddUnitPriceAbsorbed")
+                                            : `+${formatEuro(deltaEuro)}`,
+                                    })}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    type="button"
+                                    aria-label={t("decrease", { label })}
+                                    disabled={extra <= 0}
+                                    onClick={() => {
+                                      const nextExtra = {
+                                        ...extraRoomCounts,
+                                        [key]: Math.max(0, extra - 1),
+                                      };
+                                      setExtraRoomCounts(nextExtra);
+                                      setRoomCounts(
+                                        mergeCleaningV1BaseAndExtra(
+                                          cleaningV1BaseRooms,
+                                          nextExtra,
+                                        ),
+                                      );
+                                      setExtraRoomsCapNoticeKeys([]);
+                                      clearError();
+                                    }}
+                                    className="havenly-control inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
+                                  >
+                                    −
+                                  </button>
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    readOnly
+                                    value={String(extra)}
+                                    aria-valuemin={0}
+                                    aria-valuemax={maxExtra}
+                                    aria-valuenow={extra}
+                                    className="havenly-control w-full border border-mist bg-white px-4 py-3 text-center text-ink outline-none"
+                                  />
+                                  <button
+                                    type="button"
+                                    aria-label={t("increase", { label })}
+                                    disabled={extra >= maxExtra}
+                                    onClick={() => {
+                                      const nextExtra = {
+                                        ...extraRoomCounts,
+                                        [key]: Math.min(maxExtra, extra + 1),
+                                      };
+                                      setExtraRoomCounts(nextExtra);
+                                      setRoomCounts(
+                                        mergeCleaningV1BaseAndExtra(
+                                          cleaningV1BaseRooms,
+                                          nextExtra,
+                                        ),
+                                      );
+                                      setExtraRoomsCapNoticeKeys([]);
+                                      clearError();
+                                    }}
+                                    className="havenly-control inline-flex h-11 w-11 items-center justify-center border border-mist bg-white text-lg text-ink transition hover:border-olive disabled:opacity-40"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {activePreset != null && cleaningType != null ? (
+                      <div>
+                        <p className="mb-1 block text-sm font-medium text-ink">
+                          {t("cleaningV1AddonsHeading")}
+                        </p>
+                        <p className="mb-3 text-xs text-muted">
+                          {t("cleaningV1AddonsSectionHint")}
+                        </p>
+                        <div className="space-y-3">
+                          {CLEANING_V1_ADDON_KEYS.map((key: CleaningV1AddonId) => {
+                            const label = t(`cleaningV1AddonLabels.${key}`);
+                            const count = addonCounts[key];
+                            const maxCount = cleaningV1MaxAddonCount(key);
+                            const unitHint =
+                              key === "windows"
+                                ? t("cleaningV1AddonHints.windows")
+                                : null;
+                            const unitMinutes = CLEANING_V1_ADDON_MINUTES[key];
+                            const nextAddons = {
+                              ...addonCounts,
+                              [key]: Math.min(maxCount, count + 1),
+                            };
+                            const deltaEuro =
+                              count < maxCount
+                                ? cleaningV1CustomerPriceDeltaEuro(
+                                    {
+                                      rooms: roomCounts,
+                                      cleaningType,
+                                      addons: addonCounts,
+                                    },
+                                    {
+                                      rooms: roomCounts,
+                                      cleaningType,
+                                      addons: nextAddons,
+                                    },
+                                  )
+                                : null;
+                            return (
+                              <div
+                                key={key}
+                                className="booking-cleaning-qty"
+                                role="group"
+                                aria-label={label}
+                              >
+                                <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                                  <span className="text-xs font-medium text-ink/80">
+                                    {label}
+                                  </span>
+                                  <span className="text-[0.7rem] text-muted">
+                                    {t("cleaningV1AddUnitMeta", {
+                                      time: t("cleaningV1UnitMinutes", {
+                                        count: unitMinutes,
+                                      }),
+                                      price:
+                                        deltaEuro == null
+                                          ? "—"
+                                          : deltaEuro === 0
+                                            ? t("cleaningV1AddUnitPriceAbsorbed")
+                                            : `+${formatEuro(deltaEuro)}`,
+                                    })}
+                                  </span>
                                 </div>
                                 {unitHint ? (
                                   <p className="mb-2 text-xs leading-snug text-muted">
@@ -2105,9 +2224,13 @@ export default function BookingWizard({
                             );
                           })}
                         </div>
-                      ) : null}
-                    </div>
+                      </div>
+                    ) : null}
 
+                    <div>
+                      <p className="mb-2 block text-sm font-medium text-ink">
+                        {t("cleaningV1EstimateHeading")}
+                      </p>
                     <div
                       className="booking-cleaning-estimate rounded-xl border border-sand bg-sand/70 px-3 py-2.5 text-ink sm:px-4 sm:py-3"
                       aria-live="polite"
@@ -2239,6 +2362,7 @@ export default function BookingWizard({
                           </motion.div>
                         )}
                       </AnimatePresence>
+                    </div>
                     </div>
                   </>
                 ) : (

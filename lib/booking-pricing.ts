@@ -144,6 +144,66 @@ const CLEANING_V1_MULTIPLIER: Record<CleaningV1Type, number> = {
   post_renovation: 2,
 };
 
+/** Catalog person-minutes for one room of this type (before cleaning-type multiplier). */
+export function cleaningV1RoomUnitMinutes(
+  key: keyof CleaningV1RoomCounts,
+): number {
+  return CLEANING_V1_ROOM_MINUTES[key];
+}
+
+export function cleaningV1CleaningTypeMultiplier(type: CleaningV1Type): number {
+  return CLEANING_V1_MULTIPLIER[type];
+}
+
+/**
+ * Customer-price delta when switching from `from` to `to` (same type/addons shape).
+ * Accounts for billable 30-minute rounding and the €40 floor.
+ */
+export function cleaningV1CustomerPriceDeltaEuro(
+  from: CleaningV1PriceInput,
+  to: CleaningV1PriceInput,
+): number | null {
+  const a = calculateCleaningV1Price(from);
+  const b = calculateCleaningV1Price(to);
+  if ("error" in a || "error" in b) return null;
+  if (a.customerPriceEuro == null || b.customerPriceEuro == null) return null;
+  return b.customerPriceEuro - a.customerPriceEuro;
+}
+
+/**
+ * Keep extra-room counts when switching typical-home presets, clamped so
+ * base + extra never exceeds CLEANING_V1_MAX_ROOMS_PER_TYPE per key.
+ */
+export function clampCleaningV1ExtraRoomsForPreset(
+  preset: CleaningV1RoomCounts,
+  extras: CleaningV1RoomCounts,
+): {
+  extras: CleaningV1RoomCounts;
+  totals: CleaningV1RoomCounts;
+  reducedKeys: Array<keyof CleaningV1RoomCounts>;
+} {
+  const nextExtras = { ...EMPTY_CLEANING_V1_ROOMS };
+  const totals = { ...EMPTY_CLEANING_V1_ROOMS };
+  const reducedKeys: Array<keyof CleaningV1RoomCounts> = [];
+  for (const key of CLEANING_V1_ROOM_KEYS) {
+    const maxExtra = Math.max(
+      0,
+      CLEANING_V1_MAX_ROOMS_PER_TYPE - preset[key],
+    );
+    const requested = extras[key];
+    const clamped = Math.min(Math.max(0, requested), maxExtra);
+    nextExtras[key] = clamped;
+    totals[key] = Math.min(
+      CLEANING_V1_MAX_ROOMS_PER_TYPE,
+      preset[key] + clamped,
+    );
+    if (clamped < requested) {
+      reducedKeys.push(key);
+    }
+  }
+  return { extras: nextExtras, totals, reducedKeys };
+}
+
 export const CLEANING_V1_MIN_PRICE_EURO = 40;
 /** Same €20/person-hour rate used for customer pricing (independent of crew size). */
 export const CLEANING_V1_HOURLY_RATE_EURO = 20;

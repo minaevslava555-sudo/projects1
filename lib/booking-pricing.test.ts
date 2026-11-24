@@ -6,10 +6,15 @@ import {
   CLEANING_V1_MAX_ROOMS_PER_TYPE,
   CLEANING_V1_PRESETS,
   EMPTY_CLEANING_V1_ADDONS,
+  EMPTY_CLEANING_V1_ROOMS,
   calculateCleaningV1Price,
   cleaningPlan,
   cleaningPriceEuro,
+  cleaningV1CleaningTypeMultiplier,
+  cleaningV1CustomerPriceDeltaEuro,
+  clampCleaningV1ExtraRoomsForPreset,
   cleaningV1MaxAddonCount,
+  cleaningV1RoomUnitMinutes,
   parseCleaningV1PriceInput,
   recommendCleaningV1Crew,
   roundUpCleaningV1BillableMinutes,
@@ -517,6 +522,50 @@ test("calculateCleaningV1Price adds add-on minutes after room type multiplier", 
   assert.equal(deepWindows.customerPriceEuro, 120);
 });
 
+test("cleaningV1CustomerPriceDeltaEuro reflects billable rounding for +1 room", () => {
+  assert.equal(cleaningV1RoomUnitMinutes("bedroom"), 40);
+  assert.equal(cleaningV1CleaningTypeMultiplier("deep"), 1.5);
+  const base = {
+    rooms: CLEANING_V1_PRESETS.t1,
+    cleaningType: "standard" as const,
+  };
+  const withExtraBedroom = {
+    rooms: {
+      ...CLEANING_V1_PRESETS.t1,
+      bedroom: CLEANING_V1_PRESETS.t1.bedroom + 1,
+    },
+    cleaningType: "standard" as const,
+  };
+  const delta = cleaningV1CustomerPriceDeltaEuro(base, withExtraBedroom);
+  const a = calculateCleaningV1Price(base);
+  const b = calculateCleaningV1Price(withExtraBedroom);
+  assert.ok(!("error" in a) && !("error" in b));
+  assert.equal(
+    delta,
+    (b.customerPriceEuro as number) - (a.customerPriceEuro as number),
+  );
+});
+
+test("cleaningV1CustomerPriceDeltaEuro is 0 when added time fits the current price", () => {
+  // 1 bedroom is under the €40 floor; +1 other room stays under the floor.
+  const base = {
+    rooms: { ...EMPTY_CLEANING_V1_ROOMS, bedroom: 1 },
+    cleaningType: "standard" as const,
+    addons: EMPTY_CLEANING_V1_ADDONS,
+  };
+  const withOtherRoom = {
+    ...base,
+    rooms: { ...base.rooms, otherRoom: 1 },
+  };
+  const a = calculateCleaningV1Price(base);
+  const b = calculateCleaningV1Price(withOtherRoom);
+  assert.ok(!("error" in a) && !("error" in b));
+  assert.equal(a.minimumPriceApplied, true);
+  assert.equal(b.minimumPriceApplied, true);
+  assert.equal(a.customerPriceEuro, b.customerPriceEuro);
+  assert.equal(cleaningV1CustomerPriceDeltaEuro(base, withOtherRoom), 0);
+});
+
 test("CLEANING_V1_PRESETS stay within room caps and match known shapes", () => {
   for (const preset of Object.values(CLEANING_V1_PRESETS)) {
     for (const count of Object.values(preset)) {
@@ -531,4 +580,59 @@ test("CLEANING_V1_PRESETS stay within room caps and match known shapes", () => {
   assert.equal(CLEANING_V1_PRESETS.t1.bedroom, 1);
   assert.equal(CLEANING_V1_PRESETS.t2.bedroom, 2);
   assert.equal(CLEANING_V1_PRESETS.t3.bedroom, 3);
+});
+
+test("clampCleaningV1ExtraRoomsForPreset keeps extras within caps", () => {
+  const extras = {
+    ...EMPTY_CLEANING_V1_ROOMS,
+    bedroom: 2,
+    bathroom: 1,
+  };
+  const kept = clampCleaningV1ExtraRoomsForPreset(
+    CLEANING_V1_PRESETS.t1,
+    extras,
+  );
+  assert.deepEqual(kept.extras, extras);
+  assert.equal(
+    kept.totals.bedroom,
+    CLEANING_V1_PRESETS.t1.bedroom + extras.bedroom,
+  );
+  assert.deepEqual(kept.reducedKeys, []);
+
+  const nearCapExtras = {
+    ...EMPTY_CLEANING_V1_ROOMS,
+    bedroom: CLEANING_V1_MAX_ROOMS_PER_TYPE,
+  };
+  const capped = clampCleaningV1ExtraRoomsForPreset(
+    CLEANING_V1_PRESETS.t3,
+    nearCapExtras,
+  );
+  const maxBedroomExtra =
+    CLEANING_V1_MAX_ROOMS_PER_TYPE - CLEANING_V1_PRESETS.t3.bedroom;
+  assert.equal(capped.extras.bedroom, maxBedroomExtra);
+  assert.equal(capped.totals.bedroom, CLEANING_V1_MAX_ROOMS_PER_TYPE);
+  assert.deepEqual(capped.reducedKeys, ["bedroom"]);
+});
+
+test("clampCleaningV1ExtraRoomsForPreset preserves extras when switching T1→T2", () => {
+  const extras = {
+    ...EMPTY_CLEANING_V1_ROOMS,
+    bedroom: 1,
+    otherRoom: 2,
+  };
+  const fromT1 = clampCleaningV1ExtraRoomsForPreset(
+    CLEANING_V1_PRESETS.t1,
+    extras,
+  );
+  const toT2 = clampCleaningV1ExtraRoomsForPreset(
+    CLEANING_V1_PRESETS.t2,
+    fromT1.extras,
+  );
+  assert.equal(toT2.extras.bedroom, 1);
+  assert.equal(toT2.extras.otherRoom, 2);
+  assert.deepEqual(toT2.reducedKeys, []);
+  assert.equal(
+    toT2.totals.bedroom,
+    CLEANING_V1_PRESETS.t2.bedroom + 1,
+  );
 });
