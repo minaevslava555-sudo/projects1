@@ -244,6 +244,9 @@
       "balcony": "Varanda",
       "ironing": "Hora de engomar"
     },
+    "cleaningV1AddonHints": {
+      "windows": "Uma unidade = uma janela standard (ambas as folhas): vidro pelo interior e pelo exterior acessível em segurança, mais a moldura e o peitoril. Janelas panorâmicas, atípicas ou de difícil acesso são orçamentadas no local."
+    },
     "cleaningV1TypeLabel": "Tipo de limpeza",
     "cleaningV1Types": {
       "standard": "Standard",
@@ -253,14 +256,28 @@
     "cleaningV1IncompleteHint": "Adicione pelo menos uma divisão e escolha o tipo de limpeza para ver a estimativa.",
     "cleaningV1InvalidHint": "Verifique as divisões e o tipo de limpeza — não foi possível calcular a estimativa.",
     "cleaningV1BillableHoursLabel": "Horas facturáveis",
-    "cleaningV1EstimateNote": "Estimativa com base nas divisões, extras e tipo de limpeza. O número de profissionais é definido pela HAVENLY após análise.",
-    "cleaningV1CleanersNote": "O número final de profissionais é definido pela HAVENLY após analisar a reserva.",
+    "cleaningV1TeamLabel": "Equipa recomendada",
+    "cleaningV1VisitLabel": "Visita estimada",
+    "cleaningV1PersonHoursLabel": "Total de horas de limpeza",
+    "cleaningV1RateLabel": "Tarifa por profissional",
+    "cleaningV1RateValue": "{rate}/hora",
+    "cleaningV1VisitDuration": "{hours, plural, =0 {{minutes} min} other {{hours}h{minutes, plural, =0 {} other { {minutes}m}}}}",
+    "cleaningV1MinimumPriceNote": "Aplica-se um mínimo de reserva de {min} a esta estimativa.",
+    "cleaningV1EstimateNote": "A equipa e a duração da visita são estimativas. A equipa final é confirmada pela HAVENLY. O preço baseia-se nas horas totais de limpeza à tarifa indicada — não no número de profissionais.",
+    "cleaningV1CleanersNote": "O número final de profissionais é confirmado pela HAVENLY após analisar a reserva.",
+    "cleaningV1ExtrasConfirmNote": "Os extras e o horário são acordados consigo no local antes da execução.",
+    "estimateRevisedBody": "A nossa estimativa foi actualizada. Reveja o novo total de {total} antes de enviar novamente. O pedido anterior continua protegido.",
+    "confirmRevisedEstimate": "Confirmar estimativa actualizada",
     "cleaningV1QuoteTitle": "Orçamento manual necessário",
     "cleaningV1QuoteBody": "Este pedido precisa de revisão pela HAVENLY. Confirmaremos o preço após avaliar — aqui não é mostrado um preço fixo.",
     "cleaningV1SummaryType": "Tipo: {type}",
     "cleaningV1SummaryRooms": "Divisões: {rooms}",
     "cleaningV1SummaryAddons": "Extras: {addons}",
-    "cleaningV1SummaryPrice": "~{hours} horas facturáveis · {total}",
+    "cleaningV1SummaryTeam": "Equipa recomendada: {team}",
+    "cleaningV1SummaryVisit": "Visita estimada: ~{duration}",
+    "cleaningV1SummaryPersonHours": "Total de horas de limpeza: {hours}",
+    "cleaningV1SummaryRate": "Tarifa por profissional: {rate}/hora",
+    "cleaningV1SummaryPrice": "Total estimado: {total}",
     "successCleaningV1QuoteNote": "Este pedido precisa de revisão pela HAVENLY — não foi confirmado um preço fixo na reserva.",
     "cleaningV1PreviewHint": "O envio Cleaning v1 permanece desactivado enquanto pré-visualiza as novas opções.",
     "cleaningV1PreviewSubmitDisabled": "Apenas pré-visualização — envio desactivado",
@@ -357,7 +374,8 @@
       "orderProcessing": "A sua reserva ainda está a ser processada. Aguarde um momento e tente novamente com os mesmos dados.",
       "temporaryUnavailable": "O serviço está temporariamente indisponível. Tente novamente em breve — a reserva ainda não foi confirmada.",
       "tooManyRequests": "Demasiados pedidos. Tente novamente mais tarde.",
-      "attemptPayloadChanged": "Estes dados são diferentes da reserva por concluir. Restaure os dados originais para tentar de novo, ou comece uma nova reserva."
+      "attemptPayloadChanged": "Estes dados são diferentes da reserva por concluir. Restaure os dados originais para tentar de novo, ou comece uma nova reserva.",
+      "estimateRevised": "A estimativa mudou desde a última tentativa. Confirme o total actualizado acima e envie novamente."
     }
   },
   "ServiceDetail": {

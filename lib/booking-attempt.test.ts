@@ -4,9 +4,11 @@ import {
   BOOKING_ATTEMPT_STORAGE_KEY,
   buildBookingAttemptFingerprint,
   clearBookingAttempt,
+  isBookingAttemptQuoteStale,
   readBookingAttempt,
   writeBookingAttempt,
 } from "./booking-attempt";
+import { CLEANING_V1_QUOTE_REVISION } from "./booking-pricing";
 import { buildOrderRequestFingerprint } from "./order-request-fingerprint";
 
 const sampleInput = {
@@ -73,11 +75,48 @@ test("write/read booking attempt round-trips key and fingerprint without extra f
   const raw = sessionStorage.getItem(BOOKING_ATTEMPT_STORAGE_KEY);
   assert.ok(raw);
   assert.equal(JSON.parse(raw as string).name, undefined);
+  assert.equal(JSON.parse(raw as string).quoteRevision, undefined);
   assert.deepEqual(readBookingAttempt(), {
     idempotencyKey: "idem-test-key-01",
     fingerprint: "a".repeat(64),
     service: "cleaning",
   });
+});
+
+test("quoteRevision round-trips and stale detection keeps key semantics", () => {
+  installMemorySessionStorage();
+  writeBookingAttempt({
+    idempotencyKey: "idem-quote-rev",
+    fingerprint: "c".repeat(64),
+    service: "cleaning",
+    quoteRevision: "old-revision",
+  });
+  const read = readBookingAttempt();
+  assert.ok(read);
+  assert.equal(read.quoteRevision, "old-revision");
+  assert.equal(
+    isBookingAttemptQuoteStale(read, CLEANING_V1_QUOTE_REVISION),
+    true,
+  );
+  assert.equal(
+    isBookingAttemptQuoteStale(
+      { ...read, quoteRevision: CLEANING_V1_QUOTE_REVISION },
+      CLEANING_V1_QUOTE_REVISION,
+    ),
+    false,
+  );
+  // Legacy attempts without quoteRevision are stale vs current engine.
+  assert.equal(
+    isBookingAttemptQuoteStale(
+      {
+        idempotencyKey: "idem-legacy",
+        fingerprint: "d".repeat(64),
+        service: "cleaning",
+      },
+      CLEANING_V1_QUOTE_REVISION,
+    ),
+    true,
+  );
 });
 
 test("clearBookingAttempt removes persisted attempt", () => {

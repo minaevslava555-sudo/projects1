@@ -2642,9 +2642,63 @@ test("enabled Cleaning v1 fixed-price booking saves snapshot without legacy room
     assert.equal(saved.pricingSnapshot?.cleaningPricingVersion, "v1");
     assert.equal(saved.pricingSnapshot?.adminReviewRequired, false);
     assert.equal(saved.pricingSnapshot?.customerPriceEuro, 70);
+    assert.equal(saved.pricingSnapshot?.recommendedCleaners, 1);
+    assert.equal(saved.pricingSnapshot?.estimatedVisitMinutes, 210);
+    assert.equal(saved.pricingSnapshot?.minimumPriceApplied, false);
     assert.match(String(saved.details), /Cleaning v1/);
+    assert.match(String(saved.details), /Rooms:/);
+    assert.match(String(saved.details), /Team: 1 cleaner/);
+    assert.match(String(saved.details), /Visit:/);
     assert.match(String(saved.details), /billable person-hours/);
+    assert.match(String(saved.details), /Estimate: €70/);
     assert.doesNotMatch(String(saved.details), /undefined/);
+  });
+});
+
+test("enabled Cleaning v1 rejects client recommendedCleaners before side effects", async () => {
+  await withCleaningV1Enabled(async () => {
+    const { fakeDeps, counters } = createCleaningV1EnabledDeps();
+    const response = await handleOrderPost(
+      new Request("http://localhost/api/order", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(
+          cleaningV1OrderBody("idem-v1-crew-rejected", {
+            recommendedCleaners: 4,
+          }),
+        ),
+      }),
+      fakeDeps,
+    );
+    const body = (await response.json()) as { ok: boolean; error?: string };
+    assert.equal(response.status, 400);
+    assert.match(String(body.error), /recommendedCleaners/);
+    assert.equal(counters().claimCalls, 0);
+    assert.equal(counters().saveCalls, 0);
+  });
+});
+
+test("enabled Cleaning v1 rejects client estimatedVisitMinutes before side effects", async () => {
+  await withCleaningV1Enabled(async () => {
+    const { fakeDeps, counters } = createCleaningV1EnabledDeps();
+    const response = await handleOrderPost(
+      new Request("http://localhost/api/order", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(
+          cleaningV1OrderBody("idem-v1-visit-rejected", {
+            estimatedVisitMinutes: 15,
+          }),
+        ),
+      }),
+      fakeDeps,
+    );
+    const body = (await response.json()) as { ok: boolean; error?: string };
+    assert.equal(response.status, 400);
+    assert.match(String(body.error), /estimatedVisitMinutes/);
+    assert.equal(counters().claimCalls, 0);
+    assert.equal(counters().saveCalls, 0);
+    assert.equal(counters().notifyCalls, 0);
   });
 });
 

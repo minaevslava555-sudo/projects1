@@ -77,17 +77,19 @@ function resolveCleaningV1Pricing(
     };
   }
 
-  if (
-    Object.prototype.hasOwnProperty.call(
-      cleaningV1 as Record<string, unknown>,
-      "areaM2",
-    )
-  ) {
-    return {
-      ok: false,
-      status: 400,
-      message: "Unexpected field: areaM2",
-    };
+  const cleaningV1Record = cleaningV1 as Record<string, unknown>;
+  for (const forbidden of [
+    "areaM2",
+    "recommendedCleaners",
+    "estimatedVisitMinutes",
+  ] as const) {
+    if (Object.prototype.hasOwnProperty.call(cleaningV1Record, forbidden)) {
+      return {
+        ok: false,
+        status: 400,
+        message: `Unexpected field: ${forbidden}`,
+      };
+    }
   }
 
   const parsed = parseCleaningV1PriceInput({
@@ -112,6 +114,9 @@ function resolveCleaningV1Pricing(
     billableHours,
     customerPriceEuro,
     adminReviewRequired,
+    minimumPriceApplied,
+    recommendedCleaners,
+    estimatedVisitMinutes,
   } = calculated;
 
   const addons = parsed.value.addons;
@@ -127,6 +132,9 @@ function resolveCleaningV1Pricing(
     billableHours,
     customerPriceEuro,
     adminReviewRequired,
+    minimumPriceApplied,
+    recommendedCleaners,
+    estimatedVisitMinutes,
   };
   if (addons != null && cleaningV1AddonsHaveWork(addons)) {
     pricingSnapshot.addons = addons;

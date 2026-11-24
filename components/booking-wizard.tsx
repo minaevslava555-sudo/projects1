@@ -5,14 +5,18 @@ import TurnstileWidget from "@/components/turnstile-widget";
 import {
   buildBookingAttemptFingerprint,
   clearBookingAttempt,
+  isBookingAttemptQuoteStale,
   readBookingAttempt,
   writeBookingAttempt,
 } from "@/lib/booking-attempt";
 import {
   CLEANING_V1_ADDON_KEYS,
   CLEANING_V1_ADVANCED_ROOM_KEYS,
-  CLEANING_V1_MAX_ADDON_COUNT,
+  CLEANING_V1_HOURLY_RATE_EURO,
   CLEANING_V1_MAX_ROOMS_PER_TYPE,
+  CLEANING_V1_MIN_PRICE_EURO,
+  CLEANING_V1_QUOTE_REVISION,
+  cleaningV1MaxAddonCount,
   CLEANING_V1_PRESETS,
   CLEANING_V1_PRIMARY_ROOM_KEYS,
   CLEANING_V1_ROOM_KEYS,
@@ -217,6 +221,7 @@ type ErrorCode =
   | "temporaryUnavailable"
   | "tooManyRequests"
   | "attemptPayloadChanged"
+  | "estimateRevised"
   | "cleaningV1Incomplete"
   | "cleaningV1PreviewOnly";
 
@@ -400,6 +405,15 @@ export default function BookingWizard({
   const [hasUnresolvedAttempt, setHasUnresolvedAttempt] = useState(
     () => readBookingAttempt() != null,
   );
+  const [estimateNeedsConfirm, setEstimateNeedsConfirm] = useState(() => {
+    if (!CLEANING_V1_BOOKING_ENABLED) return false;
+    const pending = readBookingAttempt();
+    return (
+      pending != null &&
+      pending.service === "cleaning" &&
+      isBookingAttemptQuoteStale(pending, CLEANING_V1_QUOTE_REVISION)
+    );
+  });
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileKey, setTurnstileKey] = useState(0);
   const [repairPhotos, setRepairPhotos] = useState<RepairPhotoItem[]>([]);
@@ -547,6 +561,7 @@ export default function BookingWizard({
     if (!options?.preserveAttempt) {
       clearBookingAttempt();
       setHasUnresolvedAttempt(false);
+      setEstimateNeedsConfirm(false);
       setIdempotencyKey(crypto.randomUUID());
     }
     setTurnstileToken(null);
@@ -570,7 +585,25 @@ export default function BookingWizard({
   function startNewBookingAttempt() {
     clearBookingAttempt();
     setHasUnresolvedAttempt(false);
+    setEstimateNeedsConfirm(false);
     resetWizardFields();
+  }
+
+  /** Keep the same idempotency key; customer acknowledges the live v1 estimate. */
+  function confirmRevisedCleaningV1Estimate() {
+    const pending = readBookingAttempt();
+    if (!pending) {
+      setEstimateNeedsConfirm(false);
+      clearError();
+      return;
+    }
+    writeBookingAttempt({
+      ...pending,
+      quoteRevision: CLEANING_V1_QUOTE_REVISION,
+    });
+    setEstimateNeedsConfirm(false);
+    setHasUnresolvedAttempt(true);
+    clearError();
   }
 
   function updateRepairPhoto(id: string, patch: Partial<RepairPhotoItem>) {
@@ -1302,11 +1335,24 @@ export default function BookingWizard({
           : {}),
       });
 
-      // Stale attempts (e.g. pre-area-removal fingerprints) must not reuse the key.
+      // Stale field fingerprints must not reuse the key. Quote-engine revisions
+      // keep the key but require an explicit estimate confirmation first.
       const persisted = readBookingAttempt();
       if (persisted && persisted.fingerprint !== fingerprint) {
         setErrorCode("attemptPayloadChanged");
         setHasUnresolvedAttempt(true);
+        return;
+      }
+      if (
+        isCleaningV1Booking &&
+        persisted &&
+        persisted.fingerprint === fingerprint &&
+        isBookingAttemptQuoteStale(persisted, CLEANING_V1_QUOTE_REVISION)
+      ) {
+        setEstimateNeedsConfirm(true);
+        setHasUnresolvedAttempt(true);
+        setErrorCode("estimateRevised");
+        navigateToStep(STEPS.indexOf("configure"));
         return;
       }
 
@@ -1322,8 +1368,12 @@ export default function BookingWizard({
         idempotencyKey: keyToUse,
         fingerprint,
         service,
+        ...(isCleaningV1Booking
+          ? { quoteRevision: CLEANING_V1_QUOTE_REVISION }
+          : {}),
       });
       setHasUnresolvedAttempt(true);
+      setEstimateNeedsConfirm(false);
 
       const draft = await ensureDraft();
       const response = await fetch("/api/order", {
@@ -1593,10 +1643,31 @@ export default function BookingWizard({
               role="status"
             >
               <p className="text-sm text-ink">{t("unresolvedAttemptBody")}</p>
+              {estimateNeedsConfirm &&
+              isCleaningV1Booking &&
+              cleaningV1Estimate?.status === "fixed" &&
+              cleaningV1Estimate.result.customerPriceEuro != null ? (
+                <div className="mt-3 space-y-2 border-t border-gold/30 pt-3">
+                  <p className="text-sm text-ink">
+                    {t("estimateRevisedBody", {
+                      total: formatEuro(
+                        cleaningV1Estimate.result.customerPriceEuro,
+                      ),
+                    })}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={confirmRevisedCleaningV1Estimate}
+                    className="text-sm font-semibold text-olive underline-offset-2 hover:underline"
+                  >
+                    {t("confirmRevisedEstimate")}
+                  </button>
+                </div>
+              ) : null}
               <button
                 type="button"
                 onClick={startNewBookingAttempt}
-                className="mt-2 text-sm font-semibold text-olive underline-offset-2 hover:underline"
+                className="mt-2 block text-sm font-semibold text-olive underline-offset-2 hover:underline"
               >
                 {t("startNewBooking")}
               </button>
@@ -1965,6 +2036,11 @@ export default function BookingWizard({
                           {CLEANING_V1_ADDON_KEYS.map((key: CleaningV1AddonId) => {
                             const label = t(`cleaningV1AddonLabels.${key}`);
                             const count = addonCounts[key];
+                            const maxCount = cleaningV1MaxAddonCount(key);
+                            const unitHint =
+                              key === "windows"
+                                ? t("cleaningV1AddonHints.windows")
+                                : null;
                             return (
                               <div
                                 key={key}
@@ -1975,6 +2051,11 @@ export default function BookingWizard({
                                 <div className="mb-1 text-xs font-medium text-ink/80">
                                   {label}
                                 </div>
+                                {unitHint ? (
+                                  <p className="mb-2 text-xs leading-snug text-muted">
+                                    {unitHint}
+                                  </p>
+                                ) : null}
                                 <div className="flex items-center gap-3">
                                   <button
                                     type="button"
@@ -1997,19 +2078,19 @@ export default function BookingWizard({
                                     readOnly
                                     value={String(count)}
                                     aria-valuemin={0}
-                                    aria-valuemax={CLEANING_V1_MAX_ADDON_COUNT}
+                                    aria-valuemax={maxCount}
                                     aria-valuenow={count}
                                     className="havenly-control w-full border border-mist bg-white px-4 py-3 text-center text-ink outline-none"
                                   />
                                   <button
                                     type="button"
                                     aria-label={t("increase", { label })}
-                                    disabled={count >= CLEANING_V1_MAX_ADDON_COUNT}
+                                    disabled={count >= maxCount}
                                     onClick={() => {
                                       setAddonCounts((prev) => ({
                                         ...prev,
                                         [key]: Math.min(
-                                          CLEANING_V1_MAX_ADDON_COUNT,
+                                          maxCount,
                                           prev[key] + 1,
                                         ),
                                       }));
@@ -2044,8 +2125,57 @@ export default function BookingWizard({
                               ease: BOOKING_EASE,
                             }}
                           >
-                            <div className="booking-cleaning-metrics">
+                            <div className="booking-cleaning-metrics booking-cleaning-metrics--v1">
                               <div className="booking-cleaning-metric">
+                                <p className="booking-cleaning-metric-label">
+                                  {t("cleaningV1TeamLabel")}
+                                </p>
+                                <p className="booking-cleaning-metric-value">
+                                  {t("cleanerCount", {
+                                    count:
+                                      cleaningV1Estimate.result
+                                        .recommendedCleaners,
+                                  })}
+                                </p>
+                              </div>
+                              <div className="booking-cleaning-metric">
+                                <p className="booking-cleaning-metric-label">
+                                  {t("cleaningV1VisitLabel")}
+                                </p>
+                                <p className="booking-cleaning-metric-value">
+                                  ~
+                                  {t("cleaningV1VisitDuration", {
+                                    hours: Math.floor(
+                                      cleaningV1Estimate.result
+                                        .estimatedVisitMinutes / 60,
+                                    ),
+                                    minutes:
+                                      cleaningV1Estimate.result
+                                        .estimatedVisitMinutes % 60,
+                                  })}
+                                </p>
+                              </div>
+                              <div className="booking-cleaning-metric">
+                                <p className="booking-cleaning-metric-label">
+                                  {t("cleaningV1PersonHoursLabel")}
+                                </p>
+                                <p className="booking-cleaning-metric-value">
+                                  {cleaningV1Estimate.result.billableHours}
+                                </p>
+                              </div>
+                              <div className="booking-cleaning-metric">
+                                <p className="booking-cleaning-metric-label">
+                                  {t("cleaningV1RateLabel")}
+                                </p>
+                                <p className="booking-cleaning-metric-value">
+                                  {t("cleaningV1RateValue", {
+                                    rate: formatEuro(
+                                      CLEANING_V1_HOURLY_RATE_EURO,
+                                    ),
+                                  })}
+                                </p>
+                              </div>
+                              <div className="booking-cleaning-metric booking-cleaning-metric--total">
                                 <p className="booking-cleaning-metric-label">
                                   {t("total")}
                                 </p>
@@ -2056,8 +2186,18 @@ export default function BookingWizard({
                                 </p>
                               </div>
                             </div>
+                            {cleaningV1Estimate.result.minimumPriceApplied ? (
+                              <p className="booking-cleaning-formula mt-2 text-xs leading-snug text-olive/80 sm:text-sm">
+                                {t("cleaningV1MinimumPriceNote", {
+                                  min: formatEuro(CLEANING_V1_MIN_PRICE_EURO),
+                                })}
+                              </p>
+                            ) : null}
                             <p className="booking-cleaning-formula mt-2 text-xs leading-snug text-olive/80 sm:text-sm">
                               {t("cleaningV1EstimateNote")}
+                            </p>
+                            <p className="mt-1 text-xs leading-snug text-muted sm:text-sm">
+                              {t("cleaningV1ExtrasConfirmNote")}
                             </p>
                           </motion.div>
                         ) : cleaningV1Estimate?.status === "quote" ? (
@@ -2591,17 +2731,60 @@ export default function BookingWizard({
                         <p className="text-olive">{t("cleaningV1QuoteTitle")}</p>
                       ) : cleaningV1Estimate?.status === "fixed" &&
                         cleaningV1Estimate.result.customerPriceEuro != null ? (
-                        <p>
-                          {t("cleaningV1SummaryPrice", {
-                            hours: cleaningV1Estimate.result.billableHours,
-                            total: formatEuro(
-                              cleaningV1Estimate.result.customerPriceEuro,
-                            ),
-                          })}
-                        </p>
+                        <>
+                          <p>
+                            {t("cleaningV1SummaryTeam", {
+                              team: t("cleanerCount", {
+                                count:
+                                  cleaningV1Estimate.result.recommendedCleaners,
+                              }),
+                            })}
+                          </p>
+                          <p>
+                            {t("cleaningV1SummaryVisit", {
+                              duration: t("cleaningV1VisitDuration", {
+                                hours: Math.floor(
+                                  cleaningV1Estimate.result
+                                    .estimatedVisitMinutes / 60,
+                                ),
+                                minutes:
+                                  cleaningV1Estimate.result
+                                    .estimatedVisitMinutes % 60,
+                              }),
+                            })}
+                          </p>
+                          <p>
+                            {t("cleaningV1SummaryPersonHours", {
+                              hours: cleaningV1Estimate.result.billableHours,
+                            })}
+                          </p>
+                          <p>
+                            {t("cleaningV1SummaryRate", {
+                              rate: formatEuro(CLEANING_V1_HOURLY_RATE_EURO),
+                            })}
+                          </p>
+                          <p>
+                            {t("cleaningV1SummaryPrice", {
+                              hours: cleaningV1Estimate.result.billableHours,
+                              total: formatEuro(
+                                cleaningV1Estimate.result.customerPriceEuro,
+                              ),
+                            })}
+                          </p>
+                          {cleaningV1Estimate.result.minimumPriceApplied ? (
+                            <p className="text-olive">
+                              {t("cleaningV1MinimumPriceNote", {
+                                min: formatEuro(CLEANING_V1_MIN_PRICE_EURO),
+                              })}
+                            </p>
+                          ) : null}
+                        </>
                       ) : null}
                       <p className="text-xs text-muted">
                         {t("cleaningV1CleanersNote")}
+                      </p>
+                      <p className="text-xs text-muted">
+                        {t("cleaningV1ExtrasConfirmNote")}
                       </p>
                     </div>
                   ) : service === "cleaning" &&

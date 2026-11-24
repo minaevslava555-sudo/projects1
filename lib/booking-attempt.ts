@@ -1,6 +1,7 @@
 /**
  * Client-side unresolved booking attempt (sessionStorage).
  * Stores only idempotency key + SHA-256 fingerprint of booking fields — no raw PII.
+ * Optional quoteRevision is client-only metadata (not part of server fingerprint).
  */
 
 export const BOOKING_ATTEMPT_STORAGE_KEY = "havenly.bookingAttempt.v1";
@@ -9,6 +10,11 @@ export type PersistedBookingAttempt = {
   idempotencyKey: string;
   fingerprint: string;
   service: string;
+  /**
+   * Client-only Cleaning v1 quote-engine revision at last confirm/submit.
+   * Omitted on legacy attempts. Never sent to the server / fingerprint.
+   */
+  quoteRevision?: string;
 };
 
 /** Same field set as server OrderRequestFingerprintInput (customer booking data only). */
@@ -113,6 +119,18 @@ export async function buildBookingAttemptFingerprint(
   return bytesToHex(digest);
 }
 
+/**
+ * True when a Cleaning v1 attempt was saved under a different quote engine
+ * (or before revisions existed). Idempotency key must be kept; customer must
+ * re-confirm the live estimate before retry submit.
+ */
+export function isBookingAttemptQuoteStale(
+  attempt: PersistedBookingAttempt,
+  currentQuoteRevision: string,
+): boolean {
+  return attempt.quoteRevision !== currentQuoteRevision;
+}
+
 export function readBookingAttempt(): PersistedBookingAttempt | null {
   if (typeof sessionStorage === "undefined") return null;
   try {
@@ -129,11 +147,18 @@ export function readBookingAttempt(): PersistedBookingAttempt | null {
     ) {
       return null;
     }
-    return {
+    const attempt: PersistedBookingAttempt = {
       idempotencyKey: parsed.idempotencyKey,
       fingerprint: parsed.fingerprint.toLowerCase(),
       service: parsed.service,
     };
+    if (
+      typeof parsed.quoteRevision === "string" &&
+      parsed.quoteRevision.length > 0
+    ) {
+      attempt.quoteRevision = parsed.quoteRevision;
+    }
+    return attempt;
   } catch {
     return null;
   }
@@ -142,13 +167,20 @@ export function readBookingAttempt(): PersistedBookingAttempt | null {
 export function writeBookingAttempt(attempt: PersistedBookingAttempt): void {
   if (typeof sessionStorage === "undefined") return;
   try {
+    const payload: PersistedBookingAttempt = {
+      idempotencyKey: attempt.idempotencyKey,
+      fingerprint: attempt.fingerprint.toLowerCase(),
+      service: attempt.service,
+    };
+    if (
+      typeof attempt.quoteRevision === "string" &&
+      attempt.quoteRevision.length > 0
+    ) {
+      payload.quoteRevision = attempt.quoteRevision;
+    }
     sessionStorage.setItem(
       BOOKING_ATTEMPT_STORAGE_KEY,
-      JSON.stringify({
-        idempotencyKey: attempt.idempotencyKey,
-        fingerprint: attempt.fingerprint.toLowerCase(),
-        service: attempt.service,
-      }),
+      JSON.stringify(payload),
     );
   } catch {
     // Quota / private mode — ignore; in-memory key still used for this mount.

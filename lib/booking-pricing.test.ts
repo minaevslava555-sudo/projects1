@@ -2,13 +2,16 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   CLEANING_V1_MAX_ADDON_COUNT,
+  CLEANING_V1_MAX_WINDOWS_ADDON_COUNT,
   CLEANING_V1_MAX_ROOMS_PER_TYPE,
   CLEANING_V1_PRESETS,
   EMPTY_CLEANING_V1_ADDONS,
   calculateCleaningV1Price,
   cleaningPlan,
   cleaningPriceEuro,
+  cleaningV1MaxAddonCount,
   parseCleaningV1PriceInput,
+  recommendCleaningV1Crew,
   roundUpCleaningV1BillableMinutes,
   type CleaningV1AddonCounts,
   type CleaningV1PriceInput,
@@ -65,25 +68,25 @@ function assertPrice(
 test("calculateCleaningV1Price matches approved A/B/C × Standard/Deep/Post prices", () => {
   const cases = [
     { rooms: roomsA, cleaningType: "standard" as const, price: 70 },
-    { rooms: roomsA, cleaningType: "deep" as const, price: 100 },
+    { rooms: roomsA, cleaningType: "deep" as const, price: 110 },
     {
       rooms: roomsA,
       cleaningType: "post_renovation" as const,
-      price: 130,
+      price: 140,
     },
-    { rooms: roomsB, cleaningType: "standard" as const, price: 90 },
-    { rooms: roomsB, cleaningType: "deep" as const, price: 140 },
+    { rooms: roomsB, cleaningType: "standard" as const, price: 100 },
+    { rooms: roomsB, cleaningType: "deep" as const, price: 150 },
     {
       rooms: roomsB,
       cleaningType: "post_renovation" as const,
-      price: 180,
+      price: 200,
     },
-    { rooms: roomsC, cleaningType: "standard" as const, price: 140 },
-    { rooms: roomsC, cleaningType: "deep" as const, price: 200 },
+    { rooms: roomsC, cleaningType: "standard" as const, price: 150 },
+    { rooms: roomsC, cleaningType: "deep" as const, price: 220 },
     {
       rooms: roomsC,
       cleaningType: "post_renovation" as const,
-      price: 270,
+      price: 290,
     },
   ];
 
@@ -105,11 +108,11 @@ test("calculateCleaningV1Price presets T1/T2/T3 standard prices", () => {
   );
   assertPrice(
     { rooms: CLEANING_V1_PRESETS.t2, cleaningType: "standard" },
-    80,
+    90,
   );
   assertPrice(
     { rooms: CLEANING_V1_PRESETS.t3, cleaningType: "standard" },
-    100,
+    110,
   );
 });
 
@@ -135,7 +138,55 @@ test("calculateCleaningV1Price enforces minimum customer price of €40", () => 
   assert.equal(result.billablePersonMinutes, 30);
   assert.equal(result.billableHours, 0.5);
   assert.equal(result.customerPriceEuro, 40);
+  assert.equal(result.minimumPriceApplied, true);
   assert.equal(result.adminReviewRequired, false);
+  assert.equal(result.recommendedCleaners, 1);
+  assert.equal(result.estimatedVisitMinutes, 30);
+});
+
+test("recommendCleaningV1Crew boundaries at 4 / 8 / 12 person-hours", () => {
+  assert.deepEqual(recommendCleaningV1Crew(240), {
+    recommendedCleaners: 1,
+    estimatedVisitMinutes: 240,
+  });
+  assert.deepEqual(recommendCleaningV1Crew(241), {
+    recommendedCleaners: 2,
+    estimatedVisitMinutes: 135,
+  });
+  assert.deepEqual(recommendCleaningV1Crew(480), {
+    recommendedCleaners: 2,
+    estimatedVisitMinutes: 240,
+  });
+  assert.deepEqual(recommendCleaningV1Crew(481), {
+    recommendedCleaners: 3,
+    estimatedVisitMinutes: 165,
+  });
+  assert.deepEqual(recommendCleaningV1Crew(720), {
+    recommendedCleaners: 3,
+    estimatedVisitMinutes: 240,
+  });
+  assert.deepEqual(recommendCleaningV1Crew(721), {
+    recommendedCleaners: 4,
+    estimatedVisitMinutes: 195,
+  });
+  assert.deepEqual(recommendCleaningV1Crew(0), {
+    recommendedCleaners: 1,
+    estimatedVisitMinutes: 0,
+  });
+});
+
+test("calculateCleaningV1Price crew matches recommendCleaningV1Crew", () => {
+  const result = calculateCleaningV1Price({
+    rooms: roomsC,
+    cleaningType: "post_renovation",
+  });
+  assert.ok(!("error" in result));
+  const crew = recommendCleaningV1Crew(result.billablePersonMinutes);
+  assert.equal(result.recommendedCleaners, crew.recommendedCleaners);
+  assert.equal(result.estimatedVisitMinutes, crew.estimatedVisitMinutes);
+  assert.equal(result.minimumPriceApplied, false);
+  // Price independent of crew: same € for any recommendedCleaners.
+  assert.equal(result.customerPriceEuro, 290);
 });
 
 test("calculateCleaningV1Price rounds person-minutes up to 30-minute steps", () => {
@@ -144,7 +195,8 @@ test("calculateCleaningV1Price rounds person-minutes up to 30-minute steps", () 
     cleaningType: "standard",
   });
   assert.ok(!("error" in rounded));
-  assert.equal(rounded.totalPersonMinutes, 195);
+  assert.equal(rounded.roomMinutes, 205);
+  assert.equal(rounded.totalPersonMinutes, 205);
   assert.equal(rounded.billablePersonMinutes, 210);
 
   const exactMultiple = calculateCleaningV1Price({
@@ -152,16 +204,16 @@ test("calculateCleaningV1Price rounds person-minutes up to 30-minute steps", () 
     cleaningType: "post_renovation",
   });
   assert.ok(!("error" in exactMultiple));
-  assert.equal(exactMultiple.totalPersonMinutes, 390);
-  assert.equal(exactMultiple.billablePersonMinutes, 390);
+  assert.equal(exactMultiple.totalPersonMinutes, 410);
+  assert.equal(exactMultiple.billablePersonMinutes, 420);
 
   const deepFractional = calculateCleaningV1Price({
     rooms: roomsA,
     cleaningType: "deep",
   });
   assert.ok(!("error" in deepFractional));
-  assert.equal(deepFractional.totalPersonMinutes, 292.5);
-  assert.equal(deepFractional.billablePersonMinutes, 300);
+  assert.equal(deepFractional.totalPersonMinutes, 307.5);
+  assert.equal(deepFractional.billablePersonMinutes, 330);
 });
 
 test("roundUpCleaningV1BillableMinutes tolerates IEEE noise above exact multiples", () => {
@@ -243,7 +295,7 @@ test("calculateCleaningV1Price is independent of assigned cleaner count", () => 
   };
   const priced = calculateCleaningV1Price(input);
   assert.ok(!("error" in priced));
-  assert.equal(priced.customerPriceEuro, 90);
+  assert.equal(priced.customerPriceEuro, 100);
   assert.equal(
     Object.prototype.hasOwnProperty.call(input, "cleaners"),
     false,
@@ -394,15 +446,40 @@ test("parseCleaningV1PriceInput enforces room and add-on caps", () => {
     }).ok,
     false,
   );
+
+  assert.equal(cleaningV1MaxAddonCount("windows"), CLEANING_V1_MAX_WINDOWS_ADDON_COUNT);
+  assert.equal(
+    parseCleaningV1PriceInput({
+      rooms: roomsA,
+      cleaningType: "standard",
+      addons: {
+        ...EMPTY_CLEANING_V1_ADDONS,
+        windows: CLEANING_V1_MAX_WINDOWS_ADDON_COUNT,
+      },
+    }).ok,
+    true,
+  );
+  assert.equal(
+    parseCleaningV1PriceInput({
+      rooms: roomsA,
+      cleaningType: "standard",
+      addons: {
+        ...EMPTY_CLEANING_V1_ADDONS,
+        windows: CLEANING_V1_MAX_WINDOWS_ADDON_COUNT + 1,
+      },
+    }).ok,
+    false,
+  );
 });
 
-test("calculateCleaningV1Price adds catalog add-on person-minutes before type multiplier", () => {
+test("calculateCleaningV1Price adds add-on minutes after room type multiplier", () => {
   const base = calculateCleaningV1Price({
     rooms: roomsA,
     cleaningType: "standard",
   });
   assert.ok(!("error" in base));
   assert.equal(base.addonMinutes, 0);
+  assert.equal(base.roomMinutes, 205);
   assert.equal(base.customerPriceEuro, 70);
 
   const withOven = calculateCleaningV1Price({
@@ -413,8 +490,8 @@ test("calculateCleaningV1Price adds catalog add-on person-minutes before type mu
   assert.ok(!("error" in withOven));
   assert.equal(withOven.addonMinutes, 30);
   assert.equal(withOven.roomMinutes, base.roomMinutes);
-  // 195 + 30 = 225 → billable 240 → 4h × €20 = €80
-  assert.equal(withOven.totalPersonMinutes, 225);
+  // 205 × 1 + 30 = 235 → billable 240 → 4h × €20 = €80
+  assert.equal(withOven.totalPersonMinutes, 235);
   assert.equal(withOven.billablePersonMinutes, 240);
   assert.equal(withOven.customerPriceEuro, 80);
 
@@ -424,9 +501,20 @@ test("calculateCleaningV1Price adds catalog add-on person-minutes before type mu
     addons: { ...EMPTY_CLEANING_V1_ADDONS, oven: 1 },
   });
   assert.ok(!("error" in deepOven));
-  // (195 + 30) × 1.5 = 337.5 → 360 → €120
+  // 205 × 1.5 + 30 = 337.5 → 360 → €120 (addons not multiplied)
   assert.equal(deepOven.totalPersonMinutes, 337.5);
   assert.equal(deepOven.customerPriceEuro, 120);
+
+  const deepWindows = calculateCleaningV1Price({
+    rooms: roomsA,
+    cleaningType: "deep",
+    addons: { ...EMPTY_CLEANING_V1_ADDONS, windows: 2 },
+  });
+  assert.ok(!("error" in deepWindows));
+  assert.equal(deepWindows.addonMinutes, 40);
+  // 205 × 1.5 + 40 = 347.5 → 360 → €120
+  assert.equal(deepWindows.totalPersonMinutes, 347.5);
+  assert.equal(deepWindows.customerPriceEuro, 120);
 });
 
 test("CLEANING_V1_PRESETS stay within room caps and match known shapes", () => {

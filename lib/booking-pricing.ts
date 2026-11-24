@@ -74,16 +74,26 @@ export type CleaningV1PriceInput = {
   addons?: CleaningV1AddonCounts;
 };
 
+export type CleaningV1CrewRecommendation = {
+  recommendedCleaners: number;
+  /** Visit wall-clock minutes; display-only (ceil to 15). Does not affect price. */
+  estimatedVisitMinutes: number;
+};
+
 export type CleaningV1PriceResult = {
   roomMinutes: number;
   addonMinutes: number;
-  /** Person-minutes after rooms+addons and cleaning-type multiplier (before rounding). */
+  /** Person-minutes after room×type + addons (before billable rounding). */
   totalPersonMinutes: number;
   billablePersonMinutes: number;
   billableHours: number;
   /** VAT-inclusive customer price; null when admin review is required. */
   customerPriceEuro: number | null;
   adminReviewRequired: boolean;
+  /** True when the €40 floor raised the customer price. */
+  minimumPriceApplied: boolean;
+  recommendedCleaners: number;
+  estimatedVisitMinutes: number;
 };
 
 export type CleaningV1PresetId = "t1" | "t2" | "t3";
@@ -91,11 +101,14 @@ export type CleaningV1PresetId = "t1" | "t2" | "t3";
 /** UI + parser cap per room type. */
 export const CLEANING_V1_MAX_ROOMS_PER_TYPE = 8;
 
-/** UI + parser cap per add-on id. */
+/** Default UI + parser cap per add-on id (except windows). */
 export const CLEANING_V1_MAX_ADDON_COUNT = 3;
 
+/** Windows are counted per standard window (both sashes); higher cap. */
+export const CLEANING_V1_MAX_WINDOWS_ADDON_COUNT = 30;
+
 const CLEANING_V1_ROOM_MINUTES = {
-  bedroom: 30,
+  bedroom: 40,
   livingRoom: 40,
   kitchen: 60,
   bathroom: 45,
@@ -104,14 +117,26 @@ const CLEANING_V1_ROOM_MINUTES = {
   otherRoom: 30,
 } as const satisfies Record<keyof CleaningV1RoomCounts, number>;
 
-/** Shared add-on catalog (person-minutes each). */
+/** Shared add-on catalog (person-minutes each). Not scaled by cleaning type. */
 export const CLEANING_V1_ADDON_MINUTES = {
   oven: 30,
   fridge: 30,
-  windows: 45,
+  windows: 20,
   balcony: 20,
   ironing: 60,
 } as const satisfies Record<CleaningV1AddonId, number>;
+
+export const CLEANING_V1_MAX_ADDON_COUNTS = {
+  oven: CLEANING_V1_MAX_ADDON_COUNT,
+  fridge: CLEANING_V1_MAX_ADDON_COUNT,
+  windows: CLEANING_V1_MAX_WINDOWS_ADDON_COUNT,
+  balcony: CLEANING_V1_MAX_ADDON_COUNT,
+  ironing: CLEANING_V1_MAX_ADDON_COUNT,
+} as const satisfies Record<CleaningV1AddonId, number>;
+
+export function cleaningV1MaxAddonCount(id: CleaningV1AddonId): number {
+  return CLEANING_V1_MAX_ADDON_COUNTS[id];
+}
 
 const CLEANING_V1_MULTIPLIER: Record<CleaningV1Type, number> = {
   standard: 1,
@@ -119,9 +144,17 @@ const CLEANING_V1_MULTIPLIER: Record<CleaningV1Type, number> = {
   post_renovation: 2,
 };
 
-const CLEANING_V1_MIN_PRICE_EURO = 40;
-const CLEANING_V1_HOURLY_RATE_EURO = 20;
+export const CLEANING_V1_MIN_PRICE_EURO = 40;
+/** Same €20/person-hour rate used for customer pricing (independent of crew size). */
+export const CLEANING_V1_HOURLY_RATE_EURO = 20;
+/**
+ * Client-only quote-engine revision for unresolved booking attempts.
+ * Bump when v1 norms/formula change so the customer re-confirms the new estimate
+ * without altering server order fingerprints or idempotency keys.
+ */
+export const CLEANING_V1_QUOTE_REVISION = "2026-11-24-norms-crew";
 const CLEANING_V1_BILLABLE_STEP_MINUTES = 30;
+const CLEANING_V1_VISIT_STEP_MINUTES = 15;
 /**
  * Subtract before ceil so IEEE-754 noise slightly above an exact 30-minute
  * multiple does not bump into the next step (+€10). Keep tiny vs real work
@@ -251,7 +284,10 @@ function parseCleaningV1AddonCounts(
       return { ok: false, error: `Invalid add-on count: ${key}` };
     }
     const count = raw[key];
-    if (!isNonNegativeInt(count) || count > CLEANING_V1_MAX_ADDON_COUNT) {
+    if (
+      !isNonNegativeInt(count) ||
+      count > CLEANING_V1_MAX_ADDON_COUNTS[key as CleaningV1AddonId]
+    ) {
       return { ok: false, error: `Invalid add-on count: ${key}` };
     }
     addons[key] = count;
@@ -354,6 +390,43 @@ export function roundUpCleaningV1BillableMinutes(
 }
 
 /**
+ * Recommend crew from billable person-hours. Visit duration is display-only
+ * (person-minutes / cleaners, ceil to 15). Does not affect customer price.
+ */
+export function recommendCleaningV1Crew(
+  billablePersonMinutes: number,
+): CleaningV1CrewRecommendation {
+  if (
+    typeof billablePersonMinutes !== "number" ||
+    !Number.isFinite(billablePersonMinutes) ||
+    billablePersonMinutes <= 0
+  ) {
+    return { recommendedCleaners: 1, estimatedVisitMinutes: 0 };
+  }
+
+  const billableHours = billablePersonMinutes / 60;
+  let recommendedCleaners: number;
+  if (billableHours <= 4) {
+    recommendedCleaners = 1;
+  } else if (billableHours <= 8) {
+    recommendedCleaners = 2;
+  } else if (billableHours <= 12) {
+    recommendedCleaners = 3;
+  } else {
+    recommendedCleaners = 4;
+  }
+
+  const rawVisitMinutes = billablePersonMinutes / recommendedCleaners;
+  const estimatedVisitMinutes =
+    Math.ceil(
+      (rawVisitMinutes - CLEANING_V1_BILLABLE_ROUND_EPS) /
+        CLEANING_V1_VISIT_STEP_MINUTES,
+    ) * CLEANING_V1_VISIT_STEP_MINUTES;
+
+  return { recommendedCleaners, estimatedVisitMinutes };
+}
+
+/**
  * Isolated Cleaning v1.0 quote math. Does not affect cleaningPlan() / booking flow.
  * Customer price is independent of assigned cleaner count (person-hours, not crew size).
  */
@@ -378,15 +451,19 @@ export function calculateCleaningV1Price(
     addonMinutes += addonCounts[key] * CLEANING_V1_ADDON_MINUTES[key];
   }
 
+  // Type multiplier applies to rooms only; add-ons stay at catalog person-minutes.
   const totalPersonMinutes =
-    (roomMinutes + addonMinutes) * CLEANING_V1_MULTIPLIER[cleaningType];
+    roomMinutes * CLEANING_V1_MULTIPLIER[cleaningType] + addonMinutes;
   const billablePersonMinutes =
     roundUpCleaningV1BillableMinutes(totalPersonMinutes);
   const billableHours = billablePersonMinutes / 60;
+  const rawPriceEuro = billableHours * CLEANING_V1_HOURLY_RATE_EURO;
+  const minimumPriceApplied = rawPriceEuro < CLEANING_V1_MIN_PRICE_EURO;
   const computedPriceEuro = Math.max(
     CLEANING_V1_MIN_PRICE_EURO,
-    billableHours * CLEANING_V1_HOURLY_RATE_EURO,
+    rawPriceEuro,
   );
+  const crew = recommendCleaningV1Crew(billablePersonMinutes);
 
   return {
     roomMinutes,
@@ -396,6 +473,9 @@ export function calculateCleaningV1Price(
     billableHours,
     customerPriceEuro: computedPriceEuro,
     adminReviewRequired: false,
+    minimumPriceApplied,
+    recommendedCleaners: crew.recommendedCleaners,
+    estimatedVisitMinutes: crew.estimatedVisitMinutes,
   };
 }
 

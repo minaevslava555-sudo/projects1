@@ -244,6 +244,9 @@
       "balcony": "Balcony",
       "ironing": "Ironing hour"
     },
+    "cleaningV1AddonHints": {
+      "windows": "One unit = one standard window (both sashes): glass inside and the safely reachable outside, plus frame and sill. Panoramic, unusual or hard-to-reach windows are priced on site."
+    },
     "cleaningV1TypeLabel": "Cleaning type",
     "cleaningV1Types": {
       "standard": "Standard",
@@ -253,14 +256,28 @@
     "cleaningV1IncompleteHint": "Add at least one room and choose a cleaning type to see the estimate.",
     "cleaningV1InvalidHint": "Check the room counts and cleaning type — the estimate could not be calculated.",
     "cleaningV1BillableHoursLabel": "Billable hours",
-    "cleaningV1EstimateNote": "Estimate from rooms, extras and cleaning type. Cleaner count is set by HAVENLY after review.",
-    "cleaningV1CleanersNote": "Final cleaner count is assigned by HAVENLY after reviewing your booking.",
+    "cleaningV1TeamLabel": "Recommended team",
+    "cleaningV1VisitLabel": "Estimated visit",
+    "cleaningV1PersonHoursLabel": "Total cleaning hours",
+    "cleaningV1RateLabel": "Rate per cleaner",
+    "cleaningV1RateValue": "{rate}/hour",
+    "cleaningV1VisitDuration": "{hours, plural, =0 {{minutes} min} other {{hours}h{minutes, plural, =0 {} other { {minutes}m}}}}",
+    "cleaningV1MinimumPriceNote": "A minimum booking of {min} applies to this estimate.",
+    "cleaningV1EstimateNote": "Recommended team and visit length are estimates. The final crew is confirmed by HAVENLY. Price is based on total cleaning hours at the rate shown — not on how many cleaners arrive.",
+    "cleaningV1CleanersNote": "Final cleaner count is confirmed by HAVENLY after reviewing your booking.",
+    "cleaningV1ExtrasConfirmNote": "Extra tasks and timing are agreed with you on site before the work is done.",
+    "estimateRevisedBody": "Our estimate was updated. Please review the new total of {total} before sending again. Your previous booking request is still protected.",
+    "confirmRevisedEstimate": "Confirm updated estimate",
     "cleaningV1QuoteTitle": "Manual quote required",
     "cleaningV1QuoteBody": "This request needs a HAVENLY review. We will confirm the price after assessing it — no fixed price is shown here.",
     "cleaningV1SummaryType": "Type: {type}",
     "cleaningV1SummaryRooms": "Rooms: {rooms}",
     "cleaningV1SummaryAddons": "Extras: {addons}",
-    "cleaningV1SummaryPrice": "~{hours} billable hours · {total}",
+    "cleaningV1SummaryTeam": "Recommended team: {team}",
+    "cleaningV1SummaryVisit": "Estimated visit: ~{duration}",
+    "cleaningV1SummaryPersonHours": "Total cleaning hours: {hours}",
+    "cleaningV1SummaryRate": "Rate per cleaner: {rate}/hour",
+    "cleaningV1SummaryPrice": "Estimated total: {total}",
     "successCleaningV1QuoteNote": "This request needs a HAVENLY review — no fixed price was confirmed at booking.",
     "cleaningV1PreviewHint": "Cleaning v1 submission stays disabled while you preview the new options.",
     "cleaningV1PreviewSubmitDisabled": "Preview only — submit disabled",
@@ -357,7 +374,8 @@
       "orderProcessing": "Your booking is still being processed. Wait a moment, then retry with the same details.",
       "temporaryUnavailable": "The service is temporarily unavailable. Please retry shortly — your booking was not confirmed yet.",
       "tooManyRequests": "Too many requests. Please try again later.",
-      "attemptPayloadChanged": "These details differ from your unfinished booking. Restore the original details to retry, or start a new booking."
+      "attemptPayloadChanged": "These details differ from your unfinished booking. Restore the original details to retry, or start a new booking.",
+      "estimateRevised": "The estimate changed since your last attempt. Confirm the updated total shown above, then send again."
     }
   },
   "ServiceDetail": {

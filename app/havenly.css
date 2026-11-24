@@ -374,6 +374,15 @@
   align-items: start;
 }
 
+/* Cleaning v1: 2×2 metrics + full-width total on narrow screens; 3-col on desktop. */
+.havenly-landing .booking-cleaning-metrics--v1 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.havenly-landing .booking-cleaning-metrics--v1 .booking-cleaning-metric--total {
+  grid-column: 1 / -1;
+}
+
 .havenly-landing .booking-cleaning-metric {
   min-width: 0;
   text-align: center;
@@ -423,6 +432,16 @@
 
   .havenly-landing .booking-cleaning-metric-total {
     font-size: 1.05rem;
+  }
+}
+
+@media (min-width: 640px) {
+  .havenly-landing .booking-cleaning-metrics--v1 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .havenly-landing .booking-cleaning-metrics--v1 .booking-cleaning-metric--total {
+    grid-column: auto;
   }
 }
 

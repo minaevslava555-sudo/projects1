@@ -255,7 +255,9 @@ function rejectUnsupportedCleaningPricingVersion(
     Object.prototype.hasOwnProperty.call(raw, "roomCounts") ||
     Object.prototype.hasOwnProperty.call(raw, "areaM2") ||
     Object.prototype.hasOwnProperty.call(raw, "cleaningType") ||
-    Object.prototype.hasOwnProperty.call(raw, "addons")
+    Object.prototype.hasOwnProperty.call(raw, "addons") ||
+    Object.prototype.hasOwnProperty.call(raw, "recommendedCleaners") ||
+    Object.prototype.hasOwnProperty.call(raw, "estimatedVisitMinutes")
   ) {
     return {
       ok: false,
@@ -307,8 +309,14 @@ export function parseCleaningV1OrderFields(
     };
   }
 
-  if (Object.prototype.hasOwnProperty.call(record, "areaM2")) {
-    return { ok: false, error: "Unexpected field: areaM2" };
+  for (const forbidden of [
+    "areaM2",
+    "recommendedCleaners",
+    "estimatedVisitMinutes",
+  ] as const) {
+    if (Object.prototype.hasOwnProperty.call(record, forbidden)) {
+      return { ok: false, error: `Unexpected field: ${forbidden}` };
+    }
   }
 
   const priced = parseCleaningV1PriceInput({
@@ -406,6 +414,48 @@ function formatCleaningV1RoomComposition(
   return parts.length > 0 ? parts.join(", ") : "no rooms";
 }
 
+function formatCleaningV1AddonComposition(
+  addons: CleaningV1OrderFields["addons"],
+): string | null {
+  if (addons == null || !cleaningV1AddonsHaveWork(addons)) {
+    return null;
+  }
+  const labels: Array<[keyof NonNullable<typeof addons>, string]> = [
+    ["oven", "oven"],
+    ["fridge", "fridge"],
+    ["windows", "window"],
+    ["balcony", "balcony"],
+    ["ironing", "ironing hour"],
+  ];
+  const parts: string[] = [];
+  for (const [key, label] of labels) {
+    const count = addons[key];
+    if (count > 0) {
+      const plural =
+        key === "ironing"
+          ? count === 1
+            ? "ironing hour"
+            : "ironing hours"
+          : key === "windows"
+            ? count === 1
+              ? "window"
+              : "windows"
+            : `${label}${count === 1 ? "" : "s"}`;
+      parts.push(`${count} ${plural}`);
+    }
+  }
+  return parts.length > 0 ? parts.join(", ") : null;
+}
+
+function formatVisitDurationMinutes(minutes: number): string {
+  const whole = Math.round(minutes);
+  const hours = Math.floor(whole / 60);
+  const mins = whole % 60;
+  if (hours <= 0) return `${mins} min`;
+  if (mins === 0) return `${hours}h`;
+  return `${hours}h ${mins}m`;
+}
+
 function buildCleaningV1OrderDetails(
   cleaningV1: CleaningV1OrderFields,
   pricingSnapshot: Record<string, unknown> | null | undefined,
@@ -416,15 +466,48 @@ function buildCleaningV1OrderDetails(
       ? "post-renovation"
       : cleaningV1.cleaningType;
   const composition = formatCleaningV1RoomComposition(cleaningV1.roomCounts);
-  const base = `Cleaning v1 · ${typeLabel} · ${composition}`;
+  const addonsLine = formatCleaningV1AddonComposition(cleaningV1.addons);
+  const lines = [
+    `Cleaning v1 · ${typeLabel}`,
+    `Rooms: ${composition}`,
+  ];
+  if (addonsLine) {
+    lines.push(`Extras: ${addonsLine}`);
+  }
   if (pricingMode === "quote" || pricingSnapshot?.adminReviewRequired === true) {
-    return `${base} · manual review required`;
+    lines.push("Manual review required");
+    return lines.join(" · ");
   }
+
+  const recommendedCleaners = pricingSnapshot?.recommendedCleaners;
+  const estimatedVisitMinutes = pricingSnapshot?.estimatedVisitMinutes;
   const billableHours = pricingSnapshot?.billableHours;
-  if (typeof billableHours === "number" && Number.isFinite(billableHours)) {
-    return `${base} · ${billableHours} billable person-hours`;
+  const customerPriceEuro = pricingSnapshot?.customerPriceEuro;
+
+  if (
+    typeof recommendedCleaners === "number" &&
+    Number.isFinite(recommendedCleaners)
+  ) {
+    lines.push(
+      `Team: ${recommendedCleaners} cleaner${recommendedCleaners === 1 ? "" : "s"}`,
+    );
   }
-  return base;
+  if (
+    typeof estimatedVisitMinutes === "number" &&
+    Number.isFinite(estimatedVisitMinutes)
+  ) {
+    lines.push(`Visit: ~${formatVisitDurationMinutes(estimatedVisitMinutes)}`);
+  }
+  if (typeof billableHours === "number" && Number.isFinite(billableHours)) {
+    lines.push(`${billableHours} billable person-hours`);
+  }
+  if (
+    typeof customerPriceEuro === "number" &&
+    Number.isFinite(customerPriceEuro)
+  ) {
+    lines.push(`Estimate: €${customerPriceEuro}`);
+  }
+  return lines.join(" · ");
 }
 
 function parseValidatedBookingFields(

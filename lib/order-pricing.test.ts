@@ -264,25 +264,25 @@ test("resolveOrderPricing rejects invalid inputs before loading book", async () 
 test("resolveOrderPricing Cleaning v1 matches all 9 approved prices without loading book", async () => {
   const cases = [
     { rooms: roomsA, cleaningType: "standard" as const, price: 70 },
-    { rooms: roomsA, cleaningType: "deep" as const, price: 100 },
+    { rooms: roomsA, cleaningType: "deep" as const, price: 110 },
     {
       rooms: roomsA,
       cleaningType: "post_renovation" as const,
-      price: 130,
+      price: 140,
     },
-    { rooms: roomsB, cleaningType: "standard" as const, price: 90 },
-    { rooms: roomsB, cleaningType: "deep" as const, price: 140 },
+    { rooms: roomsB, cleaningType: "standard" as const, price: 100 },
+    { rooms: roomsB, cleaningType: "deep" as const, price: 150 },
     {
       rooms: roomsB,
       cleaningType: "post_renovation" as const,
-      price: 180,
+      price: 200,
     },
-    { rooms: roomsC, cleaningType: "standard" as const, price: 140 },
-    { rooms: roomsC, cleaningType: "deep" as const, price: 200 },
+    { rooms: roomsC, cleaningType: "standard" as const, price: 150 },
+    { rooms: roomsC, cleaningType: "deep" as const, price: 220 },
     {
       rooms: roomsC,
       cleaningType: "post_renovation" as const,
-      price: 270,
+      price: 290,
     },
   ];
 
@@ -332,6 +332,9 @@ test("resolveOrderPricing Cleaning v1 matches all 9 approved prices without load
     assert.equal(typeof result.pricingSnapshot?.totalPersonMinutes, "number");
     assert.equal(typeof result.pricingSnapshot?.billablePersonMinutes, "number");
     assert.equal(typeof result.pricingSnapshot?.billableHours, "number");
+    assert.equal(typeof result.pricingSnapshot?.recommendedCleaners, "number");
+    assert.equal(typeof result.pricingSnapshot?.estimatedVisitMinutes, "number");
+    assert.equal(typeof result.pricingSnapshot?.minimumPriceApplied, "boolean");
     assert.equal("addons" in (result.pricingSnapshot ?? {}), false);
   }
 });
@@ -400,6 +403,30 @@ test("resolveOrderPricing Cleaning v1 rejects legacy areaM2 field", async () => 
   }
   assert.equal(result.status, 400);
   assert.match(result.message, /areaM2|Unexpected field/);
+});
+
+test("resolveOrderPricing Cleaning v1 rejects client crew/visit fields", async () => {
+  const result = await resolveOrderPricing(
+    {
+      service: "cleaning",
+      cleaningPricingVersion: "v1",
+      cleaningV1: {
+        roomCounts: roomsA,
+        cleaningType: "standard",
+        ...({ recommendedCleaners: 9 } as object),
+      } as {
+        roomCounts: CleaningV1RoomCounts;
+        cleaningType: "standard";
+      },
+    },
+    async () => {
+      throw new Error("Pricing book must not load for Cleaning v1");
+    },
+  );
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.match(result.message, /recommendedCleaners/);
+  }
 });
 
 test("resolveOrderPricing Cleaning v1 rejects invalid or missing payload without legacy fallback", async () => {
