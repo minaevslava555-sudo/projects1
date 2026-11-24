@@ -10,9 +10,7 @@ import {
 } from "@/lib/booking-attempt";
 import {
   CLEANING_V1_ADDON_KEYS,
-  CLEANING_V1_ADMIN_REVIEW_AREA_M2,
   CLEANING_V1_ADVANCED_ROOM_KEYS,
-  CLEANING_V1_AREA_FREE_M2,
   CLEANING_V1_MAX_ADDON_COUNT,
   CLEANING_V1_MAX_ROOMS_PER_TYPE,
   CLEANING_V1_PRESETS,
@@ -385,7 +383,6 @@ export default function BookingWizard({
   const [addonCounts, setAddonCounts] = useState<CleaningV1AddonCounts>(
     EMPTY_CLEANING_V1_ADDONS,
   );
-  const [areaM2, setAreaM2] = useState<number | null>(null);
   const [cleaningType, setCleaningType] = useState<CleaningV1Type | null>(null);
   const [showAdvancedRooms, setShowAdvancedRooms] = useState(false);
   const [showAddons, setShowAddons] = useState(false);
@@ -483,18 +480,12 @@ export default function BookingWizard({
       return null;
     }
     const hasRooms = CLEANING_V1_ROOM_KEYS.some((key) => roomCounts[key] > 0);
-    if (
-      cleaningType == null ||
-      areaM2 == null ||
-      !(typeof areaM2 === "number" && Number.isFinite(areaM2) && areaM2 > 0) ||
-      !hasRooms
-    ) {
+    if (cleaningType == null || !hasRooms) {
       return { status: "incomplete" };
     }
     try {
       const result = calculateCleaningV1Price({
         rooms: roomCounts,
-        areaM2,
         cleaningType,
         addons: addonCounts,
       });
@@ -508,7 +499,7 @@ export default function BookingWizard({
     } catch {
       return { status: "invalid" };
     }
-  }, [service, roomCounts, addonCounts, areaM2, cleaningType]);
+  }, [service, roomCounts, addonCounts, cleaningType]);
 
   const isCleaningV1Booking =
     CLEANING_V1_BOOKING_ENABLED && service === "cleaning";
@@ -545,7 +536,6 @@ export default function BookingWizard({
     setRooms(null);
     setRoomCounts(EMPTY_CLEANING_V1_ROOMS);
     setAddonCounts(EMPTY_CLEANING_V1_ADDONS);
-    setAreaM2(null);
     setCleaningType(null);
     setShowAdvancedRooms(false);
     setShowAddons(false);
@@ -1254,7 +1244,7 @@ export default function BookingWizard({
     }
 
     if (isCleaningV1Booking) {
-      if (!cleaningV1ConfigReady || cleaningType == null || areaM2 == null) {
+      if (!cleaningV1ConfigReady || cleaningType == null) {
         setErrorCode("cleaningV1Incomplete");
         navigateToStep(STEPS.indexOf("configure"));
         return;
@@ -1300,11 +1290,10 @@ export default function BookingWizard({
             : null,
         massageMinutes: service === "massage" ? massageMinutes : null,
         repairPhotoPaths: service === "repair" ? repairPhotoPaths : null,
-        ...(isCleaningV1Booking && cleaningType != null && areaM2 != null
+        ...(isCleaningV1Booking && cleaningType != null
           ? {
               cleaningPricingVersion: "v1" as const,
               roomCounts,
-              areaM2,
               cleaningType,
               ...(cleaningV1AddonsHaveWork(addonCounts)
                 ? { addons: addonCounts }
@@ -1313,6 +1302,7 @@ export default function BookingWizard({
           : {}),
       });
 
+      // Stale attempts (e.g. pre-area-removal fingerprints) must not reuse the key.
       const persisted = readBookingAttempt();
       if (persisted && persisted.fingerprint !== fingerprint) {
         setErrorCode("attemptPayloadChanged");
@@ -1352,11 +1342,10 @@ export default function BookingWizard({
           city: city.trim(),
           apartmentFloor: apartmentFloor.trim() || undefined,
           accessInstructions: accessInstructions.trim() || undefined,
-          ...(isCleaningV1Booking && cleaningType != null && areaM2 != null
+          ...(isCleaningV1Booking && cleaningType != null
             ? {
                 cleaningPricingVersion: "v1",
                 roomCounts,
-                areaM2,
                 cleaningType,
                 ...(cleaningV1AddonsHaveWork(addonCounts)
                   ? { addons: addonCounts }
@@ -1926,36 +1915,6 @@ export default function BookingWizard({
                         </div>
                       ) : null}
                     </div>
-
-                    <Field id="cleaning-v1-area" label={t("cleaningV1AreaLabel")}>
-                      <input
-                        id="cleaning-v1-area"
-                        type="number"
-                        inputMode="decimal"
-                        min={0}
-                        step="any"
-                        value={areaM2 ?? ""}
-                        placeholder={t("cleaningV1AreaPlaceholder")}
-                        onChange={(event) => {
-                          const raw = event.target.value;
-                          if (raw === "") {
-                            setAreaM2(null);
-                            clearError();
-                            return;
-                          }
-                          const next = Number(raw);
-                          setAreaM2(Number.isFinite(next) ? next : null);
-                          clearError();
-                        }}
-                        className={inputClass}
-                      />
-                      <p className="mt-2 text-xs text-muted">
-                        {t("cleaningV1AreaHint", {
-                          freeArea: CLEANING_V1_AREA_FREE_M2,
-                          reviewArea: CLEANING_V1_ADMIN_REVIEW_AREA_M2,
-                        })}
-                      </p>
-                    </Field>
 
                     <div>
                       <p className="mb-2 block text-sm font-medium text-ink">
@@ -2595,17 +2554,11 @@ export default function BookingWizard({
                   ) : null}
                   {isCleaningV1Booking &&
                   cleaningV1ConfigReady &&
-                  cleaningType != null &&
-                  areaM2 != null ? (
+                  cleaningType != null ? (
                     <div className="mt-2 space-y-1">
                       <p>
                         {t("cleaningV1SummaryType", {
                           type: t(`cleaningV1Types.${cleaningType}`),
-                        })}
-                      </p>
-                      <p>
-                        {t("cleaningV1SummaryArea", {
-                          area: areaM2,
                         })}
                       </p>
                       <p>

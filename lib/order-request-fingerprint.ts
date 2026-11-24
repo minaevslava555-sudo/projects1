@@ -20,7 +20,6 @@ export type OrderRequestFingerprintInput = {
   /** Included in hash only when === "v1" and service === "cleaning". */
   cleaningPricingVersion?: string | null;
   roomCounts?: Record<string, unknown> | null;
-  areaM2?: number | null;
   cleaningType?: string | null;
   /** Included only when at least one add-on count is > 0 (keeps legacy v1 digests stable). */
   addons?: Record<string, unknown> | null;
@@ -77,7 +76,6 @@ export function buildOrderRequestFingerprint(
   };
 
   if (input.service === "cleaning" && input.cleaningPricingVersion === "v1") {
-    payload.areaM2 = input.areaM2 ?? null;
     payload.cleaningPricingVersion = "v1";
     payload.cleaningType = input.cleaningType ?? null;
     payload.roomCounts = input.roomCounts ?? null;

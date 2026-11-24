@@ -122,7 +122,6 @@ const v1Sample = {
     hallway: 1,
     otherRoom: 0,
   },
-  areaM2: 80,
   cleaningType: "standard",
 };
 

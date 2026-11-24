@@ -263,29 +263,26 @@ test("resolveOrderPricing rejects invalid inputs before loading book", async () 
 
 test("resolveOrderPricing Cleaning v1 matches all 9 approved prices without loading book", async () => {
   const cases = [
-    { rooms: roomsA, areaM2: 55, cleaningType: "standard" as const, price: 70 },
-    { rooms: roomsA, areaM2: 55, cleaningType: "deep" as const, price: 100 },
+    { rooms: roomsA, cleaningType: "standard" as const, price: 70 },
+    { rooms: roomsA, cleaningType: "deep" as const, price: 100 },
     {
       rooms: roomsA,
-      areaM2: 55,
       cleaningType: "post_renovation" as const,
       price: 130,
     },
-    { rooms: roomsB, areaM2: 100, cleaningType: "standard" as const, price: 100 },
-    { rooms: roomsB, areaM2: 100, cleaningType: "deep" as const, price: 150 },
+    { rooms: roomsB, cleaningType: "standard" as const, price: 90 },
+    { rooms: roomsB, cleaningType: "deep" as const, price: 140 },
     {
       rooms: roomsB,
-      areaM2: 100,
       cleaningType: "post_renovation" as const,
-      price: 190,
+      price: 180,
     },
-    { rooms: roomsC, areaM2: 170, cleaningType: "standard" as const, price: 150 },
-    { rooms: roomsC, areaM2: 170, cleaningType: "deep" as const, price: 230 },
+    { rooms: roomsC, cleaningType: "standard" as const, price: 140 },
+    { rooms: roomsC, cleaningType: "deep" as const, price: 200 },
     {
       rooms: roomsC,
-      areaM2: 170,
       cleaningType: "post_renovation" as const,
-      price: 300,
+      price: 270,
     },
   ];
 
@@ -297,7 +294,6 @@ test("resolveOrderPricing Cleaning v1 matches all 9 approved prices without load
         cleaningPricingVersion: "v1",
         cleaningV1: {
           roomCounts: row.rooms,
-          areaM2: row.areaM2,
           cleaningType: row.cleaningType,
         },
       },
@@ -324,12 +320,15 @@ test("resolveOrderPricing Cleaning v1 matches all 9 approved prices without load
     assert.equal(result.pricingSnapshot?.customerPriceEuro, row.price);
     assert.equal(result.pricingSnapshot?.adminReviewRequired, false);
     assert.deepEqual(result.pricingSnapshot?.roomCounts, row.rooms);
-    assert.equal(result.pricingSnapshot?.areaM2, row.areaM2);
+    assert.equal("areaM2" in (result.pricingSnapshot ?? {}), false);
+    assert.equal(
+      "areaAdjustmentMinutes" in (result.pricingSnapshot ?? {}),
+      false,
+    );
     assert.equal(result.pricingSnapshot?.cleaningType, row.cleaningType);
     assert.equal(typeof result.pricingSnapshot?.roomMinutes, "number");
     assert.equal(typeof result.pricingSnapshot?.addonMinutes, "number");
     assert.equal(result.pricingSnapshot?.addonMinutes, 0);
-    assert.equal(typeof result.pricingSnapshot?.areaAdjustmentMinutes, "number");
     assert.equal(typeof result.pricingSnapshot?.totalPersonMinutes, "number");
     assert.equal(typeof result.pricingSnapshot?.billablePersonMinutes, "number");
     assert.equal(typeof result.pricingSnapshot?.billableHours, "number");
@@ -344,7 +343,6 @@ test("resolveOrderPricing Cleaning v1 snapshots non-zero addons", async () => {
       cleaningPricingVersion: "v1",
       cleaningV1: {
         roomCounts: roomsA,
-        areaM2: 55,
         cleaningType: "standard",
         addons: {
           oven: 1,
@@ -374,7 +372,7 @@ test("resolveOrderPricing Cleaning v1 snapshots non-zero addons", async () => {
   });
 });
 
-test("resolveOrderPricing Cleaning v1 area 181 returns quote with null price", async () => {
+test("resolveOrderPricing Cleaning v1 rejects legacy areaM2 field", async () => {
   let loadCount = 0;
   const result = await resolveOrderPricing(
     {
@@ -382,8 +380,11 @@ test("resolveOrderPricing Cleaning v1 area 181 returns quote with null price", a
       cleaningPricingVersion: "v1",
       cleaningV1: {
         roomCounts: roomsA,
-        areaM2: 181,
         cleaningType: "standard",
+        ...({ areaM2: 181 } as object),
+      } as {
+        roomCounts: CleaningV1RoomCounts;
+        cleaningType: "standard";
       },
     },
     async () => {
@@ -393,16 +394,12 @@ test("resolveOrderPricing Cleaning v1 area 181 returns quote with null price", a
   );
 
   assert.equal(loadCount, 0);
-  assert.equal(result.ok, true);
-  if (!result.ok) {
+  assert.equal(result.ok, false);
+  if (result.ok) {
     return;
   }
-  assert.equal(result.priced.mode, "quote");
-  assert.equal(result.priced.priceEuro, null);
-  assert.equal(result.pricingSnapshot?.adminReviewRequired, true);
-  assert.equal(result.pricingSnapshot?.customerPriceEuro, null);
-  assert.equal(result.pricingSnapshot?.areaM2, 181);
-  assert.equal(result.pricingSnapshot?.cleaningPricingVersion, "v1");
+  assert.equal(result.status, 400);
+  assert.match(result.message, /areaM2|Unexpected field/);
 });
 
 test("resolveOrderPricing Cleaning v1 rejects invalid or missing payload without legacy fallback", async () => {
@@ -416,7 +413,6 @@ test("resolveOrderPricing Cleaning v1 rejects invalid or missing payload without
       cleaningPricingVersion: "v1" as const,
       cleaningV1: {
         roomCounts: { bedroom: 1 } as CleaningV1RoomCounts,
-        areaM2: 55,
         cleaningType: "standard" as const,
       },
     },
@@ -425,16 +421,6 @@ test("resolveOrderPricing Cleaning v1 rejects invalid or missing payload without
       cleaningPricingVersion: "v1" as const,
       cleaningV1: {
         roomCounts: roomsA,
-        areaM2: "55" as unknown as number,
-        cleaningType: "standard" as const,
-      },
-    },
-    {
-      service: "cleaning" as const,
-      cleaningPricingVersion: "v1" as const,
-      cleaningV1: {
-        roomCounts: roomsA,
-        areaM2: 55,
         cleaningType: "express" as "standard",
       },
     },
@@ -466,7 +452,6 @@ test("resolveOrderPricing Cleaning v1 rejects mixed legacy rooms", async () => {
       cleaningPricingVersion: "v1",
       cleaningV1: {
         roomCounts: roomsA,
-        areaM2: 55,
         cleaningType: "standard",
       },
     },
@@ -496,8 +481,11 @@ test("resolveOrderPricing Cleaning v1 does not fall back to legacy rooms pricing
         rooms: 2,
         cleaningV1: {
           roomCounts: roomsA,
-          areaM2: "bad" as unknown as number,
           cleaningType: "standard",
+          ...({ areaM2: "bad" } as object),
+        } as {
+          roomCounts: CleaningV1RoomCounts;
+          cleaningType: "standard";
         },
       },
       loadBook,

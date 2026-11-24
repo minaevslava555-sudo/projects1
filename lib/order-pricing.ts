@@ -20,7 +20,6 @@ import type { ActivePricingBook } from "@/lib/pricing-book-validation";
 
 export type ResolveOrderPricingCleaningV1 = {
   roomCounts: CleaningV1RoomCounts;
-  areaM2: number;
   cleaningType: CleaningV1Type;
   addons?: CleaningV1AddonCounts;
 };
@@ -78,9 +77,21 @@ function resolveCleaningV1Pricing(
     };
   }
 
+  if (
+    Object.prototype.hasOwnProperty.call(
+      cleaningV1 as Record<string, unknown>,
+      "areaM2",
+    )
+  ) {
+    return {
+      ok: false,
+      status: 400,
+      message: "Unexpected field: areaM2",
+    };
+  }
+
   const parsed = parseCleaningV1PriceInput({
     rooms: cleaningV1.roomCounts,
-    areaM2: cleaningV1.areaM2,
     cleaningType: cleaningV1.cleaningType,
     ...(cleaningV1.addons != null ? { addons: cleaningV1.addons } : {}),
   });
@@ -96,7 +107,6 @@ function resolveCleaningV1Pricing(
   const {
     roomMinutes,
     addonMinutes,
-    areaAdjustmentMinutes,
     totalPersonMinutes,
     billablePersonMinutes,
     billableHours,
@@ -109,11 +119,9 @@ function resolveCleaningV1Pricing(
     service: "cleaning",
     cleaningPricingVersion: "v1",
     roomCounts: parsed.value.rooms,
-    areaM2: parsed.value.areaM2,
     cleaningType: parsed.value.cleaningType,
     roomMinutes,
     addonMinutes,
-    areaAdjustmentMinutes,
     totalPersonMinutes,
     billablePersonMinutes,
     billableHours,

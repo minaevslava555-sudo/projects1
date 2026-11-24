@@ -270,7 +270,6 @@ function rejectUnsupportedCleaningPricingVersion(
 export type CleaningV1OrderFields = {
   cleaningPricingVersion: "v1";
   roomCounts: CleaningV1RoomCounts;
-  areaM2: number;
   cleaningType: CleaningV1Type;
   addons?: CleaningV1AddonCounts;
 };
@@ -308,9 +307,12 @@ export function parseCleaningV1OrderFields(
     };
   }
 
+  if (Object.prototype.hasOwnProperty.call(record, "areaM2")) {
+    return { ok: false, error: "Unexpected field: areaM2" };
+  }
+
   const priced = parseCleaningV1PriceInput({
     rooms: record.roomCounts,
-    areaM2: record.areaM2,
     cleaningType: record.cleaningType,
     ...(Object.prototype.hasOwnProperty.call(record, "addons")
       ? { addons: record.addons }
@@ -326,7 +328,6 @@ export function parseCleaningV1OrderFields(
     value: {
       cleaningPricingVersion: "v1",
       roomCounts: priced.value.rooms,
-      areaM2: priced.value.areaM2,
       cleaningType: priced.value.cleaningType,
       ...(addons != null && cleaningV1AddonsHaveWork(addons)
         ? { addons }
@@ -415,9 +416,9 @@ function buildCleaningV1OrderDetails(
       ? "post-renovation"
       : cleaningV1.cleaningType;
   const composition = formatCleaningV1RoomComposition(cleaningV1.roomCounts);
-  const base = `Cleaning v1 · ${typeLabel} · ${cleaningV1.areaM2} m² · ${composition}`;
+  const base = `Cleaning v1 · ${typeLabel} · ${composition}`;
   if (pricingMode === "quote" || pricingSnapshot?.adminReviewRequired === true) {
-    return `${base} · manual review required (area over 180 m²)`;
+    return `${base} · manual review required`;
   }
   const billableHours = pricingSnapshot?.billableHours;
   if (typeof billableHours === "number" && Number.isFinite(billableHours)) {
@@ -622,7 +623,6 @@ export async function handleOrderPost(
         ? {
             cleaningPricingVersion: "v1" as const,
             roomCounts: cleaningV1.roomCounts,
-            areaM2: cleaningV1.areaM2,
             cleaningType: cleaningV1.cleaningType,
             ...(cleaningV1.addons != null &&
             cleaningV1AddonsHaveWork(cleaningV1.addons)
@@ -742,7 +742,6 @@ export async function handleOrderPost(
             cleaningPricingVersion: "v1",
             cleaningV1: {
               roomCounts: cleaningV1.roomCounts,
-              areaM2: cleaningV1.areaM2,
               cleaningType: cleaningV1.cleaningType,
               ...(cleaningV1.addons != null
                 ? { addons: cleaningV1.addons }

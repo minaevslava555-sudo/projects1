@@ -69,7 +69,6 @@ export type CleaningV1AddonCounts = Record<CleaningV1AddonId, number>;
 
 export type CleaningV1PriceInput = {
   rooms: CleaningV1RoomCounts;
-  areaM2: number;
   cleaningType: CleaningV1Type;
   /** Optional; omitted or all-zero is equivalent. */
   addons?: CleaningV1AddonCounts;
@@ -78,8 +77,7 @@ export type CleaningV1PriceInput = {
 export type CleaningV1PriceResult = {
   roomMinutes: number;
   addonMinutes: number;
-  areaAdjustmentMinutes: number;
-  /** Person-minutes after rooms+addons+area and cleaning-type multiplier (before rounding). */
+  /** Person-minutes after rooms+addons and cleaning-type multiplier (before rounding). */
   totalPersonMinutes: number;
   billablePersonMinutes: number;
   billableHours: number;
@@ -95,9 +93,6 @@ export const CLEANING_V1_MAX_ROOMS_PER_TYPE = 8;
 
 /** UI + parser cap per add-on id. */
 export const CLEANING_V1_MAX_ADDON_COUNT = 3;
-
-export const CLEANING_V1_AREA_FREE_M2 = 80;
-export const CLEANING_V1_ADMIN_REVIEW_AREA_M2 = 180;
 
 const CLEANING_V1_ROOM_MINUTES = {
   bedroom: 30,
@@ -126,7 +121,6 @@ const CLEANING_V1_MULTIPLIER: Record<CleaningV1Type, number> = {
 
 const CLEANING_V1_MIN_PRICE_EURO = 40;
 const CLEANING_V1_HOURLY_RATE_EURO = 20;
-const CLEANING_V1_AREA_MINUTES_PER_M2 = 0.6;
 const CLEANING_V1_BILLABLE_STEP_MINUTES = 30;
 /**
  * Subtract before ceil so IEEE-754 noise slightly above an exact 30-minute
@@ -162,7 +156,6 @@ const CLEANING_V1_ADDON_KEY_SET = new Set<string>(CLEANING_V1_ADDON_KEYS);
 
 const CLEANING_V1_PRICE_INPUT_KEYS = new Set([
   "rooms",
-  "areaM2",
   "cleaningType",
   "addons",
 ]);
@@ -295,14 +288,6 @@ export function parseCleaningV1PriceInput(
     return { ok: false, error: "Invalid cleaning type" };
   }
 
-  if (!Object.prototype.hasOwnProperty.call(input, "areaM2")) {
-    return { ok: false, error: "Invalid area (m²)" };
-  }
-  const areaM2 = input.areaM2;
-  if (typeof areaM2 !== "number" || !Number.isFinite(areaM2) || areaM2 <= 0) {
-    return { ok: false, error: "Invalid area (m²)" };
-  }
-
   if (!Object.prototype.hasOwnProperty.call(input, "rooms")) {
     return { ok: false, error: "Invalid room counts" };
   }
@@ -349,7 +334,6 @@ export function parseCleaningV1PriceInput(
     ok: true,
     value: {
       rooms,
-      areaM2,
       cleaningType: input.cleaningType,
       addons,
     },
@@ -381,7 +365,7 @@ export function calculateCleaningV1Price(
     return { error: parsed.error };
   }
 
-  const { rooms, areaM2, cleaningType, addons } = parsed.value;
+  const { rooms, cleaningType, addons } = parsed.value;
   const addonCounts = addons ?? EMPTY_CLEANING_V1_ADDONS;
 
   let roomMinutes = 0;
@@ -394,16 +378,11 @@ export function calculateCleaningV1Price(
     addonMinutes += addonCounts[key] * CLEANING_V1_ADDON_MINUTES[key];
   }
 
-  const areaAdjustmentMinutes =
-    Math.max(0, areaM2 - CLEANING_V1_AREA_FREE_M2) *
-    CLEANING_V1_AREA_MINUTES_PER_M2;
   const totalPersonMinutes =
-    (roomMinutes + addonMinutes + areaAdjustmentMinutes) *
-    CLEANING_V1_MULTIPLIER[cleaningType];
+    (roomMinutes + addonMinutes) * CLEANING_V1_MULTIPLIER[cleaningType];
   const billablePersonMinutes =
     roundUpCleaningV1BillableMinutes(totalPersonMinutes);
   const billableHours = billablePersonMinutes / 60;
-  const adminReviewRequired = areaM2 > CLEANING_V1_ADMIN_REVIEW_AREA_M2;
   const computedPriceEuro = Math.max(
     CLEANING_V1_MIN_PRICE_EURO,
     billableHours * CLEANING_V1_HOURLY_RATE_EURO,
@@ -412,12 +391,11 @@ export function calculateCleaningV1Price(
   return {
     roomMinutes,
     addonMinutes,
-    areaAdjustmentMinutes,
     totalPersonMinutes,
     billablePersonMinutes,
     billableHours,
-    customerPriceEuro: adminReviewRequired ? null : computedPriceEuro,
-    adminReviewRequired,
+    customerPriceEuro: computedPriceEuro,
+    adminReviewRequired: false,
   };
 }
 

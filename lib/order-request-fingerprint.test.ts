@@ -205,20 +205,18 @@ test("explicit cleaningPricingVersion legacy matches golden fingerprint", () => 
       ...baseBooking,
       cleaningPricingVersion: "legacy",
       roomCounts: v1RoomCountsA,
-      areaM2: 90,
       cleaningType: "deep",
     }),
     LEGACY_GOLDEN_FINGERPRINT,
   );
 });
 
-test("cleaning v1 fingerprints differ by roomCounts, areaM2 and cleaningType", () => {
+test("cleaning v1 fingerprints differ by roomCounts and cleaningType", () => {
   const baseV1 = {
     ...baseBooking,
     rooms: null as number | null,
     cleaningPricingVersion: "v1" as const,
     roomCounts: v1RoomCountsA,
-    areaM2: 80,
     cleaningType: "standard",
   };
   const baseFp = buildOrderRequestFingerprint(baseV1);
@@ -226,10 +224,6 @@ test("cleaning v1 fingerprints differ by roomCounts, areaM2 and cleaningType", (
   assert.notEqual(
     baseFp,
     buildOrderRequestFingerprint({ ...baseV1, roomCounts: v1RoomCountsB }),
-  );
-  assert.notEqual(
-    baseFp,
-    buildOrderRequestFingerprint({ ...baseV1, areaM2: 120 }),
   );
   assert.notEqual(
     baseFp,
@@ -242,7 +236,6 @@ test("equivalent roomCounts key order yields identical v1 fingerprint", () => {
     ...baseBooking,
     rooms: null,
     cleaningPricingVersion: "v1",
-    areaM2: 80,
     cleaningType: "standard",
     roomCounts: {
       bedroom: 1,
@@ -258,7 +251,6 @@ test("equivalent roomCounts key order yields identical v1 fingerprint", () => {
     ...baseBooking,
     rooms: null,
     cleaningPricingVersion: "v1",
-    areaM2: 80,
     cleaningType: "standard",
     roomCounts: {
       otherRoom: 0,
@@ -273,24 +265,23 @@ test("equivalent roomCounts key order yields identical v1 fingerprint", () => {
   assert.equal(a, b);
 });
 
-test("areaM2 80 and 80.0 produce identical v1 fingerprints", () => {
-  const a = buildOrderRequestFingerprint({
+test("legacy areaM2 on input does not affect v1 fingerprint", () => {
+  const withoutArea = buildOrderRequestFingerprint({
     ...baseBooking,
     rooms: null,
     cleaningPricingVersion: "v1",
     roomCounts: v1RoomCountsA,
-    areaM2: 80,
     cleaningType: "standard",
   });
-  const b = buildOrderRequestFingerprint({
+  const withStaleArea = buildOrderRequestFingerprint({
     ...baseBooking,
     rooms: null,
     cleaningPricingVersion: "v1",
     roomCounts: v1RoomCountsA,
-    areaM2: 80.0,
     cleaningType: "standard",
+    ...({ areaM2: 120 } as object),
   });
-  assert.equal(a, b);
+  assert.equal(withoutArea, withStaleArea);
 });
 
 test("zero addons leave v1 fingerprint unchanged; non-zero addons change it", () => {
@@ -299,7 +290,6 @@ test("zero addons leave v1 fingerprint unchanged; non-zero addons change it", ()
     rooms: null,
     cleaningPricingVersion: "v1",
     roomCounts: v1RoomCountsA,
-    areaM2: 80,
     cleaningType: "standard",
   });
   const withZero = buildOrderRequestFingerprint({
@@ -307,7 +297,6 @@ test("zero addons leave v1 fingerprint unchanged; non-zero addons change it", ()
     rooms: null,
     cleaningPricingVersion: "v1",
     roomCounts: v1RoomCountsA,
-    areaM2: 80,
     cleaningType: "standard",
     addons: {
       oven: 0,
@@ -322,7 +311,6 @@ test("zero addons leave v1 fingerprint unchanged; non-zero addons change it", ()
     rooms: null,
     cleaningPricingVersion: "v1",
     roomCounts: v1RoomCountsA,
-    areaM2: 80,
     cleaningType: "standard",
     addons: {
       oven: 1,

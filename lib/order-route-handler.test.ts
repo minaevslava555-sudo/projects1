@@ -2286,7 +2286,6 @@ const validV1RoomCounts = {
 const validV1OrderFields = {
   cleaningPricingVersion: "v1" as const,
   roomCounts: validV1RoomCounts,
-  areaM2: 80,
   cleaningType: "standard" as const,
 };
 
@@ -2296,8 +2295,11 @@ test("parseCleaningV1OrderFields accepts a valid v1 payload", () => {
   if (parsed.ok) {
     assert.equal(parsed.value.cleaningPricingVersion, "v1");
     assert.deepEqual(parsed.value.roomCounts, validV1RoomCounts);
-    assert.equal(parsed.value.areaM2, 80);
     assert.equal(parsed.value.cleaningType, "standard");
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(parsed.value, "areaM2"),
+      false,
+    );
   }
 });
 
@@ -2325,18 +2327,18 @@ test("parseCleaningV1OrderFields rejects missing or malformed roomCounts", () =>
   );
 });
 
-test("parseCleaningV1OrderFields rejects invalid areaM2 and cleaningType", () => {
+test("parseCleaningV1OrderFields rejects legacy areaM2 and invalid cleaningType", () => {
   assert.equal(
     parseCleaningV1OrderFields({
       ...validV1OrderFields,
-      areaM2: "80",
+      areaM2: 80,
     }).ok,
     false,
   );
   assert.equal(
     parseCleaningV1OrderFields({
       ...validV1OrderFields,
-      areaM2: 0,
+      areaM2: "80",
     }).ok,
     false,
   );
@@ -2364,7 +2366,6 @@ test("parseCleaningV1OrderFields rejects unknown or missing version", () => {
   assert.equal(
     parseCleaningV1OrderFields({
       roomCounts: validV1RoomCounts,
-      areaM2: 80,
       cleaningType: "standard",
     }).ok,
     false,
@@ -2426,7 +2427,6 @@ function cleaningV1OrderBody(
     city: PRECLAIM_BOOKING.city,
     cleaningPricingVersion: "v1",
     roomCounts: v1RoomsA,
-    areaM2: 55,
     cleaningType: "standard",
     ...extra,
   };
@@ -2452,7 +2452,6 @@ function v1Fingerprint(extra: Record<string, unknown> = {}) {
     repairPhotoPaths: [],
     cleaningPricingVersion: "v1",
     roomCounts: body.roomCounts as Record<string, unknown>,
-    areaM2: body.areaM2 as number,
     cleaningType: body.cleaningType as string,
   });
 }
@@ -2649,7 +2648,7 @@ test("enabled Cleaning v1 fixed-price booking saves snapshot without legacy room
   });
 });
 
-test("enabled Cleaning v1 area 181 returns quote with null price", async () => {
+test("enabled Cleaning v1 rejects legacy areaM2 before side effects", async () => {
   await withCleaningV1Enabled(async () => {
     const { fakeDeps, counters } = createCleaningV1EnabledDeps();
     const response = await handleOrderPost(
@@ -2657,35 +2656,19 @@ test("enabled Cleaning v1 area 181 returns quote with null price", async () => {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(
-          cleaningV1OrderBody("idem-v1-quote", { areaM2: 181 }),
+          cleaningV1OrderBody("idem-v1-area-rejected", { areaM2: 181 }),
         ),
       }),
       fakeDeps,
     );
-    const body = (await response.json()) as {
-      ok: boolean;
-      pricingMode?: string;
-      priceEuro?: number | null;
-    };
+    const body = (await response.json()) as { ok: boolean; error?: string };
     const c = counters();
-    assert.equal(response.status, 200);
-    assert.equal(body.ok, true);
-    assert.equal(body.pricingMode, "quote");
-    assert.equal(body.priceEuro, null);
-    assert.equal(c.saveCalls, 1);
-    const saved = c.saveArgs[0] as {
-      pricingMode?: string;
-      priceEuro?: number | null;
-      pricingSnapshot?: Record<string, unknown>;
-      details?: string;
-      rooms?: number;
-    };
-    assert.equal(saved.pricingMode, "quote");
-    assert.equal(saved.priceEuro, null);
-    assert.equal(saved.rooms, undefined);
-    assert.equal(saved.pricingSnapshot?.adminReviewRequired, true);
-    assert.equal(saved.pricingSnapshot?.customerPriceEuro, null);
-    assert.match(String(saved.details), /manual review required/);
+    assert.equal(response.status, 400);
+    assert.equal(body.ok, false);
+    assert.match(String(body.error), /areaM2|Unexpected field/);
+    assert.equal(c.claimCalls, 0);
+    assert.equal(c.saveCalls, 0);
+    assert.equal(c.notifyCalls, 0);
   });
 });
 
@@ -2697,7 +2680,9 @@ test("enabled Cleaning v1 rejects invalid and mixed requests before side effects
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(
-          cleaningV1OrderBody("idem-v1-invalid", { areaM2: "80" }),
+          cleaningV1OrderBody("idem-v1-invalid", {
+            cleaningType: "express",
+          }),
         ),
       }),
       fakeDeps,

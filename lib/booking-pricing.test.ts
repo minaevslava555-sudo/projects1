@@ -64,29 +64,26 @@ function assertPrice(
 
 test("calculateCleaningV1Price matches approved A/B/C × Standard/Deep/Post prices", () => {
   const cases = [
-    { rooms: roomsA, areaM2: 55, cleaningType: "standard" as const, price: 70 },
-    { rooms: roomsA, areaM2: 55, cleaningType: "deep" as const, price: 100 },
+    { rooms: roomsA, cleaningType: "standard" as const, price: 70 },
+    { rooms: roomsA, cleaningType: "deep" as const, price: 100 },
     {
       rooms: roomsA,
-      areaM2: 55,
       cleaningType: "post_renovation" as const,
       price: 130,
     },
-    { rooms: roomsB, areaM2: 100, cleaningType: "standard" as const, price: 100 },
-    { rooms: roomsB, areaM2: 100, cleaningType: "deep" as const, price: 150 },
+    { rooms: roomsB, cleaningType: "standard" as const, price: 90 },
+    { rooms: roomsB, cleaningType: "deep" as const, price: 140 },
     {
       rooms: roomsB,
-      areaM2: 100,
       cleaningType: "post_renovation" as const,
-      price: 190,
+      price: 180,
     },
-    { rooms: roomsC, areaM2: 170, cleaningType: "standard" as const, price: 150 },
-    { rooms: roomsC, areaM2: 170, cleaningType: "deep" as const, price: 230 },
+    { rooms: roomsC, cleaningType: "standard" as const, price: 140 },
+    { rooms: roomsC, cleaningType: "deep" as const, price: 200 },
     {
       rooms: roomsC,
-      areaM2: 170,
       cleaningType: "post_renovation" as const,
-      price: 300,
+      price: 270,
     },
   ];
 
@@ -94,7 +91,6 @@ test("calculateCleaningV1Price matches approved A/B/C × Standard/Deep/Post pric
     assertPrice(
       {
         rooms: row.rooms,
-        areaM2: row.areaM2,
         cleaningType: row.cleaningType,
       },
       row.price,
@@ -102,65 +98,36 @@ test("calculateCleaningV1Price matches approved A/B/C × Standard/Deep/Post pric
   }
 });
 
-test("calculateCleaningV1Price area boundaries 80/81 and 120/121", () => {
-  const at80 = calculateCleaningV1Price({
-    rooms: roomsA,
-    areaM2: 80,
-    cleaningType: "standard",
-  });
-  const at81 = calculateCleaningV1Price({
-    rooms: roomsA,
-    areaM2: 81,
-    cleaningType: "standard",
-  });
-  assert.ok(!("error" in at80) && !("error" in at81));
-  assert.equal(at80.areaAdjustmentMinutes, 0);
-  assert.equal(at81.areaAdjustmentMinutes, 0.6);
-  assert.equal(at80.customerPriceEuro, 70);
-  assert.equal(at81.customerPriceEuro, 70);
-  assert.equal(at80.billablePersonMinutes, at81.billablePersonMinutes);
-
-  const at120 = calculateCleaningV1Price({
-    rooms: roomsA,
-    areaM2: 120,
-    cleaningType: "standard",
-  });
-  const at121 = calculateCleaningV1Price({
-    rooms: roomsA,
-    areaM2: 121,
-    cleaningType: "standard",
-  });
-  assert.ok(!("error" in at120) && !("error" in at121));
-  assert.equal(at120.areaAdjustmentMinutes, 24);
-  // 41 * 0.6 is not exactly 24.6 in IEEE-754; assert proximity + shared billable outcome.
-  assert.ok(Math.abs(at121.areaAdjustmentMinutes - 24.6) < 1e-9);
-  assert.equal(at120.customerPriceEuro, 80);
-  assert.equal(at121.customerPriceEuro, 80);
-  assert.equal(at120.billablePersonMinutes, at121.billablePersonMinutes);
+test("calculateCleaningV1Price presets T1/T2/T3 standard prices", () => {
+  assertPrice(
+    { rooms: CLEANING_V1_PRESETS.t1, cleaningType: "standard" },
+    70,
+  );
+  assertPrice(
+    { rooms: CLEANING_V1_PRESETS.t2, cleaningType: "standard" },
+    80,
+  );
+  assertPrice(
+    { rooms: CLEANING_V1_PRESETS.t3, cleaningType: "standard" },
+    100,
+  );
 });
 
-test("calculateCleaningV1Price area 180 auto-prices; 181 requires admin review", () => {
-  const at180 = calculateCleaningV1Price({
+test("calculateCleaningV1Price ignores area — field is rejected by parser", () => {
+  const withArea = parseCleaningV1PriceInput({
     rooms: roomsA,
-    areaM2: 180,
     cleaningType: "standard",
-  });
-  const at181 = calculateCleaningV1Price({
-    rooms: roomsA,
     areaM2: 181,
-    cleaningType: "standard",
   });
-  assert.ok(!("error" in at180) && !("error" in at181));
-  assert.equal(at180.adminReviewRequired, false);
-  assert.equal(at180.customerPriceEuro, 90);
-  assert.equal(at181.adminReviewRequired, true);
-  assert.equal(at181.customerPriceEuro, null);
+  assert.equal(withArea.ok, false);
+  if (!withArea.ok) {
+    assert.match(withArea.error, /areaM2|Unexpected field/);
+  }
 });
 
 test("calculateCleaningV1Price enforces minimum customer price of €40", () => {
   const result = calculateCleaningV1Price({
     rooms: { ...emptyRooms, hallway: 1 },
-    areaM2: 40,
     cleaningType: "standard",
   });
   assert.ok(!("error" in result));
@@ -168,12 +135,12 @@ test("calculateCleaningV1Price enforces minimum customer price of €40", () => 
   assert.equal(result.billablePersonMinutes, 30);
   assert.equal(result.billableHours, 0.5);
   assert.equal(result.customerPriceEuro, 40);
+  assert.equal(result.adminReviewRequired, false);
 });
 
 test("calculateCleaningV1Price rounds person-minutes up to 30-minute steps", () => {
   const rounded = calculateCleaningV1Price({
     rooms: roomsA,
-    areaM2: 55,
     cleaningType: "standard",
   });
   assert.ok(!("error" in rounded));
@@ -182,7 +149,6 @@ test("calculateCleaningV1Price rounds person-minutes up to 30-minute steps", () 
 
   const exactMultiple = calculateCleaningV1Price({
     rooms: roomsA,
-    areaM2: 55,
     cleaningType: "post_renovation",
   });
   assert.ok(!("error" in exactMultiple));
@@ -191,7 +157,6 @@ test("calculateCleaningV1Price rounds person-minutes up to 30-minute steps", () 
 
   const deepFractional = calculateCleaningV1Price({
     rooms: roomsA,
-    areaM2: 55,
     cleaningType: "deep",
   });
   assert.ok(!("error" in deepFractional));
@@ -220,23 +185,11 @@ test("roundUpCleaningV1BillableMinutes tolerates IEEE noise above exact multiple
   assert.equal(roundUpCleaningV1BillableMinutes(300.01), 330);
 });
 
-test("calculateCleaningV1Price rejects invalid area and room inputs", () => {
+test("calculateCleaningV1Price rejects invalid room inputs", () => {
   const base = {
     rooms: roomsA,
-    areaM2: 55,
     cleaningType: "standard" as const,
   };
-
-  for (const areaM2 of [
-    -1,
-    0,
-    Number.NaN,
-    Number.POSITIVE_INFINITY,
-    Number.NEGATIVE_INFINITY,
-  ]) {
-    const result = calculateCleaningV1Price({ ...base, areaM2 });
-    assert.ok("error" in result);
-  }
 
   const negativeRooms = calculateCleaningV1Price({
     ...base,
@@ -286,12 +239,11 @@ test("calculateCleaningV1Price rejects invalid area and room inputs", () => {
 test("calculateCleaningV1Price is independent of assigned cleaner count", () => {
   const input: CleaningV1PriceInput = {
     rooms: roomsB,
-    areaM2: 100,
     cleaningType: "standard",
   };
   const priced = calculateCleaningV1Price(input);
   assert.ok(!("error" in priced));
-  assert.equal(priced.customerPriceEuro, 100);
+  assert.equal(priced.customerPriceEuro, 90);
   assert.equal(
     Object.prototype.hasOwnProperty.call(input, "cleaners"),
     false,
@@ -307,14 +259,16 @@ test("calculateCleaningV1Price is independent of assigned cleaner count", () => 
 test("parseCleaningV1PriceInput accepts valid shapes and rejects invalid ones", () => {
   const valid = parseCleaningV1PriceInput({
     rooms: roomsA,
-    areaM2: 55,
     cleaningType: "standard",
   });
   assert.equal(valid.ok, true);
   if (valid.ok) {
     assert.deepEqual(valid.value.rooms, roomsA);
-    assert.equal(valid.value.areaM2, 55);
     assert.equal(valid.value.cleaningType, "standard");
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(valid.value, "areaM2"),
+      false,
+    );
   }
 
   assert.equal(parseCleaningV1PriceInput(null).ok, false);
@@ -324,7 +278,6 @@ test("parseCleaningV1PriceInput accepts valid shapes and rejects invalid ones", 
   assert.equal(
     parseCleaningV1PriceInput({
       rooms: roomsA,
-      areaM2: 55,
       cleaningType: "standard",
       cleaners: 2,
     }).ok,
@@ -334,8 +287,8 @@ test("parseCleaningV1PriceInput accepts valid shapes and rejects invalid ones", 
   assert.equal(
     parseCleaningV1PriceInput({
       rooms: roomsA,
-      areaM2: "55",
       cleaningType: "standard",
+      areaM2: 55,
     }).ok,
     false,
   );
@@ -343,7 +296,6 @@ test("parseCleaningV1PriceInput accepts valid shapes and rejects invalid ones", 
   assert.equal(
     parseCleaningV1PriceInput({
       rooms: { ...roomsA, bedroom: "1" },
-      areaM2: 55,
       cleaningType: "standard",
     }).ok,
     false,
@@ -352,7 +304,6 @@ test("parseCleaningV1PriceInput accepts valid shapes and rejects invalid ones", 
   assert.equal(
     parseCleaningV1PriceInput({
       rooms: { ...roomsA, balcony: 1 },
-      areaM2: 55,
       cleaningType: "standard",
     }).ok,
     false,
@@ -368,34 +319,6 @@ test("parseCleaningV1PriceInput accepts valid shapes and rejects invalid ones", 
         separateWc: 0,
         hallway: 1,
       },
-      areaM2: 55,
-      cleaningType: "standard",
-    }).ok,
-    false,
-  );
-
-  assert.equal(
-    parseCleaningV1PriceInput({
-      rooms: roomsA,
-      areaM2: 0,
-      cleaningType: "standard",
-    }).ok,
-    false,
-  );
-
-  assert.equal(
-    parseCleaningV1PriceInput({
-      rooms: roomsA,
-      areaM2: Number.NaN,
-      cleaningType: "standard",
-    }).ok,
-    false,
-  );
-
-  assert.equal(
-    parseCleaningV1PriceInput({
-      rooms: roomsA,
-      areaM2: Number.POSITIVE_INFINITY,
       cleaningType: "standard",
     }).ok,
     false,
@@ -404,7 +327,6 @@ test("parseCleaningV1PriceInput accepts valid shapes and rejects invalid ones", 
   assert.equal(
     parseCleaningV1PriceInput({
       rooms: { ...roomsA, bedroom: 1.5 },
-      areaM2: 55,
       cleaningType: "standard",
     }).ok,
     false,
@@ -413,7 +335,6 @@ test("parseCleaningV1PriceInput accepts valid shapes and rejects invalid ones", 
   assert.equal(
     parseCleaningV1PriceInput({
       rooms: roomsA,
-      areaM2: 55,
       cleaningType: "express",
     }).ok,
     false,
@@ -441,7 +362,6 @@ test("parseCleaningV1PriceInput enforces room and add-on caps", () => {
   assert.equal(
     parseCleaningV1PriceInput({
       rooms: { ...roomsA, bedroom: CLEANING_V1_MAX_ROOMS_PER_TYPE },
-      areaM2: 55,
       cleaningType: "standard",
     }).ok,
     true,
@@ -449,7 +369,6 @@ test("parseCleaningV1PriceInput enforces room and add-on caps", () => {
   assert.equal(
     parseCleaningV1PriceInput({
       rooms: { ...roomsA, bedroom: CLEANING_V1_MAX_ROOMS_PER_TYPE + 1 },
-      areaM2: 55,
       cleaningType: "standard",
     }).ok,
     false,
@@ -462,7 +381,6 @@ test("parseCleaningV1PriceInput enforces room and add-on caps", () => {
   assert.equal(
     parseCleaningV1PriceInput({
       rooms: roomsA,
-      areaM2: 55,
       cleaningType: "standard",
       addons: validAddons,
     }).ok,
@@ -471,7 +389,6 @@ test("parseCleaningV1PriceInput enforces room and add-on caps", () => {
   assert.equal(
     parseCleaningV1PriceInput({
       rooms: roomsA,
-      areaM2: 55,
       cleaningType: "standard",
       addons: { ...validAddons, oven: CLEANING_V1_MAX_ADDON_COUNT + 1 },
     }).ok,
@@ -482,7 +399,6 @@ test("parseCleaningV1PriceInput enforces room and add-on caps", () => {
 test("calculateCleaningV1Price adds catalog add-on person-minutes before type multiplier", () => {
   const base = calculateCleaningV1Price({
     rooms: roomsA,
-    areaM2: 55,
     cleaningType: "standard",
   });
   assert.ok(!("error" in base));
@@ -491,7 +407,6 @@ test("calculateCleaningV1Price adds catalog add-on person-minutes before type mu
 
   const withOven = calculateCleaningV1Price({
     rooms: roomsA,
-    areaM2: 55,
     cleaningType: "standard",
     addons: { ...EMPTY_CLEANING_V1_ADDONS, oven: 1 },
   });
@@ -505,7 +420,6 @@ test("calculateCleaningV1Price adds catalog add-on person-minutes before type mu
 
   const deepOven = calculateCleaningV1Price({
     rooms: roomsA,
-    areaM2: 55,
     cleaningType: "deep",
     addons: { ...EMPTY_CLEANING_V1_ADDONS, oven: 1 },
   });
@@ -522,7 +436,6 @@ test("CLEANING_V1_PRESETS stay within room caps and match known shapes", () => {
     }
     const parsed = parseCleaningV1PriceInput({
       rooms: preset,
-      areaM2: 70,
       cleaningType: "standard",
     });
     assert.equal(parsed.ok, true);

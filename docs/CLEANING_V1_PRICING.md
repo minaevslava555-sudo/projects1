@@ -9,19 +9,17 @@ Accepted for HAVENLY booking on branch `feature/85h-gallery-motion-prototype`.
 Two cleaning calculators coexist:
 
 - **Legacy** — room count 1–6 → wall-clock hours × cleaner count × €20/h (`cleaningPlan` / pricing book).
-- **Cleaning v1** — room composition + area m² + cleaning type (+ optional add-ons) → **person-minutes** → billable steps → customer price.
+- **Cleaning v1** — room composition + cleaning type (+ optional add-ons) → **person-minutes** → billable steps → customer price.
 
-v1 customer price does **not** depend on how many cleaners HAVENLY later assigns. `billableHours` are person-hours of work, not visit duration.
+v1 customer price does **not** depend on how many cleaners HAVENLY later assigns. `billableHours` are person-hours of work, not visit duration. Area (m²) is **not** part of v1 pricing.
 
 ## Formula (source of truth: `lib/booking-pricing.ts`)
 
 1. Sum room person-minutes from fixed per-type constants (bedroom 30, living 40, kitchen 60, bathroom 45, separate WC 25, hallway 20, other 30).
 2. Add optional add-on person-minutes from the shared catalog.
-3. Area adjustment: `max(0, areaM2 − 80) × 0.6` minutes.
-4. Multiply by cleaning type: standard ×1, deep ×1.5, post-renovation ×2.
-5. Round **up** to the next 30-minute billable step (float-safe epsilon).
-6. `priceEuro = max(40, billableHours × 20)` (VAT-inclusive customer price).
-7. If `areaM2 > 180` → admin review / quote (`customerPriceEuro = null`).
+3. Multiply by cleaning type: standard ×1, deep ×1.5, post-renovation ×2.
+4. Round **up** to the next 30-minute billable step (float-safe epsilon).
+5. `priceEuro = max(40, billableHours × 20)` (VAT-inclusive customer price).
 
 Per-type room counts are capped (UI + parser). Add-on counts are capped per catalog id.
 
@@ -38,9 +36,10 @@ Set the two ORDERS flags together when enabling live v1 bookings. Preview with b
 ## Security invariants
 
 - Client never supplies `priceEuro`; server recomputes via `calculateCleaningV1Price`.
-- Strict parse allowlists for rooms / add-ons; unexpected keys rejected.
+- Strict parse allowlists for rooms / add-ons; unexpected keys (including legacy `areaM2`) rejected.
 - Add-ons and room counts participate in order fingerprint + `pricingSnapshot` when used.
 - Do not trust i18n or UI-only prices for billing.
+- Historical order snapshots may still contain `areaM2` / `areaAdjustmentMinutes`; new v1 orders omit them. Do not rewrite stored rows.
 
 ## Legacy
 
