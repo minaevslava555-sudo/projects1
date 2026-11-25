@@ -2,12 +2,15 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildOrderRequestFingerprint } from "./order-request-fingerprint";
 import { resolveOrderPricing } from "./order-pricing";
+import { MASSAGE_V1_QUOTE_REVISION } from "./massage-wellness-catalog";
 import {
   handleOrderPost,
   parseCleaningV1OrderFields,
+  parseMassageV1OrderFields,
   type OrderRouteDeps,
 } from "./order-route-handler";
 import { OrderIdempotencyConflictError } from "./orders";
+import { resolveOrderPricing as realResolveOrderPricing } from "./order-pricing";
 
 const PRECLAIM_BOOKING = {
   name: "Test User",
@@ -2834,4 +2837,395 @@ test("enabled Cleaning v1 identical replay returns 200 without duplicate save or
     assert.equal(counters().notifyCalls, 0);
     assert.equal(counters().claimCalls, 0);
   });
+});
+
+test("parseMassageV1OrderFields accepts tariff and sorts equipment", () => {
+  const parsed = parseMassageV1OrderFields({
+    massageVersion: "v1",
+    massageTariffId: "relaxing-60",
+    wellnessEquipmentIds: ["top-relax", "foot-system"],
+    massageQuoteRevision: MASSAGE_V1_QUOTE_REVISION,
+  });
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) return;
+  assert.equal(parsed.value.massageTariffId, "relaxing-60");
+  assert.deepEqual(parsed.value.wellnessEquipmentIds, [
+    "foot-system",
+    "top-relax",
+  ]);
+});
+
+test("parseMassageV1OrderFields rejects stale quote revision and legacy mix", () => {
+  assert.equal(
+    parseMassageV1OrderFields({
+      massageVersion: "v1",
+      massageTariffId: "relaxing-60",
+      massageQuoteRevision: "old-revision",
+    }).ok,
+    false,
+  );
+  assert.equal(
+    parseMassageV1OrderFields({
+      massageVersion: "v1",
+      massageTariffId: "relaxing-60",
+      massageMinutes: 60,
+      massageQuoteRevision: MASSAGE_V1_QUOTE_REVISION,
+    }).ok,
+    false,
+  );
+  assert.equal(
+    parseMassageV1OrderFields({
+      massageVersion: "v1",
+      massageTariffId: "relaxing-60",
+      priceEuro: 70,
+      massageQuoteRevision: MASSAGE_V1_QUOTE_REVISION,
+    }).ok,
+    false,
+  );
+});
+
+async function withMassageV1Enabled<T>(
+  run: () => Promise<T>,
+  extraEnv: Record<string, string> = {},
+): Promise<T> {
+  const keys = [
+    "MASSAGE_V1_ORDERS_ENABLED",
+    "MASSAGE_V1_EQUIPMENT_BOOKABLE",
+    "MASSAGE_V1_PREMIUM_WELLNESS_BOOKABLE",
+    ...Object.keys(extraEnv),
+  ];
+  const previous = new Map(
+    keys.map((key) => [key, process.env[key]] as const),
+  );
+  process.env.MASSAGE_V1_ORDERS_ENABLED = "true";
+  for (const [key, value] of Object.entries(extraEnv)) {
+    process.env[key] = value;
+  }
+  try {
+    return await run();
+  } finally {
+    for (const key of keys) {
+      const prev = previous.get(key);
+      if (prev === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = prev;
+      }
+    }
+  }
+}
+
+function massageV1OrderBody(
+  idempotencyKey: string,
+  extra: Record<string, unknown> = {},
+) {
+  return {
+    turnstileToken: "test-turnstile-token",
+    idempotencyKey,
+    draftToken: "draft-token",
+    name: "Test User",
+    phone: "+351900000000",
+    service: "massage",
+    date: "2026-12-01",
+    preferredTime: "10:00",
+    streetAddress: "Rua Test 1",
+    city: "Lisboa",
+    massageVersion: "v1",
+    massageTariffId: "relaxing-60",
+    massageQuoteRevision: MASSAGE_V1_QUOTE_REVISION,
+    ...extra,
+  };
+}
+
+test("Massage v1 rejected when orders flag off", async () => {
+  const previous = process.env.MASSAGE_V1_ORDERS_ENABLED;
+  delete process.env.MASSAGE_V1_ORDERS_ENABLED;
+  try {
+    const fakeDeps = {
+      cleanupOrphanRepairPhotos: async () => ({ drafts: 0, files: 0 }),
+      clientIpFromHeaders: () => "127.0.0.1",
+      consumeRateLimit: async () => ({ ok: true as const, remaining: 9 }),
+      verifyTurnstileToken: async () => ({ ok: true }),
+      normalizeIdempotencyKey: (value: unknown) =>
+        typeof value === "string" && value.trim() ? value.trim() : null,
+      getIdempotentOrder: async () => null,
+      claimIdempotencyKeyWithToken: async () => {
+        throw new Error("must not claim");
+      },
+      releasePendingIdempotencyKey: async () => true,
+      finalizePendingIdempotencyKey: async () => "finalized" as const,
+      storeIdempotentOrder: async () => undefined,
+      verifyDraftToken: () => ({
+        ok: true as const,
+        draftId: "draft-1",
+        exp: 1_900_000_000,
+      }),
+      isDraftConsumed: async () => false,
+      assertPhotosBelongToDraft: async () => ({ ok: true as const }),
+      markDraftConsumed: async () => undefined,
+      resolveOrderPricing: realResolveOrderPricing,
+      generateOrderRef: () => "HV-MW",
+      saveOrderToSupabase: async () => {
+        throw new Error("must not save");
+      },
+      findOrderByIdempotencyKey: async () => null,
+      notifyAdminAboutOrder: async () => undefined,
+    } satisfies OrderRouteDeps;
+
+    const response = await handleOrderPost(
+      new Request("http://localhost/api/order", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(massageV1OrderBody("idem-mw-off")),
+      }),
+      fakeDeps,
+    );
+    assert.equal(response.status, 400);
+    const body = (await response.json()) as { ok: boolean; error?: string };
+    assert.equal(body.ok, false);
+    assert.match(String(body.error), /Massage v1/i);
+  } finally {
+    if (previous === undefined) {
+      delete process.env.MASSAGE_V1_ORDERS_ENABLED;
+    } else {
+      process.env.MASSAGE_V1_ORDERS_ENABLED = previous;
+    }
+  }
+});
+
+test("enabled Massage v1 POST saves snapshot and notifies", async () => {
+  await withMassageV1Enabled(async () => {
+    const savedOrders: unknown[] = [];
+    const notifications: unknown[] = [];
+    const claimPayload = JSON.stringify({
+      id: "__pending__",
+      orderRef: "",
+      pricingMode: "fixed",
+      priceEuro: null,
+      telegramOk: false,
+      claimToken: "mw-claim-1",
+    });
+
+    const fakeDeps = {
+      cleanupOrphanRepairPhotos: async () => ({ drafts: 0, files: 0 }),
+      clientIpFromHeaders: () => "127.0.0.1",
+      consumeRateLimit: async () => ({ ok: true as const, remaining: 9 }),
+      verifyTurnstileToken: async () => ({ ok: true }),
+      normalizeIdempotencyKey: (value: unknown) =>
+        typeof value === "string" && value.trim() ? value.trim() : null,
+      getIdempotentOrder: async () => null,
+      claimIdempotencyKeyWithToken: async () => ({
+        status: "claimed" as const,
+        claimPayload,
+      }),
+      releasePendingIdempotencyKey: async () => true,
+      finalizePendingIdempotencyKey: async () => "finalized" as const,
+      storeIdempotentOrder: async () => undefined,
+      verifyDraftToken: () => ({
+        ok: true as const,
+        draftId: "draft-mw-1",
+        exp: 1_900_000_000,
+      }),
+      isDraftConsumed: async () => false,
+      assertPhotosBelongToDraft: async () => ({ ok: true as const }),
+      markDraftConsumed: async () => undefined,
+      resolveOrderPricing: realResolveOrderPricing,
+      generateOrderRef: () => "HV-MW01",
+      saveOrderToSupabase: async (order: unknown) => {
+        savedOrders.push(order);
+        return { id: "ord-mw-1", orderRef: "HV-MW01" };
+      },
+      findOrderByIdempotencyKey: async () => null,
+      notifyAdminAboutOrder: async (order: unknown) => {
+        notifications.push(order);
+      },
+    } satisfies OrderRouteDeps;
+
+    const response = await handleOrderPost(
+      new Request("http://localhost/api/order", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(massageV1OrderBody("idem-mw-ok")),
+      }),
+      fakeDeps,
+    );
+    const body = (await response.json()) as {
+      ok: boolean;
+      priceEuro?: number | null;
+      orderRef?: string;
+    };
+    assert.equal(response.status, 200);
+    assert.equal(body.ok, true);
+    assert.equal(body.priceEuro, 70);
+    assert.equal(body.orderRef, "HV-MW01");
+    assert.equal(savedOrders.length, 1);
+    const saved = savedOrders[0] as {
+      massageMinutes?: number;
+      massageCategory?: string;
+      priceEuro?: number;
+      pricingSnapshot?: Record<string, unknown>;
+      details?: string;
+    };
+    assert.equal(saved.massageMinutes, 60);
+    assert.equal(saved.massageCategory, "relaxing-60");
+    assert.equal(saved.priceEuro, 70);
+    assert.equal(saved.pricingSnapshot?.massageVersion, "v1");
+    assert.equal(saved.pricingSnapshot?.tariffId, "relaxing-60");
+    assert.equal(saved.pricingSnapshot?.baseDurationMin, 60);
+    assert.equal(saved.pricingSnapshot?.totalSessionMinutes, 60);
+    assert.match(String(saved.details), /relaxing-60/);
+    assert.equal(notifications.length, 1);
+    const notify = notifications[0] as {
+      massageCategory?: string;
+      massageMinutes?: number;
+      priceEuro?: number | null;
+      pricingSnapshot?: Record<string, unknown>;
+    };
+    assert.equal(notify.massageCategory, "relaxing-60");
+    assert.equal(notify.massageMinutes, 60);
+    assert.equal(notify.priceEuro, 70);
+    assert.equal(notify.pricingSnapshot?.massageVersion, "v1");
+    assert.equal(notify.pricingSnapshot?.tariffId, "relaxing-60");
+    assert.equal(notify.pricingSnapshot?.baseDurationMin, 60);
+    assert.equal(notify.pricingSnapshot?.totalSessionMinutes, 60);
+    assert.equal(notify.pricingSnapshot?.priceEuro, 70);
+  });
+});
+
+test("enabled Massage v1 rejects equipment when equipment flag off", async () => {
+  await withMassageV1Enabled(async () => {
+    delete process.env.MASSAGE_V1_EQUIPMENT_BOOKABLE;
+    let saveCalls = 0;
+    const claimPayload = JSON.stringify({
+      id: "__pending__",
+      orderRef: "",
+      pricingMode: "fixed",
+      priceEuro: null,
+      telegramOk: false,
+      claimToken: "mw-claim-2",
+    });
+    const fakeDeps = {
+      cleanupOrphanRepairPhotos: async () => ({ drafts: 0, files: 0 }),
+      clientIpFromHeaders: () => "127.0.0.1",
+      consumeRateLimit: async () => ({ ok: true as const, remaining: 9 }),
+      verifyTurnstileToken: async () => ({ ok: true }),
+      normalizeIdempotencyKey: (value: unknown) =>
+        typeof value === "string" && value.trim() ? value.trim() : null,
+      getIdempotentOrder: async () => null,
+      claimIdempotencyKeyWithToken: async () => ({
+        status: "claimed" as const,
+        claimPayload,
+      }),
+      releasePendingIdempotencyKey: async () => true,
+      finalizePendingIdempotencyKey: async () => "finalized" as const,
+      storeIdempotentOrder: async () => undefined,
+      verifyDraftToken: () => ({
+        ok: true as const,
+        draftId: "draft-mw-2",
+        exp: 1_900_000_000,
+      }),
+      isDraftConsumed: async () => false,
+      assertPhotosBelongToDraft: async () => ({ ok: true as const }),
+      markDraftConsumed: async () => undefined,
+      resolveOrderPricing: realResolveOrderPricing,
+      generateOrderRef: () => "HV-MW02",
+      saveOrderToSupabase: async () => {
+        saveCalls += 1;
+        return { id: "x", orderRef: "HV-MW02" };
+      },
+      findOrderByIdempotencyKey: async () => null,
+      notifyAdminAboutOrder: async () => undefined,
+    } satisfies OrderRouteDeps;
+
+    const response = await handleOrderPost(
+      new Request("http://localhost/api/order", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(
+          massageV1OrderBody("idem-mw-equip-off", {
+            wellnessEquipmentIds: ["foot-system"],
+          }),
+        ),
+      }),
+      fakeDeps,
+    );
+    assert.equal(response.status, 400);
+    assert.equal(saveCalls, 0);
+  });
+});
+
+test("enabled Massage v1 accepts equipment when equipment flag on", async () => {
+  await withMassageV1Enabled(
+    async () => {
+      const savedOrders: unknown[] = [];
+      const claimPayload = JSON.stringify({
+        id: "__pending__",
+        orderRef: "",
+        pricingMode: "fixed",
+        priceEuro: null,
+        telegramOk: false,
+        claimToken: "mw-claim-3",
+      });
+      const fakeDeps = {
+        cleanupOrphanRepairPhotos: async () => ({ drafts: 0, files: 0 }),
+        clientIpFromHeaders: () => "127.0.0.1",
+        consumeRateLimit: async () => ({ ok: true as const, remaining: 9 }),
+        verifyTurnstileToken: async () => ({ ok: true }),
+        normalizeIdempotencyKey: (value: unknown) =>
+          typeof value === "string" && value.trim() ? value.trim() : null,
+        getIdempotentOrder: async () => null,
+        claimIdempotencyKeyWithToken: async () => ({
+          status: "claimed" as const,
+          claimPayload,
+        }),
+        releasePendingIdempotencyKey: async () => true,
+        finalizePendingIdempotencyKey: async () => "finalized" as const,
+        storeIdempotentOrder: async () => undefined,
+        verifyDraftToken: () => ({
+          ok: true as const,
+          draftId: "draft-mw-3",
+          exp: 1_900_000_000,
+        }),
+        isDraftConsumed: async () => false,
+        assertPhotosBelongToDraft: async () => ({ ok: true as const }),
+        markDraftConsumed: async () => undefined,
+        resolveOrderPricing: realResolveOrderPricing,
+        generateOrderRef: () => "HV-MW03",
+        saveOrderToSupabase: async (order: unknown) => {
+          savedOrders.push(order);
+          return { id: "ord-mw-3", orderRef: "HV-MW03" };
+        },
+        findOrderByIdempotencyKey: async () => null,
+        notifyAdminAboutOrder: async () => undefined,
+      } satisfies OrderRouteDeps;
+
+      const response = await handleOrderPost(
+        new Request("http://localhost/api/order", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(
+            massageV1OrderBody("idem-mw-equip-on", {
+              wellnessEquipmentIds: ["foot-system", "eye-system"],
+            }),
+          ),
+        }),
+        fakeDeps,
+      );
+      const body = (await response.json()) as {
+        ok: boolean;
+        priceEuro?: number | null;
+      };
+      assert.equal(response.status, 200);
+      assert.equal(body.ok, true);
+      assert.equal(body.priceEuro, 105);
+      const saved = savedOrders[0] as {
+        pricingSnapshot?: Record<string, unknown>;
+        massageMinutes?: number;
+      };
+      assert.equal(saved.massageMinutes, 60);
+      assert.equal(saved.pricingSnapshot?.totalSessionMinutes, 115);
+      assert.equal(saved.pricingSnapshot?.priceEuro, 105);
+    },
+    { MASSAGE_V1_EQUIPMENT_BOOKABLE: "true" },
+  );
 });

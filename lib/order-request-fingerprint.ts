@@ -23,6 +23,11 @@ export type OrderRequestFingerprintInput = {
   cleaningType?: string | null;
   /** Included only when at least one add-on count is > 0 (keeps legacy v1 digests stable). */
   addons?: Record<string, unknown> | null;
+  /** Included in hash only when === "v1" and service === "massage". */
+  massageVersion?: string | null;
+  massageTariffId?: string | null;
+  /** Sorted unique ids; omit from hash when empty (keeps digests stable). */
+  wellnessEquipmentIds?: string[] | null;
 };
 
 function canonicalize(value: unknown): unknown {
@@ -89,6 +94,17 @@ export function buildOrderRequestFingerprint(
       )
     ) {
       payload.addons = addons;
+    }
+  }
+
+  if (input.service === "massage" && input.massageVersion === "v1") {
+    payload.massageVersion = "v1";
+    payload.massageTariffId = input.massageTariffId ?? null;
+    const equipment = input.wellnessEquipmentIds;
+    if (Array.isArray(equipment) && equipment.length > 0) {
+      payload.wellnessEquipmentIds = [...equipment].sort((a, b) =>
+        a < b ? -1 : a > b ? 1 : 0,
+      );
     }
   }
 

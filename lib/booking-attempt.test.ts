@@ -195,3 +195,19 @@ test("client/server fingerprint parity for legacy and cleaning v1", async () => 
   assert.equal(addonsClient, addonsServer);
   assert.notEqual(addonsClient, v1Client);
 });
+
+test("client/server fingerprint parity for massage v1", async () => {
+  const massageV1 = {
+    ...sampleInput,
+    service: "massage",
+    rooms: null as number | null,
+    massageMinutes: null as number | null,
+    massageCategory: null as string | null,
+    massageVersion: "v1" as const,
+    massageTariffId: "relaxing-60",
+    wellnessEquipmentIds: ["eye-system", "foot-system"],
+  };
+  const client = await buildBookingAttemptFingerprint(massageV1);
+  const server = buildOrderRequestFingerprint(massageV1);
+  assert.equal(client, server);
+});

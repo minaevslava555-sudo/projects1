@@ -524,3 +524,98 @@ test("resolveOrderPricing Cleaning v1 does not fall back to legacy rooms pricing
     assert.equal(result.status, 400);
   });
 });
+
+test("resolveOrderPricing Massage v1 prices without loading book", async () => {
+  let loadCount = 0;
+  const result = await resolveOrderPricing(
+    {
+      service: "massage",
+      massageVersion: "v1",
+      massageV1: {
+        tariffId: "relaxing-60",
+        wellnessEquipmentIds: ["foot-system"],
+        equipmentBookable: true,
+        premiumWellnessBookable: true,
+      },
+    },
+    async () => {
+      loadCount += 1;
+      throw new Error("Pricing book must not load for Massage v1");
+    },
+  );
+
+  assert.equal(loadCount, 0);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.priced.mode, "fixed");
+  assert.equal(result.priced.priceEuro, 90);
+  assert.equal(result.pricingConfigId, undefined);
+  assert.equal(result.pricingSnapshot?.massageVersion, "v1");
+  assert.equal(result.pricingSnapshot?.tariffId, "relaxing-60");
+  assert.equal(result.pricingSnapshot?.baseDurationMin, 60);
+  assert.equal(result.pricingSnapshot?.totalSessionMinutes, 90);
+  assert.equal(result.pricingSnapshot?.priceEuro, 90);
+});
+
+test("resolveOrderPricing Massage v1 rejects legacy massageMinutes mix", async () => {
+  const result = await resolveOrderPricing(
+    {
+      service: "massage",
+      massageVersion: "v1",
+      massageMinutes: 60,
+      massageV1: { tariffId: "relaxing-60" },
+    },
+    async () => {
+      throw new Error("Loader must not be called");
+    },
+  );
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.status, 400);
+  assert.match(result.message, /massageMinutes/);
+});
+
+test("resolveOrderPricing Massage v1 rejects equipment when not bookable", async () => {
+  const result = await resolveOrderPricing(
+    {
+      service: "massage",
+      massageVersion: "v1",
+      massageV1: {
+        tariffId: "relaxing-60",
+        wellnessEquipmentIds: ["moxi"],
+        equipmentBookable: false,
+      },
+    },
+    async () => {
+      throw new Error("Loader must not be called");
+    },
+  );
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.status, 400);
+});
+
+test("resolveOrderPricing Massage v1 Premium snapshot has included equipment", async () => {
+  const result = await resolveOrderPricing(
+    {
+      service: "massage",
+      massageVersion: "v1",
+      massageV1: {
+        tariffId: "premium-wellness-120",
+        premiumWellnessBookable: true,
+      },
+    },
+    async () => {
+      throw new Error("Loader must not be called");
+    },
+  );
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.priced.priceEuro, 120);
+  assert.deepEqual(result.pricingSnapshot?.includedEquipment, [
+    "foot-system",
+    "eye-system",
+    "moxi",
+    "top-relax",
+  ]);
+});

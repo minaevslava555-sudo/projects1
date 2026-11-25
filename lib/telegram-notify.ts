@@ -30,6 +30,11 @@ export type OrderNotification = {
   /** Private storage object paths for this order only (max 5). */
   repairPhotoPaths?: string[];
   details?: string;
+  /**
+   * Server pricing snapshot. Massage v1 Telegram breakdown reads only from this
+   * object (never from client-derived totals).
+   */
+  pricingSnapshot?: Record<string, unknown> | null;
 };
 
 type DownloadedPhoto = {
@@ -60,7 +65,78 @@ function isQuoteOrder(order: OrderNotification) {
   return order.pricingMode === "quote" || order.priceEuro == null;
 }
 
-function buildOrderMessage(order: OrderNotification) {
+function isMassageV1Snapshot(
+  snapshot: Record<string, unknown> | null | undefined,
+): snapshot is Record<string, unknown> & {
+  massageVersion: "v1";
+  tariffId: string;
+  baseDurationMin: number;
+  totalSessionMinutes: number;
+  priceEuro: number;
+} {
+  return (
+    snapshot != null &&
+    snapshot.massageVersion === "v1" &&
+    typeof snapshot.tariffId === "string" &&
+    snapshot.tariffId.length > 0 &&
+    typeof snapshot.baseDurationMin === "number" &&
+    Number.isFinite(snapshot.baseDurationMin) &&
+    typeof snapshot.totalSessionMinutes === "number" &&
+    Number.isFinite(snapshot.totalSessionMinutes) &&
+    typeof snapshot.priceEuro === "number" &&
+    Number.isFinite(snapshot.priceEuro)
+  );
+}
+
+function formatEquipmentIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const ids: string[] = [];
+  for (const item of value) {
+    if (typeof item === "string" && item.trim()) {
+      ids.push(item.trim());
+      continue;
+    }
+    if (
+      item &&
+      typeof item === "object" &&
+      !Array.isArray(item) &&
+      typeof (item as { id?: unknown }).id === "string" &&
+      (item as { id: string }).id.trim()
+    ) {
+      ids.push((item as { id: string }).id.trim());
+    }
+  }
+  return ids;
+}
+
+/** Append Massage v1 lines from server pricing_snapshot only. */
+function appendMassageV1SnapshotLines(
+  lines: string[],
+  snapshot: Record<string, unknown> & {
+    tariffId: string;
+    baseDurationMin: number;
+    totalSessionMinutes: number;
+    priceEuro: number;
+  },
+) {
+  lines.push(`🧴 Тариф: ${snapshot.tariffId}`);
+  lines.push(`🧘 Базовая длительность: ${snapshot.baseDurationMin} мин`);
+
+  const extras = formatEquipmentIds(snapshot.equipment);
+  if (extras.length > 0) {
+    lines.push(`🧴 Доп. оборудование: ${extras.join(", ")}`);
+  }
+
+  const included = formatEquipmentIds(snapshot.includedEquipment);
+  if (included.length > 0) {
+    lines.push(`✨ Включено (Premium Wellness): ${included.join(", ")}`);
+  }
+
+  lines.push(`⏱ Общая длительность визита: ${snapshot.totalSessionMinutes} мин`);
+}
+
+/** Exported for unit tests — keep side-effect free. */
+export function buildOrderMessage(order: OrderNotification) {
   const lines = [
     "🆕 Новый заказ с сайта HAVENLY",
     "────────────────",
@@ -68,11 +144,16 @@ function buildOrderMessage(order: OrderNotification) {
     `🛎 Услуга: ${order.service}`,
   ];
 
+  const snapshot = order.pricingSnapshot;
+  const isMassageV1 = isMassageV1Snapshot(snapshot);
+
   if (isQuoteOrder(order)) {
     lines.push("💶 Оценка: quote (цена после осмотра)");
     lines.push("⚠️ Quote required");
   } else {
-    lines.push(`💶 Итого: ${formatPrice(order.priceEuro!)}`);
+    // Massage v1 total comes only from server pricing_snapshot.
+    const totalEuro = isMassageV1 ? snapshot.priceEuro : order.priceEuro!;
+    lines.push(`💶 Итого: ${formatPrice(totalEuro)}`);
   }
 
   if (typeof order.rooms === "number") {
@@ -84,19 +165,26 @@ function buildOrderMessage(order: OrderNotification) {
   if (typeof order.workers === "number") {
     lines.push(`👥 Специалисты: ${order.workers}`);
   }
-  if (typeof order.massageMinutes === "number") {
-    lines.push(`🧘 Длительность: ${order.massageMinutes} мин`);
+
+  if (isMassageV1) {
+    appendMassageV1SnapshotLines(lines, snapshot);
+  } else {
+    if (typeof order.massageMinutes === "number") {
+      lines.push(`🧘 Длительность: ${order.massageMinutes} мин`);
+    }
+    if (order.massageCategory) {
+      lines.push(`🧴 Тип массажа: ${order.massageCategory}`);
+    }
   }
-  if (order.massageCategory) {
-    lines.push(`🧴 Тип массажа: ${order.massageCategory}`);
-  }
+
   if (order.problemDescription) {
     lines.push(`🛠 Проблема: ${order.problemDescription}`);
   }
   if (typeof order.repairPhotoCount === "number" && order.repairPhotoCount > 0) {
     lines.push(`📷 Фото ремонта: ${order.repairPhotoCount}`);
   }
-  if (order.details) {
+  // Massage v1 breakdown comes from pricingSnapshot; skip redundant details.
+  if (order.details && !isMassageV1) {
     lines.push(`📋 Расчёт: ${order.details}`);
   }
 

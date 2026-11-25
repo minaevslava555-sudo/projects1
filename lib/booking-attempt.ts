@@ -40,6 +40,11 @@ export type BookingAttemptFingerprintInput = {
   cleaningType?: string | null;
   /** Included only when at least one add-on count is > 0 (keeps legacy v1 digests stable). */
   addons?: Record<string, unknown> | null;
+  /** Included in hash only when === "v1" and service === "massage". */
+  massageVersion?: string | null;
+  massageTariffId?: string | null;
+  /** Sorted unique ids; omit from hash when empty. */
+  wellnessEquipmentIds?: string[] | null;
 };
 
 function canonicalize(value: unknown): unknown {
@@ -75,7 +80,7 @@ export async function buildBookingAttemptFingerprint(
       ? null
       : [...input.repairPhotoPaths].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
-  // Keep in lockstep with buildOrderRequestFingerprint (v1 keys only for cleaning + "v1").
+  // Keep in lockstep with buildOrderRequestFingerprint (v1 keys only for versioned services).
   const payload: Record<string, unknown> = {
     accessInstructions: input.accessInstructions ?? null,
     apartmentFloor: input.apartmentFloor ?? null,
@@ -108,6 +113,17 @@ export async function buildBookingAttemptFingerprint(
       )
     ) {
       payload.addons = addons;
+    }
+  }
+
+  if (input.service === "massage" && input.massageVersion === "v1") {
+    payload.massageVersion = "v1";
+    payload.massageTariffId = input.massageTariffId ?? null;
+    const equipment = input.wellnessEquipmentIds;
+    if (Array.isArray(equipment) && equipment.length > 0) {
+      payload.wellnessEquipmentIds = [...equipment].sort((a, b) =>
+        a < b ? -1 : a > b ? 1 : 0,
+      );
     }
   }
 

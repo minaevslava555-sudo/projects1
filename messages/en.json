@@ -306,6 +306,36 @@
     "cleaningFormula": "{hours} × {workers} × 20€ = {total}",
     "sessionDuration": "Session duration",
     "minutes": "{count} minutes",
+    "massageV1ChooseExperience": "Choose your experience",
+    "massageV1Enhance": "Enhance your experience",
+    "massageV1EstimateHeading": "Your wellness estimate",
+    "massageV1HomeVisitIncluded": "Home visit included",
+    "massageV1BaseDuration": "Massage duration: {minutes} min",
+    "massageV1TotalDuration": "Total session: {minutes} min",
+    "massageV1IncludedEquipment": "Included equipment",
+    "massageV1SelectedEquipment": "Selected equipment",
+    "massageV1ExtraTime": "+{minutes} min",
+    "massageV1ExtraPrice": "+{price}",
+    "massageV1LearnMore": "Learn more",
+    "massageV1ComingSoon": "Coming soon",
+    "massageV1TargetedDuration": "Duration",
+    "massageV1PreviewHint": "Massage & Wellness booking is in preview. Submission stays disabled until enabled.",
+    "massageV1PreviewSubmitDisabled": "Preview only — submit disabled",
+    "massageV1SummaryTariff": "Experience: {tariff}",
+    "massageV1SummaryVisit": "Total session: {minutes} min · {total}",
+    "massageV1Tariffs": {
+      "relaxing-60": "Relaxing Massage",
+      "sports-60": "Sports Massage",
+      "targeted-30": "Targeted Massage · 30 min",
+      "targeted-60": "Targeted Massage · 60 min",
+      "premium-wellness-120": "Premium Wellness"
+    },
+    "massageV1EquipmentNames": {
+      "foot-system": "FootSystem",
+      "eye-system": "EyeSystem",
+      "moxi": "Moxi",
+      "top-relax": "TopRelax"
+    },
     "problemLabel": "Describe the problem",
     "problemPlaceholder": "What needs fixing? Where is it? Any urgency?",
     "photosLabel": "Photos (up to 5)",
@@ -364,6 +394,8 @@
       "chooseRooms": "Select the number of rooms to continue",
       "cleaningV1Incomplete": "Choose a cleaning type and a typical home to continue.",
       "cleaningV1PreviewOnly": "Cleaning v1 booking is in preview only. Submission is not available yet — please use the standard room booking for now, or check back later.",
+      "massageV1Incomplete": "Choose a massage experience to continue",
+      "massageV1PreviewOnly": "Massage & Wellness booking is in preview only. Submission is not available yet.",
       "chooseDate": "Choose a date",
       "chooseTime": "Choose a preferred time",
       "addressRequired": "Enter street address and city",
@@ -542,6 +574,96 @@
             }
           }
         }
+      }
+    }
+  },
+  "MassageWellness": {
+    "eyebrow": "Massage & Wellness",
+    "heroTitle": "Massage & Wellness",
+    "heroTagline": "Premium in-home care at accessible prices — massage and wellness technology, delivered to you.",
+    "heroCta": "Book your session",
+    "discoverMassages": "Discover our massages",
+    "discoverMassagesIntro": "Four focused experiences. Transparent rates. Home visit included within our service area.",
+    "discoverTech": "Discover our wellness technology",
+    "discoverTechIntro": "Optional NovuMedical equipment to enhance your massage. Availability for booking is confirmed separately.",
+    "bookCta": "Book Massage & Wellness",
+    "backToServices": "← Back to services",
+    "fromPrice": "From {price}",
+    "duration": "{minutes} min",
+    "includedDevices": "Includes FootSystem, EyeSystem, Moxi and TopRelax",
+    "targetedToggleHint": "Choose 30 or 60 minutes",
+    "tariffs": {
+      "relaxing-60": {
+        "title": "Relaxing Massage",
+        "short": "A calm full-body reset at home.",
+        "description": "Unhurried pace in the privacy of your villa or apartment. Home visit included."
+      },
+      "sports-60": {
+        "title": "Sports Massage",
+        "short": "Focused work for active bodies.",
+        "description": "Deeper, purposeful techniques after training or a demanding day — at your place."
+      },
+      "targeted-30": {
+        "title": "Targeted Massage",
+        "short": "A shorter session on one priority area.",
+        "description": "Thirty focused minutes where you need them most."
+      },
+      "targeted-60": {
+        "title": "Targeted Massage",
+        "short": "Extended focus on your priority area.",
+        "description": "Sixty minutes of targeted care in the comfort of home."
+      },
+      "premium-wellness-120": {
+        "title": "Premium Wellness",
+        "short": "120 minutes with all four wellness devices included.",
+        "description": "A fixed complex with massage and wellness technology. Home visit included. Device sequence is confirmed after safety review."
+      }
+    }
+  },
+  "WellnessEquipment": {
+    "eyebrow": "Wellness technology",
+    "close": "Close",
+    "duration": "Procedure duration",
+    "extraPrice": "Extra price",
+    "extraBookingTime": "Extra booking time",
+    "minutes": "{count} min",
+    "duringMassage": "Planned during the massage",
+    "addToMassage": "Add to my massage",
+    "included": "Included in Premium Wellness",
+    "comingSoon": "Booking opens after safety review",
+    "learnMore": "Learn more",
+    "items": {
+      "foot-system": {
+        "name": "FootSystem",
+        "short": "Foot and lower-leg wellness support.",
+        "purpose": "Designed for comfortable foot and lower-leg care as an add-on to your massage.",
+        "howItWorks": "Used as a complementary wellness procedure. Exact protocol is confirmed with you before the visit.",
+        "limitations": "Not a medical treatment. Contraindications and suitability are reviewed before booking is enabled.",
+        "imageAlt": "FootSystem wellness device placeholder"
+      },
+      "eye-system": {
+        "name": "EyeSystem",
+        "short": "Eye-area wellness support.",
+        "purpose": "A gentle wellness add-on focused on the eye area.",
+        "howItWorks": "Scheduled around your massage session. Steps are explained before use.",
+        "limitations": "Not a medical treatment. Booking stays closed until instructions and contraindications are verified.",
+        "imageAlt": "EyeSystem wellness device placeholder"
+      },
+      "moxi": {
+        "name": "Moxi",
+        "short": "Compact wellness support during massage.",
+        "purpose": "A short wellness add-on planned for use during the massage.",
+        "howItWorks": "Applied as part of the session timing without extending the visit clock.",
+        "limitations": "Preliminary scheduling rule only — not a confirmed medical protocol. Safety review required before booking.",
+        "imageAlt": "Moxi wellness device placeholder"
+      },
+      "top-relax": {
+        "name": "TopRelax",
+        "short": "Relaxation support during massage.",
+        "purpose": "A brief wellness add-on planned alongside manual massage.",
+        "howItWorks": "Fits within the massage window; no extra booking minutes in the current catalog.",
+        "limitations": "Not a medical treatment. Real booking remains gated until compatibility and contraindications are cleared.",
+        "imageAlt": "TopRelax wellness device placeholder"
       }
     }
   },

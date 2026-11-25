@@ -306,6 +306,36 @@
     "cleaningFormula": "{hours} × {workers} × 20€ = {total}",
     "sessionDuration": "Duração da sessão",
     "minutes": "{count} minutos",
+    "massageV1ChooseExperience": "Escolha a sua experiência",
+    "massageV1Enhance": "Melhore a sua experiência",
+    "massageV1EstimateHeading": "O seu orçamento wellness",
+    "massageV1HomeVisitIncluded": "Deslocação a domicílio incluída",
+    "massageV1BaseDuration": "Duração da massagem: {minutes} min",
+    "massageV1TotalDuration": "Sessão total: {minutes} min",
+    "massageV1IncludedEquipment": "Equipamento incluído",
+    "massageV1SelectedEquipment": "Equipamento selecionado",
+    "massageV1ExtraTime": "+{minutes} min",
+    "massageV1ExtraPrice": "+{price}",
+    "massageV1LearnMore": "Saber mais",
+    "massageV1ComingSoon": "Em breve",
+    "massageV1TargetedDuration": "Duração",
+    "massageV1PreviewHint": "Massage & Wellness está em pré-visualização. O envio permanece desativado até ser autorizado.",
+    "massageV1PreviewSubmitDisabled": "Só pré-visualização — envio desativado",
+    "massageV1SummaryTariff": "Experiência: {tariff}",
+    "massageV1SummaryVisit": "Sessão total: {minutes} min · {total}",
+    "massageV1Tariffs": {
+      "relaxing-60": "Massagem Relaxante",
+      "sports-60": "Massagem Desportiva",
+      "targeted-30": "Massagem Direcionada · 30 min",
+      "targeted-60": "Massagem Direcionada · 60 min",
+      "premium-wellness-120": "Premium Wellness"
+    },
+    "massageV1EquipmentNames": {
+      "foot-system": "FootSystem",
+      "eye-system": "EyeSystem",
+      "moxi": "Moxi",
+      "top-relax": "TopRelax"
+    },
     "problemLabel": "Descreva o problema",
     "problemPlaceholder": "O que precisa de reparação? Onde está? Há urgência?",
     "photosLabel": "Fotografias (até 5)",
@@ -364,6 +394,8 @@
       "chooseRooms": "Seleccione o número de divisões para continuar",
       "cleaningV1Incomplete": "Escolha o tipo de limpeza e uma casa típica para continuar.",
       "cleaningV1PreviewOnly": "A reserva Cleaning v1 está apenas em pré-visualização. O envio ainda não está disponível — use a reserva por número de divisões por agora, ou volte mais tarde.",
+      "massageV1Incomplete": "Escolha uma experiência de massagem para continuar",
+      "massageV1PreviewOnly": "A reserva Massage & Wellness está apenas em pré-visualização. O envio ainda não está disponível.",
       "chooseDate": "Escolha uma data",
       "chooseTime": "Escolha uma hora preferida",
       "addressRequired": "Introduza a morada e a cidade",
@@ -542,6 +574,96 @@
             }
           }
         }
+      }
+    }
+  },
+  "MassageWellness": {
+    "eyebrow": "Massage & Wellness",
+    "heroTitle": "Massage & Wellness",
+    "heroTagline": "Cuidado premium ao domicílio a preços acessíveis — massagem e tecnologia wellness, onde estiver.",
+    "heroCta": "Reservar sessão",
+    "discoverMassages": "Descubra as nossas massagens",
+    "discoverMassagesIntro": "Quatro experiências focadas. Preços transparentes. Deslocação incluída na nossa área de serviço.",
+    "discoverTech": "Descubra a nossa tecnologia wellness",
+    "discoverTechIntro": "Equipamento NovuMedical opcional para enriquecer a massagem. A disponibilidade para reserva é confirmada à parte.",
+    "bookCta": "Reservar Massage & Wellness",
+    "backToServices": "← Voltar aos serviços",
+    "fromPrice": "Desde {price}",
+    "duration": "{minutes} min",
+    "includedDevices": "Inclui FootSystem, EyeSystem, Moxi e TopRelax",
+    "targetedToggleHint": "Escolha 30 ou 60 minutos",
+    "tariffs": {
+      "relaxing-60": {
+        "title": "Massagem Relaxante",
+        "short": "Um reset calmo de corpo inteiro em casa.",
+        "description": "Ritmo sereno na privacidade da sua villa ou apartamento. Deslocação incluída."
+      },
+      "sports-60": {
+        "title": "Massagem Desportiva",
+        "short": "Trabalho focado para corpos activos.",
+        "description": "Técnicas mais profundas após treino ou um dia exigente — no seu espaço."
+      },
+      "targeted-30": {
+        "title": "Massagem Direcionada",
+        "short": "Sessão mais curta numa zona prioritária.",
+        "description": "Trinta minutos focados onde mais precisa."
+      },
+      "targeted-60": {
+        "title": "Massagem Direcionada",
+        "short": "Foco alargado na zona prioritária.",
+        "description": "Sessenta minutos de cuidado direcionado no conforto de casa."
+      },
+      "premium-wellness-120": {
+        "title": "Premium Wellness",
+        "short": "120 minutos com os quatro aparelhos wellness incluídos.",
+        "description": "Complexo fixo com massagem e tecnologia wellness. Deslocação incluída. A sequência dos aparelhos é confirmada após revisão de segurança."
+      }
+    }
+  },
+  "WellnessEquipment": {
+    "eyebrow": "Tecnologia wellness",
+    "close": "Fechar",
+    "duration": "Duração do procedimento",
+    "extraPrice": "Preço extra",
+    "extraBookingTime": "Tempo extra de reserva",
+    "minutes": "{count} min",
+    "duringMassage": "Planeado durante a massagem",
+    "addToMassage": "Adicionar à minha massagem",
+    "included": "Incluído no Premium Wellness",
+    "comingSoon": "Reservas abrem após revisão de segurança",
+    "learnMore": "Saber mais",
+    "items": {
+      "foot-system": {
+        "name": "FootSystem",
+        "short": "Apoio wellness para pés e pernas.",
+        "purpose": "Pensado para cuidado confortável de pés e pernas como complemento à massagem.",
+        "howItWorks": "Usado como procedimento wellness complementar. O protocolo exacto é confirmado consigo antes da visita.",
+        "limitations": "Não é um tratamento médico. Contra-indicações e adequação são revistas antes de activar reservas.",
+        "imageAlt": "Placeholder do aparelho FootSystem"
+      },
+      "eye-system": {
+        "name": "EyeSystem",
+        "short": "Apoio wellness na zona dos olhos.",
+        "purpose": "Complemento wellness suave focado na zona dos olhos.",
+        "howItWorks": "Agendado em torno da sessão de massagem. Os passos são explicados antes da utilização.",
+        "limitations": "Não é um tratamento médico. A reserva permanece fechada até verificar instruções e contra-indicações.",
+        "imageAlt": "Placeholder do aparelho EyeSystem"
+      },
+      "moxi": {
+        "name": "Moxi",
+        "short": "Apoio wellness compacto durante a massagem.",
+        "purpose": "Complemento wellness breve planeado durante a massagem.",
+        "howItWorks": "Aplicado no tempo da sessão sem alargar o relógio da visita.",
+        "limitations": "Regra de agendamento preliminar — não é um protocolo médico confirmado. Revisão de segurança necessária antes da reserva.",
+        "imageAlt": "Placeholder do aparelho Moxi"
+      },
+      "top-relax": {
+        "name": "TopRelax",
+        "short": "Apoio de relaxamento durante a massagem.",
+        "purpose": "Complemento wellness breve planeado junto com a massagem manual.",
+        "howItWorks": "Encaixa na janela da massagem; sem minutos extra no catálogo actual.",
+        "limitations": "Não é um tratamento médico. A reserva real permanece bloqueada até limpar compatibilidade e contra-indicações.",
+        "imageAlt": "Placeholder do aparelho TopRelax"
       }
     }
   },

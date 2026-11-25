@@ -4,7 +4,9 @@ import HotspotGallery, {
   type TranslatedHotspotScene,
 } from "@/components/hotspot-gallery";
 import MassageCatalogView from "@/components/massage-catalog-view";
+import MassageWellnessView from "@/components/massage-wellness-view";
 import type { MassageCategoryId } from "@/lib/massage-catalog";
+import type { MassageV1TariffId } from "@/lib/massage-wellness-catalog";
 import {
   SERVICE_HOTSPOTS,
   type HotspotService,
@@ -13,14 +15,19 @@ import {
 import { useTranslations } from "next-intl";
 import { useMemo } from "react";
 
+const MASSAGE_V1_UI_ENABLED =
+  process.env.NEXT_PUBLIC_MASSAGE_V1_UI_ENABLED === "true";
+
 export default function ServiceDetailView({
   service,
   onBack,
   onBook,
+  onBookMassageTariff,
 }: {
   service: ServiceValue;
   onBack: () => void;
   onBook: (massageCategoryId?: MassageCategoryId) => void;
+  onBookMassageTariff?: (tariffId?: MassageV1TariffId) => void;
 }) {
   const t = useTranslations("ServiceDetail");
   const hotspotService: HotspotService =
@@ -45,6 +52,14 @@ export default function ServiceDetailView({
   );
 
   if (service === "massage") {
+    if (MASSAGE_V1_UI_ENABLED) {
+      return (
+        <MassageWellnessView
+          onBack={onBack}
+          onBook={(tariffId) => onBookMassageTariff?.(tariffId)}
+        />
+      );
+    }
     return (
       <MassageCatalogView
         onBack={onBack}

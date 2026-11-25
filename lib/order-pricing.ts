@@ -16,12 +16,24 @@ import {
   resolveBookingPricingFromBook,
   type ResolvedPricingFromBook,
 } from "@/lib/booking-pricing-from-book";
+import type { MassageV1TariffId } from "@/lib/massage-wellness-catalog";
+import {
+  buildMassageV1PricingSnapshot,
+  calculateMassageV1Price,
+} from "@/lib/massage-wellness-pricing";
 import type { ActivePricingBook } from "@/lib/pricing-book-validation";
 
 export type ResolveOrderPricingCleaningV1 = {
   roomCounts: CleaningV1RoomCounts;
   cleaningType: CleaningV1Type;
   addons?: CleaningV1AddonCounts;
+};
+
+export type ResolveOrderPricingMassageV1 = {
+  tariffId: MassageV1TariffId;
+  wellnessEquipmentIds?: string[];
+  equipmentBookable?: boolean;
+  premiumWellnessBookable?: boolean;
 };
 
 export type ResolveOrderPricingInput = {
@@ -31,6 +43,9 @@ export type ResolveOrderPricingInput = {
   /** Cleaning v1 branch — gated by CLEANING_V1_ORDERS_ENABLED in the HTTP handler. */
   cleaningPricingVersion?: "v1";
   cleaningV1?: ResolveOrderPricingCleaningV1;
+  /** Massage v1 branch — gated by MASSAGE_V1_ORDERS_ENABLED in the HTTP handler. */
+  massageVersion?: "v1";
+  massageV1?: ResolveOrderPricingMassageV1;
 };
 
 export type ResolveOrderPricingSuccess = {
@@ -224,6 +239,10 @@ export async function resolveOrderPricing(
     };
   }
 
+  if (input.massageVersion === "v1") {
+    return resolveMassageV1Pricing(input);
+  }
+
   const massageMinutes = input.massageMinutes;
   if (massageMinutes == null || !isMassageMinutes(massageMinutes)) {
     return { ok: false, status: 400, message: "Укажите длительность сеанса" };
@@ -256,5 +275,53 @@ export async function resolveOrderPricing(
       massageMinutes: resolved.massageMinutes,
       priceEuro: resolved.priceEuro,
     },
+  };
+}
+
+function resolveMassageV1Pricing(
+  input: ResolveOrderPricingInput,
+): ResolveOrderPricingSuccess | ResolveOrderPricingFailure {
+  if (input.massageMinutes != null) {
+    return {
+      ok: false,
+      status: 400,
+      message: "Уберите устаревшее поле massageMinutes из запроса Massage v1",
+    };
+  }
+
+  const massageV1 = input.massageV1;
+  if (massageV1 == null || typeof massageV1 !== "object") {
+    return {
+      ok: false,
+      status: 400,
+      message: "Некорректные поля Massage v1",
+    };
+  }
+
+  const calculated = calculateMassageV1Price(
+    {
+      tariffId: massageV1.tariffId,
+      ...(massageV1.wellnessEquipmentIds != null &&
+      massageV1.wellnessEquipmentIds.length > 0
+        ? { wellnessEquipmentIds: massageV1.wellnessEquipmentIds }
+        : {}),
+    },
+    {
+      equipmentBookable: massageV1.equipmentBookable !== false,
+      premiumWellnessBookable: massageV1.premiumWellnessBookable !== false,
+    },
+  );
+  if ("error" in calculated) {
+    return { ok: false, status: 400, message: calculated.error };
+  }
+
+  return {
+    ok: true,
+    // Base duration lives in pricingSnapshot.baseDurationMin (may be 30).
+    priced: {
+      mode: "fixed",
+      priceEuro: calculated.priceEuro,
+    },
+    pricingSnapshot: buildMassageV1PricingSnapshot(calculated),
   };
 }

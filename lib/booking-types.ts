@@ -17,7 +17,8 @@ export type OrderRecord = {
   rooms?: number;
   hours?: number;
   workers?: number;
-  massageMinutes?: MassageMinutes;
+  /** Base session minutes (legacy 60|90|120; Massage v1 may be 30/60/120). */
+  massageMinutes?: MassageMinutes | number;
   massageCategory?: string;
   problemDescription?: string;
   repairPhotoPaths?: string[];

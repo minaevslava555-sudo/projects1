@@ -2,6 +2,7 @@
 
 import LanguageSwitcher from "@/components/language-switcher";
 import TurnstileWidget from "@/components/turnstile-widget";
+import WellnessEquipmentModal from "@/components/wellness-equipment-modal";
 import {
   buildBookingAttemptFingerprint,
   clearBookingAttempt,
@@ -46,6 +47,16 @@ import {
   getMassageCategory,
   type MassageCategoryId,
 } from "@/lib/massage-catalog";
+import {
+  MASSAGE_V1_QUOTE_REVISION,
+  MASSAGE_V1_TARIFFS,
+  WELLNESS_EQUIPMENT,
+  WELLNESS_EQUIPMENT_IDS,
+  centsToEuro,
+  type MassageV1TariffId,
+  type WellnessEquipmentId,
+} from "@/lib/massage-wellness-catalog";
+import { calculateMassageV1Price } from "@/lib/massage-wellness-pricing";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useTranslations } from "next-intl";
 import {
@@ -226,7 +237,9 @@ type ErrorCode =
   | "attemptPayloadChanged"
   | "estimateRevised"
   | "cleaningV1Incomplete"
-  | "cleaningV1PreviewOnly";
+  | "cleaningV1PreviewOnly"
+  | "massageV1Incomplete"
+  | "massageV1PreviewOnly";
 
 type WizardError =
   | { kind: "code"; code: ErrorCode; values?: Record<string, string | number> }
@@ -266,7 +279,28 @@ const CLEANING_V1_BOOKING_ENABLED =
 const CLEANING_V1_ORDERS_CLIENT_ENABLED =
   process.env.NEXT_PUBLIC_CLEANING_V1_ORDERS_ENABLED === "true";
 
+/** Client Preview gate for Massage & Wellness v1 UI. Default off. */
+const MASSAGE_V1_UI_ENABLED =
+  process.env.NEXT_PUBLIC_MASSAGE_V1_UI_ENABLED === "true";
+
+/** Client submit gate — pair with server MASSAGE_V1_ORDERS_ENABLED. */
+const MASSAGE_V1_ORDERS_CLIENT_ENABLED =
+  process.env.NEXT_PUBLIC_MASSAGE_V1_ORDERS_ENABLED === "true";
+
+const MASSAGE_V1_EQUIPMENT_UI_BOOKABLE =
+  process.env.NEXT_PUBLIC_MASSAGE_V1_EQUIPMENT_BOOKABLE === "true";
+
+const MASSAGE_V1_PREMIUM_UI_BOOKABLE =
+  process.env.NEXT_PUBLIC_MASSAGE_V1_PREMIUM_WELLNESS_BOOKABLE === "true";
+
 const CLEANING_V1_PRESET_IDS: CleaningV1PresetId[] = ["t1", "t2", "t3"];
+
+const MASSAGE_V1_PRIMARY_TARIFFS: MassageV1TariffId[] = [
+  "relaxing-60",
+  "sports-60",
+  "targeted-60",
+  "premium-wellness-120",
+];
 
 const CLEANING_V1_TYPES: CleaningV1Type[] = [
   "standard",
@@ -372,6 +406,7 @@ export default function BookingWizard({
   onClose,
   lockService = false,
   massageCategoryId = null,
+  initialMassageTariffId = null,
 }: {
   open: boolean;
   service: BookingService;
@@ -379,9 +414,11 @@ export default function BookingWizard({
   onClose: () => void;
   lockService?: boolean;
   massageCategoryId?: MassageCategoryId | null;
+  initialMassageTariffId?: MassageV1TariffId | null;
 }) {
   const t = useTranslations("BookingWizard");
   const tMassage = useTranslations("MassageCatalog");
+  const tEquip = useTranslations("WellnessEquipment");
   const titleId = useId();
   const stepHeadingId = useId();
   const reduceMotion = useReducedMotion();
@@ -417,6 +454,14 @@ export default function BookingWizard({
     Array<keyof CleaningV1RoomCounts>
   >([]);
   const [massageMinutes, setMassageMinutes] = useState<MassageMinutes>(60);
+  const [massageTariffId, setMassageTariffId] = useState<MassageV1TariffId | null>(
+    () => (MASSAGE_V1_UI_ENABLED ? initialMassageTariffId : null),
+  );
+  const [wellnessEquipmentIds, setWellnessEquipmentIds] = useState<
+    WellnessEquipmentId[]
+  >([]);
+  const [equipmentModalId, setEquipmentModalId] =
+    useState<WellnessEquipmentId | null>(null);
   const [problemDescription, setProblemDescription] = useState("");
   const [draftId, setDraftId] = useState<string | null>(null);
   const [draftToken, setDraftToken] = useState<string | null>(null);
@@ -428,13 +473,23 @@ export default function BookingWizard({
     () => readBookingAttempt() != null,
   );
   const [estimateNeedsConfirm, setEstimateNeedsConfirm] = useState(() => {
-    if (!CLEANING_V1_BOOKING_ENABLED) return false;
     const pending = readBookingAttempt();
-    return (
-      pending != null &&
+    if (pending == null) return false;
+    if (
+      CLEANING_V1_BOOKING_ENABLED &&
       pending.service === "cleaning" &&
       isBookingAttemptQuoteStale(pending, CLEANING_V1_QUOTE_REVISION)
-    );
+    ) {
+      return true;
+    }
+    if (
+      MASSAGE_V1_UI_ENABLED &&
+      pending.service === "massage" &&
+      isBookingAttemptQuoteStale(pending, MASSAGE_V1_QUOTE_REVISION)
+    ) {
+      return true;
+    }
+    return false;
   });
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileKey, setTurnstileKey] = useState(0);
@@ -497,13 +552,54 @@ export default function BookingWizard({
   const occupiedPhotoSlots = repairPhotos.length;
   const failedPhotoCount = repairPhotos.filter((item) => item.status === "failed").length;
 
+  const isMassageV1Booking =
+    MASSAGE_V1_UI_ENABLED && service === "massage";
+  const isMassageV1PreviewOnly =
+    isMassageV1Booking && !MASSAGE_V1_ORDERS_CLIENT_ENABLED;
+  const isPremiumTariff = massageTariffId === "premium-wellness-120";
+
+  const massageV1Estimate = useMemo(() => {
+    if (!isMassageV1Booking || massageTariffId == null) return null;
+    if (isPremiumTariff && !MASSAGE_V1_PREMIUM_UI_BOOKABLE) {
+      // Still show catalog price for UX preview; submit gated separately.
+    }
+    const result = calculateMassageV1Price(
+      {
+        tariffId: massageTariffId,
+        ...(wellnessEquipmentIds.length > 0 && !isPremiumTariff
+          ? { wellnessEquipmentIds }
+          : {}),
+      },
+      {
+        equipmentBookable: true,
+        premiumWellnessBookable: true,
+      },
+    );
+    if ("error" in result) return null;
+    return result;
+  }, [
+    isMassageV1Booking,
+    massageTariffId,
+    wellnessEquipmentIds,
+    isPremiumTariff,
+  ]);
+
   const total = useMemo(() => {
+    if (isMassageV1Booking) {
+      return massageV1Estimate?.priceEuro ?? null;
+    }
     if (service === "massage") return massagePriceEuro(massageMinutes) ?? 45;
     if (service === "cleaning") {
       return rooms == null ? null : cleaningPriceEuro(rooms);
     }
     return null;
-  }, [service, massageMinutes, rooms]);
+  }, [
+    isMassageV1Booking,
+    massageV1Estimate,
+    service,
+    massageMinutes,
+    rooms,
+  ]);
 
   type CleaningV1EstimateView =
     | { status: "incomplete" }
@@ -566,6 +662,21 @@ export default function BookingWizard({
   const cleaningV1ConfigReady =
     cleaningV1Estimate?.status === "fixed" ||
     cleaningV1Estimate?.status === "quote";
+  const massageV1ConfigReady = !isMassageV1Booking || massageTariffId != null;
+
+  function selectMassageTariff(next: MassageV1TariffId) {
+    setMassageTariffId(next);
+    if (next === "premium-wellness-120") {
+      setWellnessEquipmentIds([]);
+    }
+  }
+
+  function toggleWellnessEquipment(id: WellnessEquipmentId) {
+    if (isPremiumTariff) return;
+    setWellnessEquipmentIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  }
 
   function setErrorCode(
     code: ErrorCode,
@@ -599,6 +710,9 @@ export default function BookingWizard({
     setCleaningType(null);
     setActivePreset(null);
     setMassageMinutes(60);
+    setMassageTariffId(MASSAGE_V1_UI_ENABLED ? initialMassageTariffId : null);
+    setWellnessEquipmentIds([]);
+    setEquipmentModalId(null);
     setProblemDescription("");
     setDraftId(null);
     setDraftToken(null);
@@ -1090,6 +1204,9 @@ export default function BookingWizard({
       if (service === "repair" && problemDescription.trim().length < 10) {
         return "repairDetail";
       }
+      if (isMassageV1Booking && massageTariffId == null) {
+        return "massageV1Incomplete";
+      }
       return null;
     }
     if (current === "schedule") {
@@ -1337,13 +1454,26 @@ export default function BookingWizard({
       return;
     }
 
+    if (isMassageV1Booking) {
+      if (massageTariffId == null) {
+        setErrorCode("massageV1Incomplete");
+        navigateToStep(STEPS.indexOf("configure"));
+        return;
+      }
+      if (isMassageV1PreviewOnly) {
+        setErrorCode("massageV1PreviewOnly");
+        navigateToStep(STEPS.indexOf("configure"));
+        return;
+      }
+    }
+
     submittingRef.current = true;
     setSending(true);
     clearError();
 
     try {
       const massageCategoryValue =
-        service === "massage"
+        service === "massage" && !isMassageV1Booking
           ? massageCategory?.title || massageCategoryId || null
           : null;
       const fingerprint = await buildBookingAttemptFingerprint({
@@ -1359,13 +1489,14 @@ export default function BookingWizard({
         details: null,
         problemDescription:
           service === "repair" ? problemDescription.trim() : null,
-        massageCategory: massageCategoryValue,
+        massageCategory: isMassageV1Booking ? null : massageCategoryValue,
         rooms: isCleaningV1Booking
           ? null
           : service === "cleaning"
             ? rooms
             : null,
-        massageMinutes: service === "massage" ? massageMinutes : null,
+        massageMinutes:
+          service === "massage" && !isMassageV1Booking ? massageMinutes : null,
         repairPhotoPaths: service === "repair" ? repairPhotoPaths : null,
         ...(isCleaningV1Booking && cleaningType != null
           ? {
@@ -1374,6 +1505,15 @@ export default function BookingWizard({
               cleaningType,
               ...(cleaningV1AddonsHaveWork(addonCounts)
                 ? { addons: addonCounts }
+                : {}),
+            }
+          : {}),
+        ...(isMassageV1Booking && massageTariffId != null
+          ? {
+              massageVersion: "v1" as const,
+              massageTariffId,
+              ...(wellnessEquipmentIds.length > 0 && !isPremiumTariff
+                ? { wellnessEquipmentIds }
                 : {}),
             }
           : {}),
@@ -1399,6 +1539,18 @@ export default function BookingWizard({
         navigateToStep(STEPS.indexOf("configure"));
         return;
       }
+      if (
+        isMassageV1Booking &&
+        persisted &&
+        persisted.fingerprint === fingerprint &&
+        isBookingAttemptQuoteStale(persisted, MASSAGE_V1_QUOTE_REVISION)
+      ) {
+        setEstimateNeedsConfirm(true);
+        setHasUnresolvedAttempt(true);
+        setErrorCode("estimateRevised");
+        navigateToStep(STEPS.indexOf("configure"));
+        return;
+      }
 
       const keyToUse =
         persisted && persisted.fingerprint === fingerprint
@@ -1414,6 +1566,9 @@ export default function BookingWizard({
         service,
         ...(isCleaningV1Booking
           ? { quoteRevision: CLEANING_V1_QUOTE_REVISION }
+          : {}),
+        ...(isMassageV1Booking
+          ? { quoteRevision: MASSAGE_V1_QUOTE_REVISION }
           : {}),
       });
       setHasUnresolvedAttempt(true);
@@ -1448,8 +1603,20 @@ export default function BookingWizard({
             : {
                 rooms: service === "cleaning" ? rooms : undefined,
               }),
-          massageMinutes: service === "massage" ? massageMinutes : undefined,
-          massageCategory: massageCategoryValue || undefined,
+          ...(isMassageV1Booking && massageTariffId != null
+            ? {
+                massageVersion: "v1",
+                massageTariffId,
+                massageQuoteRevision: MASSAGE_V1_QUOTE_REVISION,
+                ...(wellnessEquipmentIds.length > 0 && !isPremiumTariff
+                  ? { wellnessEquipmentIds }
+                  : {}),
+              }
+            : {
+                massageMinutes:
+                  service === "massage" ? massageMinutes : undefined,
+                massageCategory: massageCategoryValue || undefined,
+              }),
           problemDescription:
             service === "repair" ? problemDescription.trim() : undefined,
           repairPhotoPaths: service === "repair" ? repairPhotoPaths : undefined,
@@ -1621,7 +1788,11 @@ export default function BookingWizard({
               <h2 id={titleId} className="mt-1 font-display text-2xl font-medium text-ink">
                 {serviceTitle}
               </h2>
-              {massageCategory ? (
+              {isMassageV1Booking && massageTariffId ? (
+                <p className="mt-1 text-sm font-medium text-olive">
+                  {t(`massageV1Tariffs.${massageTariffId}`)}
+                </p>
+              ) : massageCategory ? (
                 <p className="mt-1 text-sm font-medium text-olive">
                   {tMassage(`categories.${massageCategory.id}.title`)}
                 </p>
@@ -2531,33 +2702,250 @@ export default function BookingWizard({
             ) : null}
 
             {step === "configure" && service === "massage" ? (
-              <div>
-                <p className="mb-2 text-sm font-medium text-ink">{t("sessionDuration")}</p>
-                <div className="grid gap-2">
-                  {MASSAGE_OPTIONS.map((option) => {
-                    const active = massageMinutes === option.minutes;
-                    return (
-                      <button
-                        key={option.minutes}
-                        type="button"
-                        onClick={() => setMassageMinutes(option.minutes)}
-                        className={`havenly-control flex items-center justify-between border px-4 py-3 text-left transition ${
-                          active
-                            ? "border-olive bg-olive/10 text-ink"
-                            : "border-mist bg-white text-ink hover:border-olive"
-                        }`}
-                      >
-                        <span className="font-medium">
-                          {t("minutes", { count: option.minutes })}
-                        </span>
-                        <span className="font-display text-lg font-bold">
-                          {formatEuro(option.price)}
-                        </span>
-                      </button>
-                    );
-                  })}
+              isMassageV1Booking ? (
+                <div className="space-y-6">
+                  {isMassageV1PreviewOnly ? (
+                    <p className="border border-gold/40 bg-gold/10 px-3 py-2 text-sm text-ink">
+                      {t("massageV1PreviewHint")}
+                    </p>
+                  ) : null}
+                  <div>
+                    <p className="mb-3 text-sm font-medium text-ink">
+                      {t("massageV1ChooseExperience")}
+                    </p>
+                    <div className="grid gap-2">
+                      {MASSAGE_V1_PRIMARY_TARIFFS.map((tariffId) => {
+                        const isTargetedCard = tariffId === "targeted-60";
+                        const activeTargeted =
+                          massageTariffId === "targeted-30" ||
+                          massageTariffId === "targeted-60";
+                        const active = isTargetedCard
+                          ? activeTargeted
+                          : massageTariffId === tariffId;
+                        const displayTariffId: MassageV1TariffId =
+                          isTargetedCard && massageTariffId === "targeted-30"
+                            ? "targeted-30"
+                            : tariffId;
+                        const tariff = MASSAGE_V1_TARIFFS[displayTariffId];
+                        return (
+                          <div key={tariffId} className="space-y-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                selectMassageTariff(
+                                  isTargetedCard && activeTargeted
+                                    ? displayTariffId
+                                    : tariffId,
+                                )
+                              }
+                              className={`havenly-control w-full border px-4 py-3 text-left transition ${
+                                active
+                                  ? "border-olive bg-olive/10 text-ink"
+                                  : "border-mist bg-white text-ink hover:border-olive"
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="font-medium">
+                                    {t(`massageV1Tariffs.${displayTariffId}`)}
+                                  </p>
+                                  {tariffId === "premium-wellness-120" ? (
+                                    <p className="mt-1 text-xs text-muted">
+                                      {t("massageV1IncludedEquipment")}
+                                    </p>
+                                  ) : null}
+                                </div>
+                                <span className="font-display text-lg font-bold">
+                                  {formatEuro(centsToEuro(tariff.priceCents))}
+                                </span>
+                              </div>
+                            </button>
+                            {isTargetedCard && activeTargeted ? (
+                              <div className="flex gap-2 pl-1">
+                                {(["targeted-30", "targeted-60"] as const).map(
+                                  (id) => (
+                                    <button
+                                      key={id}
+                                      type="button"
+                                      onClick={() => selectMassageTariff(id)}
+                                      className={`havenly-control flex-1 border px-3 py-2 text-sm ${
+                                        massageTariffId === id
+                                          ? "border-olive bg-olive/10"
+                                          : "border-mist bg-white"
+                                      }`}
+                                    >
+                                      {MASSAGE_V1_TARIFFS[id].durationMin} min
+                                    </button>
+                                  ),
+                                )}
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="mb-3 text-sm font-medium text-ink">
+                      {t("massageV1Enhance")}
+                    </p>
+                    {isPremiumTariff ? (
+                      <ul className="space-y-2">
+                        {WELLNESS_EQUIPMENT_IDS.map((id) => (
+                          <li
+                            key={id}
+                            className="flex items-center justify-between border border-mist bg-white/70 px-3 py-2 text-sm"
+                          >
+                            <span>{t(`massageV1EquipmentNames.${id}`)}</span>
+                            <span className="text-olive">
+                              {tEquip("included")}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <ul className="space-y-2">
+                        {WELLNESS_EQUIPMENT_IDS.map((id) => {
+                          const item = WELLNESS_EQUIPMENT[id];
+                          const checked = wellnessEquipmentIds.includes(id);
+                          return (
+                            <li
+                              key={id}
+                              className="flex gap-3 border border-mist bg-white px-3 py-3"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={item.placeholderImage}
+                                alt=""
+                                className="h-14 w-14 shrink-0 object-cover"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div>
+                                    <p className="text-sm font-medium text-ink">
+                                      {t(`massageV1EquipmentNames.${id}`)}
+                                    </p>
+                                    <p className="text-xs text-muted">
+                                      {tEquip(`items.${id}.short`)}
+                                    </p>
+                                  </div>
+                                  <label className="flex items-center gap-2 text-sm">
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      disabled={!MASSAGE_V1_EQUIPMENT_UI_BOOKABLE}
+                                      onChange={() =>
+                                        toggleWellnessEquipment(id)
+                                      }
+                                    />
+                                  </label>
+                                </div>
+                                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
+                                  <span>
+                                    {t("massageV1ExtraTime", {
+                                      minutes: item.extraBookingMin,
+                                    })}
+                                  </span>
+                                  <span>
+                                    {t("massageV1ExtraPrice", {
+                                      price: formatEuro(
+                                        centsToEuro(item.priceCents),
+                                      ),
+                                    })}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="font-semibold text-olive underline-offset-2 hover:underline"
+                                    onClick={() => setEquipmentModalId(id)}
+                                  >
+                                    {t("massageV1LearnMore")}
+                                  </button>
+                                  {!MASSAGE_V1_EQUIPMENT_UI_BOOKABLE ? (
+                                    <span>{t("massageV1ComingSoon")}</span>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+
+                  {massageV1Estimate ? (
+                    <div className="border border-mist bg-white/80 px-4 py-4">
+                      <p className="text-xs tracking-[0.14em] text-muted uppercase">
+                        {t("massageV1EstimateHeading")}
+                      </p>
+                      <p className="mt-2 font-medium text-ink">
+                        {t(`massageV1Tariffs.${massageV1Estimate.tariffId}`)}
+                      </p>
+                      <p className="mt-1 text-sm text-muted">
+                        {t("massageV1BaseDuration", {
+                          minutes: massageV1Estimate.baseDurationMin,
+                        })}
+                      </p>
+                      {massageV1Estimate.equipment.length > 0 ? (
+                        <p className="mt-1 text-sm text-muted">
+                          {t("massageV1SelectedEquipment")}:{" "}
+                          {massageV1Estimate.equipment
+                            .map((line) =>
+                              t(`massageV1EquipmentNames.${line.id}`),
+                            )
+                            .join(", ")}
+                        </p>
+                      ) : null}
+                      {massageV1Estimate.includedEquipment.length > 0 ? (
+                        <p className="mt-1 text-sm text-muted">
+                          {t("massageV1IncludedEquipment")}
+                        </p>
+                      ) : null}
+                      <p className="mt-1 text-sm text-muted">
+                        {t("massageV1TotalDuration", {
+                          minutes: massageV1Estimate.totalSessionMinutes,
+                        })}
+                      </p>
+                      <p className="mt-1 text-sm text-olive">
+                        {t("massageV1HomeVisitIncluded")}
+                      </p>
+                      <p className="mt-3 font-display text-2xl font-bold text-ink">
+                        {formatEuro(massageV1Estimate.priceEuro)}
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <p className="mb-2 text-sm font-medium text-ink">
+                    {t("sessionDuration")}
+                  </p>
+                  <div className="grid gap-2">
+                    {MASSAGE_OPTIONS.map((option) => {
+                      const active = massageMinutes === option.minutes;
+                      return (
+                        <button
+                          key={option.minutes}
+                          type="button"
+                          onClick={() => setMassageMinutes(option.minutes)}
+                          className={`havenly-control flex items-center justify-between border px-4 py-3 text-left transition ${
+                            active
+                              ? "border-olive bg-olive/10 text-ink"
+                              : "border-mist bg-white text-ink hover:border-olive"
+                          }`}
+                        >
+                          <span className="font-medium">
+                            {t("minutes", { count: option.minutes })}
+                          </span>
+                          <span className="font-display text-lg font-bold">
+                            {formatEuro(option.price)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )
             ) : null}
 
             {step === "configure" && service === "repair" ? (
@@ -2811,7 +3199,11 @@ export default function BookingWizard({
                     {t("summary")}
                   </p>
                   <p className="mt-2 font-display text-xl text-ink">{serviceTitle}</p>
-                  {massageCategory ? (
+                  {isMassageV1Booking && massageTariffId ? (
+                    <p className="mt-1 text-olive">
+                      {t(`massageV1Tariffs.${massageTariffId}`)}
+                    </p>
+                  ) : massageCategory ? (
                     <p className="mt-1 text-olive">
                       {tMassage(`categories.${massageCategory.id}.title`)}
                     </p>
@@ -2926,7 +3318,39 @@ export default function BookingWizard({
                       })}
                     </p>
                   ) : null}
-                  {service === "massage" ? (
+                  {isMassageV1Booking && massageV1Estimate ? (
+                    <div className="mt-2 space-y-1">
+                      <p>
+                        {t("massageV1SummaryTariff", {
+                          tariff: t(
+                            `massageV1Tariffs.${massageV1Estimate.tariffId}`,
+                          ),
+                        })}
+                      </p>
+                      {massageV1Estimate.equipment.length > 0 ? (
+                        <p>
+                          {t("massageV1SelectedEquipment")}:{" "}
+                          {massageV1Estimate.equipment
+                            .map((line) =>
+                              t(`massageV1EquipmentNames.${line.id}`),
+                            )
+                            .join(", ")}
+                        </p>
+                      ) : null}
+                      {massageV1Estimate.includedEquipment.length > 0 ? (
+                        <p>{t("massageV1IncludedEquipment")}</p>
+                      ) : null}
+                      <p>
+                        {t("massageV1SummaryVisit", {
+                          minutes: massageV1Estimate.totalSessionMinutes,
+                          total: formatEuro(massageV1Estimate.priceEuro),
+                        })}
+                      </p>
+                      <p className="text-olive">
+                        {t("massageV1HomeVisitIncluded")}
+                      </p>
+                    </div>
+                  ) : service === "massage" ? (
                     <p className="mt-2">
                       {t("massageSummary", {
                         minutes: massageMinutes,
@@ -3010,7 +3434,10 @@ export default function BookingWizard({
                         step === "configure" &&
                         (CLEANING_V1_BOOKING_ENABLED
                           ? !cleaningV1ConfigReady
-                          : rooms == null))
+                          : rooms == null)) ||
+                      (service === "massage" &&
+                        isMassageV1Booking &&
+                        !massageV1ConfigReady)
                     }
                     className="havenly-control flex-1 bg-olive px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-deep disabled:opacity-60"
                   >
@@ -3023,6 +3450,7 @@ export default function BookingWizard({
                       sending ||
                       hasUploadingPhotos ||
                       isCleaningV1PreviewOnly ||
+                      isMassageV1PreviewOnly ||
                       (service === "repair" && hasFailedPhotos) ||
                       (service === "repair" &&
                         uploadedPhotoCount === 0 &&
@@ -3034,20 +3462,23 @@ export default function BookingWizard({
                       ? t("sending")
                       : isCleaningV1PreviewOnly
                         ? t("cleaningV1PreviewSubmitDisabled")
-                        : service === "repair" ||
-                            (isCleaningV1Booking &&
-                              cleaningV1Estimate?.status === "quote")
-                          ? t("requestQuote")
-                          : t("confirmPrice", {
-                              price: formatEuro(
-                                isCleaningV1Booking &&
-                                  cleaningV1Estimate?.status === "fixed" &&
-                                  cleaningV1Estimate.result.customerPriceEuro !=
-                                    null
-                                  ? cleaningV1Estimate.result.customerPriceEuro
-                                  : (total ?? 0),
-                              ),
-                            })}
+                        : isMassageV1PreviewOnly
+                          ? t("massageV1PreviewSubmitDisabled")
+                          : service === "repair" ||
+                              (isCleaningV1Booking &&
+                                cleaningV1Estimate?.status === "quote")
+                            ? t("requestQuote")
+                            : t("confirmPrice", {
+                                price: formatEuro(
+                                  isCleaningV1Booking &&
+                                    cleaningV1Estimate?.status === "fixed" &&
+                                    cleaningV1Estimate.result
+                                      .customerPriceEuro != null
+                                    ? cleaningV1Estimate.result
+                                        .customerPriceEuro
+                                    : (total ?? 0),
+                                ),
+                              })}
                   </button>
                 )}
               </div>
@@ -3056,6 +3487,24 @@ export default function BookingWizard({
         )}
         </div>
       </motion.div>
+      <WellnessEquipmentModal
+        equipmentId={equipmentModalId}
+        open={equipmentModalId != null}
+        onClose={() => setEquipmentModalId(null)}
+        canAdd={
+          MASSAGE_V1_EQUIPMENT_UI_BOOKABLE &&
+          !isPremiumTariff &&
+          equipmentModalId != null &&
+          !wellnessEquipmentIds.includes(equipmentModalId)
+        }
+        alreadyIncluded={isPremiumTariff}
+        onAdd={(id) => {
+          if (!MASSAGE_V1_EQUIPMENT_UI_BOOKABLE || isPremiumTariff) return;
+          setWellnessEquipmentIds((prev) =>
+            prev.includes(id) ? prev : [...prev, id],
+          );
+        }}
+      />
     </div>
   );
 }

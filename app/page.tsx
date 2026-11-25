@@ -7,6 +7,7 @@ import { readBookingAttempt } from "@/lib/booking-attempt";
 import LanguageSwitcher from "@/components/language-switcher";
 import ServiceDetailView from "@/components/service-detail-view";
 import { type MassageCategoryId } from "@/lib/massage-catalog";
+import { type MassageV1TariffId } from "@/lib/massage-wellness-catalog";
 import { type ServiceValue } from "@/lib/service-hotspots";
 import { useTranslations } from "next-intl";
 import {
@@ -97,6 +98,9 @@ export default function Home() {
   const [headerOnHero, setHeaderOnHero] = useState(true);
   const [lockService, setLockService] = useState(false);
   const [massageCategoryId, setMassageCategoryId] = useState<MassageCategoryId | null>(
+    null,
+  );
+  const [massageTariffId, setMassageTariffId] = useState<MassageV1TariffId | null>(
     null,
   );
   const [includedService, setIncludedService] = useState<ServiceValue>("cleaning");
@@ -315,10 +319,12 @@ export default function Home() {
     value: ServiceValue,
     locked = false,
     categoryId: MassageCategoryId | null = null,
+    tariffId: MassageV1TariffId | null = null,
   ) {
     setService(value);
     setLockService(locked);
     setMassageCategoryId(value === "massage" ? categoryId : null);
+    setMassageTariffId(value === "massage" ? tariffId : null);
     // Remount only for a fresh attempt — keep the same session when an
     // unresolved submit may still be recoverable via the same idempotency key.
     if (!readBookingAttempt()) {
@@ -919,7 +925,10 @@ export default function Home() {
                 service={activeServiceView}
                 onBack={goHome}
                 onBook={(categoryId) =>
-                  openOrder(activeServiceView, true, categoryId ?? null)
+                  openOrder(activeServiceView, true, categoryId ?? null, null)
+                }
+                onBookMassageTariff={(tariffId) =>
+                  openOrder(activeServiceView, true, null, tariffId ?? null)
                 }
               />
             ) : (
@@ -1007,14 +1016,19 @@ export default function Home() {
         service={service}
         onServiceChange={(next) => {
           setService(next);
-          if (next !== "massage") setMassageCategoryId(null);
+          if (next !== "massage") {
+            setMassageCategoryId(null);
+            setMassageTariffId(null);
+          }
         }}
         onClose={() => {
           setModalOpen(false);
           setMassageCategoryId(null);
+          setMassageTariffId(null);
         }}
         lockService={lockService}
         massageCategoryId={massageCategoryId}
+        initialMassageTariffId={massageTariffId}
       />
     </div>
   );

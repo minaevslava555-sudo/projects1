@@ -22,6 +22,16 @@ import {
   isValidPreferredTime,
   parseCleaningV1PriceInput,
 } from "@/lib/booking-pricing";
+import {
+  MASSAGE_V1_QUOTE_REVISION,
+  isMassageV1TariffId,
+  type MassageV1TariffId,
+} from "@/lib/massage-wellness-catalog";
+import {
+  formatMassageV1OrderDetails,
+  parseMassageV1PriceInput,
+  type MassageV1PriceResult,
+} from "@/lib/massage-wellness-pricing";
 import { buildOrderRequestFingerprint } from "@/lib/order-request-fingerprint";
 import { resolveOrderPricing } from "@/lib/order-pricing";
 import { generateOrderRef } from "@/lib/order-ref";
@@ -221,6 +231,19 @@ function isCleaningV1OrdersEnabled(): boolean {
   return process.env.CLEANING_V1_ORDERS_ENABLED === "true";
 }
 
+/** Server Preview gate for Massage v1 orders. Default off. */
+function isMassageV1OrdersEnabled(): boolean {
+  return process.env.MASSAGE_V1_ORDERS_ENABLED === "true";
+}
+
+function isMassageV1EquipmentBookable(): boolean {
+  return process.env.MASSAGE_V1_EQUIPMENT_BOOKABLE === "true";
+}
+
+function isMassageV1PremiumWellnessBookable(): boolean {
+  return process.env.MASSAGE_V1_PREMIUM_WELLNESS_BOOKABLE === "true";
+}
+
 /** Reject Cleaning v1 / mixed payloads until v1 order processing is enabled. */
 function rejectUnsupportedCleaningPricingVersion(
   raw: Record<string, unknown>,
@@ -278,6 +301,17 @@ export type CleaningV1OrderFields = {
 
 export type ParseCleaningV1OrderFieldsResult =
   | { ok: true; value: CleaningV1OrderFields }
+  | { ok: false; error: string };
+
+export type MassageV1OrderFields = {
+  massageVersion: "v1";
+  massageTariffId: MassageV1TariffId;
+  wellnessEquipmentIds?: string[];
+  massageQuoteRevision: string;
+};
+
+export type ParseMassageV1OrderFieldsResult =
+  | { ok: true; value: MassageV1OrderFields }
   | { ok: false; error: string };
 
 /**
@@ -344,6 +378,96 @@ export function parseCleaningV1OrderFields(
   };
 }
 
+/**
+ * Isolated Massage v1 order-field parser. Wired into handleOrderPost behind
+ * MASSAGE_V1_ORDERS_ENABLED; rejects mixed legacy minutes/category.
+ */
+export function parseMassageV1OrderFields(
+  raw: unknown,
+): ParseMassageV1OrderFieldsResult {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return { ok: false, error: "Некорректные поля Massage v1" };
+  }
+  const record = raw as Record<string, unknown>;
+
+  if (!Object.prototype.hasOwnProperty.call(record, "massageVersion")) {
+    return { ok: false, error: "Укажите версию заказа массажа" };
+  }
+  if (record.massageVersion !== "v1") {
+    return { ok: false, error: "Неизвестная версия заказа массажа" };
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(record, "massageMinutes") &&
+    record.massageMinutes != null
+  ) {
+    return {
+      ok: false,
+      error: "Уберите устаревшее поле massageMinutes из запроса Massage v1",
+    };
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(record, "massageCategory") &&
+    record.massageCategory != null &&
+    record.massageCategory !== ""
+  ) {
+    return {
+      ok: false,
+      error: "Уберите устаревшее поле massageCategory из запроса Massage v1",
+    };
+  }
+
+  for (const forbidden of [
+    "priceEuro",
+    "totalSessionMinutes",
+    "basePriceEuro",
+    "equipmentPrices",
+  ] as const) {
+    if (Object.prototype.hasOwnProperty.call(record, forbidden)) {
+      return { ok: false, error: `Unexpected field: ${forbidden}` };
+    }
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(record, "massageQuoteRevision")) {
+    return { ok: false, error: "Укажите версию тарифов массажа" };
+  }
+  if (
+    typeof record.massageQuoteRevision !== "string" ||
+    record.massageQuoteRevision.trim() !== MASSAGE_V1_QUOTE_REVISION
+  ) {
+    return {
+      ok: false,
+      error: "Тарифы обновились. Обновите расчёт и подтвердите снова",
+    };
+  }
+
+  const priced = parseMassageV1PriceInput({
+    tariffId: record.massageTariffId,
+    ...(Object.prototype.hasOwnProperty.call(record, "wellnessEquipmentIds")
+      ? { wellnessEquipmentIds: record.wellnessEquipmentIds }
+      : {}),
+  });
+  if (!priced.ok) {
+    return { ok: false, error: priced.error };
+  }
+  if (!isMassageV1TariffId(priced.value.tariffId)) {
+    return { ok: false, error: "Invalid massage tariff" };
+  }
+
+  return {
+    ok: true,
+    value: {
+      massageVersion: "v1",
+      massageTariffId: priced.value.tariffId,
+      massageQuoteRevision: MASSAGE_V1_QUOTE_REVISION,
+      ...(priced.value.wellnessEquipmentIds != null &&
+      priced.value.wellnessEquipmentIds.length > 0
+        ? { wellnessEquipmentIds: [...priced.value.wellnessEquipmentIds] }
+        : {}),
+    },
+  };
+}
+
 function jsonError(message: string, status: number) {
   return Response.json({ ok: false, error: message }, { status });
 }
@@ -390,6 +514,8 @@ type ValidatedBookingFields = {
   repairPhotoPaths: string[];
   /** Present only for gated Cleaning v1 bookings. */
   cleaningV1?: CleaningV1OrderFields;
+  /** Present only for gated Massage v1 bookings. */
+  massageV1?: MassageV1OrderFields;
 };
 
 function formatCleaningV1RoomComposition(
@@ -570,7 +696,11 @@ function parseValidatedBookingFields(
   }
 
   let cleaningV1: CleaningV1OrderFields | undefined;
+  let massageV1: MassageV1OrderFields | undefined;
   let validatedRooms = rooms;
+  let validatedMassageMinutes = massageMinutes;
+  let validatedMassageCategory =
+    massageCategory === "invalid" ? undefined : massageCategory;
 
   if (service === "cleaning") {
     if (raw.cleaningPricingVersion === "v1") {
@@ -593,6 +723,35 @@ function parseValidatedBookingFields(
     }
   }
 
+  if (service === "massage") {
+    if (raw.massageVersion === "v1") {
+      if (!isMassageV1OrdersEnabled()) {
+        return {
+          ok: false,
+          message: "Massage v1 пока недоступна",
+          status: 400,
+        };
+      }
+      const parsedV1 = parseMassageV1OrderFields(raw);
+      if (!parsedV1.ok) {
+        return { ok: false, message: parsedV1.error, status: 400 };
+      }
+      massageV1 = parsedV1.value;
+      validatedMassageMinutes = null;
+      validatedMassageCategory = undefined;
+    } else if (
+      Object.prototype.hasOwnProperty.call(raw, "massageTariffId") ||
+      Object.prototype.hasOwnProperty.call(raw, "wellnessEquipmentIds") ||
+      Object.prototype.hasOwnProperty.call(raw, "massageQuoteRevision")
+    ) {
+      return {
+        ok: false,
+        message: "Укажите massageVersion: v1 для полей Massage v1",
+        status: 400,
+      };
+    }
+  }
+
   return {
     ok: true,
     fields: {
@@ -609,11 +768,12 @@ function parseValidatedBookingFields(
       details: details === "invalid" ? undefined : details,
       problemDescription:
         problemDescription === "invalid" ? undefined : problemDescription,
-      massageCategory: massageCategory === "invalid" ? undefined : massageCategory,
+      massageCategory: validatedMassageCategory,
       rooms: validatedRooms,
-      massageMinutes,
+      massageMinutes: validatedMassageMinutes,
       repairPhotoPaths,
       cleaningV1,
+      massageV1,
     },
   };
 }
@@ -682,6 +842,7 @@ export async function handleOrderPost(
       massageMinutes,
       repairPhotoPaths,
       cleaningV1,
+      massageV1,
     } = validated.fields;
 
     const requestFingerprint = buildOrderRequestFingerprint({
@@ -698,9 +859,13 @@ export async function handleOrderPost(
       details: details === "invalid" ? null : details ?? null,
       problemDescription:
         problemDescription === "invalid" ? null : problemDescription ?? null,
-      massageCategory: massageCategory === "invalid" ? null : massageCategory ?? null,
+      massageCategory: massageV1
+        ? null
+        : massageCategory === "invalid"
+          ? null
+          : massageCategory ?? null,
       rooms,
-      massageMinutes,
+      massageMinutes: massageV1 ? null : massageMinutes,
       repairPhotoPaths,
       ...(cleaningV1
         ? {
@@ -710,6 +875,16 @@ export async function handleOrderPost(
             ...(cleaningV1.addons != null &&
             cleaningV1AddonsHaveWork(cleaningV1.addons)
               ? { addons: cleaningV1.addons }
+              : {}),
+          }
+        : {}),
+      ...(massageV1
+        ? {
+            massageVersion: "v1" as const,
+            massageTariffId: massageV1.massageTariffId,
+            ...(massageV1.wellnessEquipmentIds != null &&
+            massageV1.wellnessEquipmentIds.length > 0
+              ? { wellnessEquipmentIds: massageV1.wellnessEquipmentIds }
               : {}),
           }
         : {}),
@@ -831,11 +1006,24 @@ export async function handleOrderPost(
                 : {}),
             },
           }
-        : {
-            service,
-            rooms: rooms ?? undefined,
-            massageMinutes: massageMinutes ?? undefined,
-          },
+        : massageV1
+          ? {
+              service: "massage",
+              massageVersion: "v1",
+              massageV1: {
+                tariffId: massageV1.massageTariffId,
+                ...(massageV1.wellnessEquipmentIds != null
+                  ? { wellnessEquipmentIds: massageV1.wellnessEquipmentIds }
+                  : {}),
+                equipmentBookable: isMassageV1EquipmentBookable(),
+                premiumWellnessBookable: isMassageV1PremiumWellnessBookable(),
+              },
+            }
+          : {
+              service,
+              rooms: rooms ?? undefined,
+              massageMinutes: massageMinutes ?? undefined,
+            },
     );
     if (!pricingResult.ok) {
       return failBeforeSave(pricingResult.message, pricingResult.status);
@@ -858,7 +1046,38 @@ export async function handleOrderPost(
         orderDetails ??
         `${rooms} room(s) require ~${priced.hours} hours and ${priced.workers} cleaner(s)`;
     }
-    if (service === "massage" && priced.mode === "fixed") {
+    if (
+      massageV1 &&
+      pricingSnapshot &&
+      pricingSnapshot.massageVersion === "v1" &&
+      typeof pricingSnapshot.tariffId === "string" &&
+      typeof pricingSnapshot.baseDurationMin === "number" &&
+      typeof pricingSnapshot.basePriceCents === "number" &&
+      typeof pricingSnapshot.totalSessionMinutes === "number" &&
+      typeof pricingSnapshot.priceCents === "number" &&
+      typeof pricingSnapshot.priceEuro === "number"
+    ) {
+      const v1Details: MassageV1PriceResult = {
+        tariffId: massageV1.massageTariffId,
+        catalogVersion: "v1",
+        quoteRevision:
+          typeof pricingSnapshot.quoteRevision === "string"
+            ? pricingSnapshot.quoteRevision
+            : MASSAGE_V1_QUOTE_REVISION,
+        baseDurationMin: pricingSnapshot.baseDurationMin,
+        basePriceCents: pricingSnapshot.basePriceCents,
+        equipment: Array.isArray(pricingSnapshot.equipment)
+          ? (pricingSnapshot.equipment as MassageV1PriceResult["equipment"])
+          : [],
+        includedEquipment: Array.isArray(pricingSnapshot.includedEquipment)
+          ? (pricingSnapshot.includedEquipment as MassageV1PriceResult["includedEquipment"])
+          : [],
+        totalSessionMinutes: pricingSnapshot.totalSessionMinutes,
+        priceCents: pricingSnapshot.priceCents,
+        priceEuro: pricingSnapshot.priceEuro,
+      };
+      orderDetails = orderDetails ?? formatMassageV1OrderDetails(v1Details);
+    } else if (service === "massage" && priced.mode === "fixed") {
       const duration = `${priced.massageMinutes} min session`;
       orderDetails = orderDetails
         ? orderDetails
@@ -872,6 +1091,13 @@ export async function handleOrderPost(
 
     const orderRef = deps.generateOrderRef();
     const isCleaningV1 = cleaningV1 != null;
+    const isMassageV1 = massageV1 != null;
+    const massageV1BaseMinutes =
+      isMassageV1 &&
+      pricingSnapshot &&
+      typeof pricingSnapshot.baseDurationMin === "number"
+        ? pricingSnapshot.baseDurationMin
+        : undefined;
 
     saveStarted = true;
     let id: string;
@@ -896,8 +1122,16 @@ export async function handleOrderPost(
           !isCleaningV1 && priced.mode === "fixed" ? priced.hours : undefined,
         workers:
           !isCleaningV1 && priced.mode === "fixed" ? priced.workers : undefined,
-        massageMinutes: priced.mode === "fixed" ? priced.massageMinutes : undefined,
-        massageCategory: service === "massage" ? massageCategory : undefined,
+        massageMinutes: isMassageV1
+          ? massageV1BaseMinutes
+          : priced.mode === "fixed"
+            ? priced.massageMinutes
+            : undefined,
+        massageCategory: isMassageV1
+          ? massageV1.massageTariffId
+          : service === "massage"
+            ? massageCategory
+            : undefined,
         problemDescription: service === "repair" ? problemDescription : undefined,
         repairPhotoPaths: service === "repair" ? repairPhotoPaths : undefined,
         orderRef,
@@ -977,11 +1211,20 @@ export async function handleOrderPost(
           !isCleaningV1 && priced.mode === "fixed" ? priced.hours : undefined,
         workers:
           !isCleaningV1 && priced.mode === "fixed" ? priced.workers : undefined,
-        massageMinutes: priced.mode === "fixed" ? priced.massageMinutes : undefined,
-        massageCategory: service === "massage" ? massageCategory : undefined,
+        massageMinutes: isMassageV1
+          ? massageV1BaseMinutes
+          : priced.mode === "fixed"
+            ? priced.massageMinutes
+            : undefined,
+        massageCategory: isMassageV1
+          ? massageV1.massageTariffId
+          : service === "massage"
+            ? massageCategory
+            : undefined,
         problemDescription: service === "repair" ? problemDescription : undefined,
         repairPhotoCount: service === "repair" ? repairPhotoPaths.length : undefined,
         repairPhotoPaths: service === "repair" ? repairPhotoPaths : undefined,
+        pricingSnapshot: isMassageV1 ? pricingSnapshot : undefined,
       });
     } catch (notifyError) {
       telegramOk = false;

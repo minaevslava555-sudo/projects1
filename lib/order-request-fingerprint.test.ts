@@ -323,3 +323,67 @@ test("zero addons leave v1 fingerprint unchanged; non-zero addons change it", ()
   assert.equal(base, withZero);
   assert.notEqual(base, withOven);
 });
+
+test("massage v1 fingerprint differs by tariff and equipment; empty equipment omitted", () => {
+  const baseV1 = {
+    ...baseBooking,
+    service: "massage",
+    rooms: null as number | null,
+    massageMinutes: null as number | null,
+    massageCategory: null as string | null,
+    massageVersion: "v1" as const,
+    massageTariffId: "relaxing-60",
+  };
+  const baseFp = buildOrderRequestFingerprint(baseV1);
+  assert.notEqual(
+    baseFp,
+    buildOrderRequestFingerprint({
+      ...baseV1,
+      massageTariffId: "sports-60",
+    }),
+  );
+  assert.equal(
+    baseFp,
+    buildOrderRequestFingerprint({
+      ...baseV1,
+      wellnessEquipmentIds: [],
+    }),
+  );
+  assert.notEqual(
+    baseFp,
+    buildOrderRequestFingerprint({
+      ...baseV1,
+      wellnessEquipmentIds: ["foot-system"],
+    }),
+  );
+  assert.equal(
+    buildOrderRequestFingerprint({
+      ...baseV1,
+      wellnessEquipmentIds: ["moxi", "foot-system"],
+    }),
+    buildOrderRequestFingerprint({
+      ...baseV1,
+      wellnessEquipmentIds: ["foot-system", "moxi"],
+    }),
+  );
+});
+
+test("legacy massage fingerprint unchanged when massageVersion absent", () => {
+  const legacy = buildOrderRequestFingerprint({
+    ...baseBooking,
+    service: "massage",
+    rooms: null,
+    massageMinutes: 60,
+    massageCategory: "Relaxing Massage",
+  });
+  const withStaleV1Fields = buildOrderRequestFingerprint({
+    ...baseBooking,
+    service: "massage",
+    rooms: null,
+    massageMinutes: 60,
+    massageCategory: "Relaxing Massage",
+    massageTariffId: "relaxing-60",
+    wellnessEquipmentIds: ["moxi"],
+  });
+  assert.equal(legacy, withStaleV1Fields);
+});
