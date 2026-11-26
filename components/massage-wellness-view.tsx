@@ -11,7 +11,7 @@ import {
   type WellnessEquipmentId,
 } from "@/lib/massage-wellness-catalog";
 import { useTranslations } from "next-intl";
-import { useReducedMotion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
 
 const MASSAGE_CARDS: Array<{
@@ -24,6 +24,8 @@ const MASSAGE_CARDS: Array<{
   { id: "targeted-60", family: "targeted" },
   { id: "premium-wellness-120", signature: true },
 ];
+
+const EASE = [0.22, 1, 0.36, 1] as const;
 
 export default function MassageWellnessView({
   onBack,
@@ -92,7 +94,7 @@ export default function MassageWellnessView({
           </p>
 
           <div className="mt-8 grid gap-5 sm:grid-cols-2 sm:gap-6">
-            {MASSAGE_CARDS.map((card) => {
+            {MASSAGE_CARDS.map((card, index) => {
               const tariffId: MassageV1TariffId =
                 card.family === "targeted"
                   ? targetedMinutes === 30
@@ -104,8 +106,16 @@ export default function MassageWellnessView({
               const title = t(`tariffs.${tariffId}.title`);
 
               return (
-                <article
+                <motion.article
                   key={card.id}
+                  initial={reduceMotion ? false : { opacity: 0, y: 18 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.2 }}
+                  transition={{
+                    duration: reduceMotion ? 0 : 0.55,
+                    delay: reduceMotion ? 0 : index * 0.06,
+                    ease: EASE,
+                  }}
                   className={`group overflow-hidden rounded-[12px] border shadow-[0_18px_40px_rgba(27,37,33,0.06)] ${motionClass} ${cardHoverClass} ${
                     isSignature
                       ? "border-olive-deep/40 bg-olive text-paper"
@@ -135,7 +145,10 @@ export default function MassageWellnessView({
 
                   <div className="flex flex-1 flex-col px-5 py-5 sm:px-6 sm:py-6">
                     {isSignature ? (
-                      <div className="mb-3 h-px w-10 bg-gold/70" aria-hidden="true" />
+                      <div
+                        className="mb-3 h-px w-10 bg-gold/70"
+                        aria-hidden="true"
+                      />
                     ) : null}
                     <h4
                       className={`font-display text-xl font-medium tracking-tight sm:text-2xl ${
@@ -199,7 +212,7 @@ export default function MassageWellnessView({
                       {t("bookCta")}
                     </button>
                   </div>
-                </article>
+                </motion.article>
               );
             })}
           </div>
@@ -213,19 +226,30 @@ export default function MassageWellnessView({
             {t("discoverTechIntro")}
           </p>
           <div className="mt-8 grid gap-5 sm:grid-cols-2 sm:gap-6">
-            {WELLNESS_EQUIPMENT_IDS.map((id) => {
+            {WELLNESS_EQUIPMENT_IDS.map((id, index) => {
               const item = WELLNESS_EQUIPMENT[id];
               return (
-                <article
+                <motion.article
                   key={id}
+                  initial={reduceMotion ? false : { opacity: 0, y: 18 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.2 }}
+                  transition={{
+                    duration: reduceMotion ? 0 : 0.55,
+                    delay: reduceMotion ? 0 : index * 0.06,
+                    ease: EASE,
+                  }}
                   className={`group overflow-hidden rounded-[12px] border border-mist/70 bg-white/55 shadow-[0_18px_40px_rgba(27,37,33,0.06)] ${motionClass} ${cardHoverClass}`}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={item.placeholderImage}
-                    alt={tEquip(`items.${id}.imageAlt`)}
-                    className={`aspect-[5/4] w-full object-cover ${imageHoverClass}`}
-                  />
+                  <div className="relative aspect-[5/4] overflow-hidden bg-sand">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={item.image}
+                      alt={tEquip(`items.${id}.imageAlt`)}
+                      className={`absolute inset-0 h-full w-full object-cover object-center ${imageHoverClass}`}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-ink/25 via-transparent to-transparent" />
+                  </div>
                   <div className="px-5 py-5 sm:px-6 sm:py-6">
                     <h4 className="font-display text-xl font-medium tracking-tight text-ink sm:text-2xl">
                       {tEquip(`items.${id}.name`)}
@@ -245,7 +269,7 @@ export default function MassageWellnessView({
                       {tEquip("learnMore")}
                     </button>
                   </div>
-                </article>
+                </motion.article>
               );
             })}
           </div>

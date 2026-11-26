@@ -40,7 +40,10 @@ export type WellnessEquipment = {
   priceCents: number;
   /** Catalog-level availability; booking still gated by feature flags. */
   available: boolean;
-  placeholderImage: string;
+  /** Primary lifestyle / in-use photo for cards and modal hero. */
+  image: string;
+  /** Studio device photo for booking thumbs and modal detail. */
+  deviceImage: string;
 };
 
 export const MASSAGE_V1_TARIFF_IDS: readonly MassageV1TariffId[] = [
@@ -121,7 +124,8 @@ export const WELLNESS_EQUIPMENT: Record<
     extraBookingMin: 30,
     priceCents: 2000,
     available: true,
-    placeholderImage: "/images/wellness/placeholder-foot-system.svg",
+    image: "/images/wellness/foot-system.webp",
+    deviceImage: "/images/wellness/foot-system-device.webp",
   },
   "eye-system": {
     id: "eye-system",
@@ -131,7 +135,8 @@ export const WELLNESS_EQUIPMENT: Record<
     extraBookingMin: 25,
     priceCents: 1500,
     available: true,
-    placeholderImage: "/images/wellness/placeholder-eye-system.svg",
+    image: "/images/wellness/eye-system.webp",
+    deviceImage: "/images/wellness/eye-system-device.webp",
   },
   moxi: {
     id: "moxi",
@@ -141,7 +146,8 @@ export const WELLNESS_EQUIPMENT: Record<
     extraBookingMin: 0,
     priceCents: 1000,
     available: true,
-    placeholderImage: "/images/wellness/placeholder-moxi.svg",
+    image: "/images/wellness/moxi.webp",
+    deviceImage: "/images/wellness/moxi-device.webp",
   },
   "top-relax": {
     id: "top-relax",
@@ -151,7 +157,8 @@ export const WELLNESS_EQUIPMENT: Record<
     extraBookingMin: 0,
     priceCents: 1000,
     available: true,
-    placeholderImage: "/images/wellness/placeholder-top-relax.svg",
+    image: "/images/wellness/top-relax.webp",
+    deviceImage: "/images/wellness/top-relax-device.webp",
   },
 };
 

@@ -642,7 +642,8 @@
         "purpose": "Pensado para cuidado confortável de pés e pernas como complemento à massagem.",
         "howItWorks": "Usado como procedimento wellness complementar. O protocolo exacto é confirmado consigo antes da visita.",
         "limitations": "Não é um tratamento médico. Contra-indicações e adequação são revistas antes de activar reservas.",
-        "imageAlt": "Placeholder do aparelho FootSystem"
+        "imageAlt": "FootSystem num interior luminoso durante uma sessão wellness",
+        "deviceImageAlt": "Aparelho FootSystem sobre fundo claro"
       },
       "eye-system": {
         "name": "EyeSystem",
@@ -650,7 +651,8 @@
         "purpose": "Complemento wellness suave focado na zona dos olhos.",
         "howItWorks": "Agendado em torno da sessão de massagem. Os passos são explicados antes da utilização.",
         "limitations": "Não é um tratamento médico. A reserva permanece fechada até verificar instruções e contra-indicações.",
-        "imageAlt": "Placeholder do aparelho EyeSystem"
+        "imageAlt": "EyeSystem num momento calmo de wellness em casa",
+        "deviceImageAlt": "Aparelho EyeSystem sobre fundo branco"
       },
       "moxi": {
         "name": "Moxi",
@@ -658,7 +660,8 @@
         "purpose": "Complemento wellness breve planeado durante a massagem.",
         "howItWorks": "Aplicado no tempo da sessão sem alargar o relógio da visita.",
         "limitations": "Regra de agendamento preliminar — não é um protocolo médico confirmado. Revisão de segurança necessária antes da reserva.",
-        "imageAlt": "Placeholder do aparelho Moxi"
+        "imageAlt": "Moxi utilizado durante uma sessão wellness em casa",
+        "deviceImageAlt": "Aparelho Moxi visto de lado"
       },
       "top-relax": {
         "name": "TopRelax",
@@ -666,7 +669,8 @@
         "purpose": "Complemento wellness breve planeado junto com a massagem manual.",
         "howItWorks": "Encaixa na janela da massagem; sem minutos extra no catálogo actual.",
         "limitations": "Não é um tratamento médico. A reserva real permanece bloqueada até limpar compatibilidade e contra-indicações.",
-        "imageAlt": "Placeholder do aparelho TopRelax"
+        "imageAlt": "TopRelax num quarto luminoso durante wellness",
+        "deviceImageAlt": "Aparelho TopRelax em vista de estúdio"
       }
     }
   },

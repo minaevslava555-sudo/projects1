@@ -65,7 +65,10 @@ export default function WellnessEquipmentModal({
           initial={reduceMotion ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={reduceMotion ? undefined : { opacity: 0 }}
-          transition={{ duration: reduceMotion ? 0 : 0.22, ease: [0.22, 1, 0.36, 1] }}
+          transition={{
+            duration: reduceMotion ? 0 : 0.22,
+            ease: [0.22, 1, 0.36, 1],
+          }}
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) onClose();
           }}
@@ -92,9 +95,9 @@ export default function WellnessEquipmentModal({
             <div className="relative aspect-[5/4] overflow-hidden bg-sand">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={item.placeholderImage}
+                src={item.image}
                 alt={t(`items.${equipmentId}.imageAlt`)}
-                className="h-full w-full object-cover"
+                className="h-full w-full object-cover object-center"
               />
               <button
                 ref={closeRef}
@@ -106,16 +109,26 @@ export default function WellnessEquipmentModal({
               </button>
             </div>
             <div className="space-y-4 px-5 py-5 sm:px-6 sm:py-6">
-              <div>
-                <p className="text-xs tracking-[0.2em] text-gold uppercase">
-                  {t("eyebrow")}
-                </p>
-                <h3
-                  id={titleId}
-                  className="mt-2 font-display text-2xl font-medium tracking-tight text-ink"
-                >
-                  {t(`items.${equipmentId}.name`)}
-                </h3>
+              <div className="flex items-start gap-3">
+                <div className="h-16 w-16 shrink-0 overflow-hidden rounded-[12px] border border-mist/70 bg-white">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={item.deviceImage}
+                    alt={t(`items.${equipmentId}.deviceImageAlt`)}
+                    className="h-full w-full object-contain p-1"
+                  />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs tracking-[0.2em] text-gold uppercase">
+                    {t("eyebrow")}
+                  </p>
+                  <h3
+                    id={titleId}
+                    className="mt-2 font-display text-2xl font-medium tracking-tight text-ink"
+                  >
+                    {t(`items.${equipmentId}.name`)}
+                  </h3>
+                </div>
               </div>
               <p className="text-sm leading-relaxed text-ink">
                 {t(`items.${equipmentId}.purpose`)}

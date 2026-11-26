@@ -642,7 +642,8 @@
         "purpose": "Designed for comfortable foot and lower-leg care as an add-on to your massage.",
         "howItWorks": "Used as a complementary wellness procedure. Exact protocol is confirmed with you before the visit.",
         "limitations": "Not a medical treatment. Contraindications and suitability are reviewed before booking is enabled.",
-        "imageAlt": "FootSystem wellness device placeholder"
+        "imageAlt": "FootSystem in a bright home interior during a wellness session",
+        "deviceImageAlt": "FootSystem device on a light background"
       },
       "eye-system": {
         "name": "EyeSystem",
@@ -650,7 +651,8 @@
         "purpose": "A gentle wellness add-on focused on the eye area.",
         "howItWorks": "Scheduled around your massage session. Steps are explained before use.",
         "limitations": "Not a medical treatment. Booking stays closed until instructions and contraindications are verified.",
-        "imageAlt": "EyeSystem wellness device placeholder"
+        "imageAlt": "EyeSystem worn during a calm home wellness moment",
+        "deviceImageAlt": "EyeSystem device on a white background"
       },
       "moxi": {
         "name": "Moxi",
@@ -658,7 +660,8 @@
         "purpose": "A short wellness add-on planned for use during the massage.",
         "howItWorks": "Applied as part of the session timing without extending the visit clock.",
         "limitations": "Preliminary scheduling rule only — not a confirmed medical protocol. Safety review required before booking.",
-        "imageAlt": "Moxi wellness device placeholder"
+        "imageAlt": "Moxi used during a home wellness session",
+        "deviceImageAlt": "Moxi handheld device side view"
       },
       "top-relax": {
         "name": "TopRelax",
@@ -666,7 +669,8 @@
         "purpose": "A brief wellness add-on planned alongside manual massage.",
         "howItWorks": "Fits within the massage window; no extra booking minutes in the current catalog.",
         "limitations": "Not a medical treatment. Real booking remains gated until compatibility and contraindications are cleared.",
-        "imageAlt": "TopRelax wellness device placeholder"
+        "imageAlt": "TopRelax used in a bright bedroom wellness setting",
+        "deviceImageAlt": "TopRelax device studio view"
       }
     }
   },

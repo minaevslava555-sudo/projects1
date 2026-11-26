@@ -2845,9 +2845,9 @@ export default function BookingWizard({
                             >
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
-                                src={item.placeholderImage}
+                                src={item.deviceImage}
                                 alt=""
-                                className="h-14 w-14 shrink-0 rounded-[10px] object-cover"
+                                className="h-14 w-14 shrink-0 rounded-[10px] border border-mist/60 bg-sand object-contain p-0.5"
                               />
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-start justify-between gap-2">
