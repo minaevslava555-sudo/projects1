@@ -1,5 +1,6 @@
 "use client";
 
+import HavenlyMediaImage from "@/components/havenly-media-image";
 import LanguageSwitcher from "@/components/language-switcher";
 import TurnstileWidget from "@/components/turnstile-widget";
 import WellnessEquipmentModal from "@/components/wellness-equipment-modal";
@@ -60,7 +61,6 @@ import {
 import { calculateMassageV1Price } from "@/lib/massage-wellness-pricing";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useTranslations } from "next-intl";
-import Image from "next/image";
 import {
   useEffect,
   useId,
@@ -2872,7 +2872,7 @@ export default function BookingWizard({
                                 }`}
                               >
                                 <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[10px] border border-mist/60 bg-sand">
-                                  <Image
+                                  <HavenlyMediaImage
                                     src={item.deviceImage}
                                     alt=""
                                     width={56}

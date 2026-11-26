@@ -1,5 +1,6 @@
 "use client";
 
+import HavenlyMediaImage from "@/components/havenly-media-image";
 import {
   WELLNESS_EQUIPMENT,
   centsToEuro,
@@ -9,7 +10,6 @@ import {
 import { formatEuro } from "@/lib/booking-pricing";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useTranslations } from "next-intl";
-import Image from "next/image";
 import {
   useEffect,
   useId,
@@ -348,17 +348,18 @@ export default function WellnessEquipmentModal({
               <div className="grid lg:grid-cols-[0.45fr_0.55fr]">
                 <div className="space-y-3 bg-sand/40 p-4 sm:p-5 lg:sticky lg:top-0 lg:self-start">
                   <div className="relative aspect-[4/3] overflow-hidden rounded-[12px] border border-mist/60 bg-sand">
-                    <Image
+                    <HavenlyMediaImage
                       src={item.image}
                       alt={t(`items.${equipmentId}.imageAlt`)}
                       fill
                       sizes="(max-width: 1024px) 100vw, 468px"
+                      priority
                       className="object-cover object-center"
                     />
                   </div>
                   <div className="relative aspect-[5/4] overflow-hidden rounded-[12px] border border-mist/60 bg-white">
                     <div className="absolute inset-4 sm:inset-5">
-                      <Image
+                      <HavenlyMediaImage
                         src={item.deviceImage}
                         alt={t(`items.${equipmentId}.deviceImageAlt`)}
                         fill

@@ -1,5 +1,6 @@
 "use client";
 
+import HavenlyMediaImage from "@/components/havenly-media-image";
 import WellnessEquipmentModal from "@/components/wellness-equipment-modal";
 import { formatEuro } from "@/lib/booking-pricing";
 import {
@@ -12,7 +13,6 @@ import {
 } from "@/lib/massage-wellness-catalog";
 import { useTranslations } from "next-intl";
 import { motion, useReducedMotion } from "motion/react";
-import Image from "next/image";
 import { useState } from "react";
 
 const MASSAGE_CARDS: Array<{
@@ -109,12 +109,14 @@ export default function MassageWellnessView({
               return (
                 <motion.article
                   key={card.id}
-                  initial={reduceMotion ? false : { opacity: 0, y: 18 }}
+                  initial={
+                    reduceMotion ? false : { opacity: 0.72, y: 14 }
+                  }
                   whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, amount: 0.2 }}
+                  viewport={{ once: true, amount: 0.18 }}
                   transition={{
                     duration: reduceMotion ? 0 : 0.55,
-                    delay: reduceMotion ? 0 : index * 0.06,
+                    delay: reduceMotion ? 0 : index * 0.05,
                     ease: EASE,
                   }}
                   className={`group overflow-hidden rounded-[12px] border shadow-[0_18px_40px_rgba(27,37,33,0.06)] ${motionClass} ${cardHoverClass} ${
@@ -124,14 +126,17 @@ export default function MassageWellnessView({
                   }`}
                 >
                   <div className="relative aspect-[5/4] overflow-hidden bg-sand">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                    <HavenlyMediaImage
                       src={tariff.image}
                       alt={t("imageAlt", { title })}
-                      className={`absolute inset-0 h-full w-full object-cover ${imageHoverClass}`}
+                      fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 560px"
+                      // First desktop row (2 cards) is above-the-fold for this section.
+                      priority={index < 2}
+                      className={`object-cover object-center ${imageHoverClass}`}
                     />
                     <div
-                      className={`absolute inset-0 ${
+                      className={`pointer-events-none absolute inset-0 ${
                         isSignature
                           ? "bg-gradient-to-t from-olive-deep/75 via-olive/20 to-transparent"
                           : "bg-gradient-to-t from-ink/35 via-transparent to-transparent"
@@ -232,18 +237,20 @@ export default function MassageWellnessView({
               return (
                 <motion.article
                   key={id}
-                  initial={reduceMotion ? false : { opacity: 0, y: 18 }}
+                  initial={
+                    reduceMotion ? false : { opacity: 0.72, y: 14 }
+                  }
                   whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, amount: 0.2 }}
+                  viewport={{ once: true, amount: 0.18 }}
                   transition={{
                     duration: reduceMotion ? 0 : 0.55,
-                    delay: reduceMotion ? 0 : index * 0.06,
+                    delay: reduceMotion ? 0 : index * 0.05,
                     ease: EASE,
                   }}
                   className={`group overflow-hidden rounded-[12px] border border-mist/70 bg-white/55 shadow-[0_18px_40px_rgba(27,37,33,0.06)] ${motionClass} ${cardHoverClass}`}
                 >
                   <div className="relative aspect-[4/3] overflow-hidden bg-sand sm:aspect-[3/2]">
-                    <Image
+                    <HavenlyMediaImage
                       src={item.image}
                       alt={tEquip(`items.${id}.imageAlt`)}
                       fill
