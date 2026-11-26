@@ -315,6 +315,7 @@
     "massageV1IncludedEquipment": "Included equipment",
     "massageV1SelectedEquipment": "Selected equipment",
     "massageV1ExtraTime": "+{minutes} min",
+    "massageV1ProcedureTime": "{minutes} min",
     "massageV1ExtraPrice": "+{price}",
     "massageV1LearnMore": "Learn more",
     "massageV1ComingSoon": "Coming soon",
@@ -592,6 +593,8 @@
     "duration": "{minutes} min",
     "includedDevices": "Includes FootSystem, EyeSystem, Moxi and TopRelax",
     "targetedToggleHint": "Choose 30 or 60 minutes",
+    "signatureEyebrow": "Signature Experience",
+    "imageAlt": "In-home {title} session",
     "tariffs": {
       "relaxing-60": {
         "title": "Relaxing Massage",
@@ -615,7 +618,7 @@
       },
       "premium-wellness-120": {
         "title": "Premium Wellness",
-        "short": "120 minutes with all four wellness devices included.",
+        "short": "Two serene hours — massage and all four wellness devices, included.",
         "description": "A fixed complex with massage and wellness technology. Home visit included. Device sequence is confirmed after safety review."
       }
     }

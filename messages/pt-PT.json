@@ -315,6 +315,7 @@
     "massageV1IncludedEquipment": "Equipamento incluído",
     "massageV1SelectedEquipment": "Equipamento selecionado",
     "massageV1ExtraTime": "+{minutes} min",
+    "massageV1ProcedureTime": "{minutes} min",
     "massageV1ExtraPrice": "+{price}",
     "massageV1LearnMore": "Saber mais",
     "massageV1ComingSoon": "Em breve",
@@ -592,6 +593,8 @@
     "duration": "{minutes} min",
     "includedDevices": "Inclui FootSystem, EyeSystem, Moxi e TopRelax",
     "targetedToggleHint": "Escolha 30 ou 60 minutos",
+    "signatureEyebrow": "Experiência Signature",
+    "imageAlt": "Sessão de {title} ao domicílio",
     "tariffs": {
       "relaxing-60": {
         "title": "Massagem Relaxante",
@@ -615,7 +618,7 @@
       },
       "premium-wellness-120": {
         "title": "Premium Wellness",
-        "short": "120 minutos com os quatro aparelhos wellness incluídos.",
+        "short": "Duas horas serenas — massagem e os quatro aparelhos wellness incluídos.",
         "description": "Complexo fixo com massagem e tecnologia wellness. Deslocação incluída. A sequência dos aparelhos é confirmada após revisão de segurança."
       }
     }

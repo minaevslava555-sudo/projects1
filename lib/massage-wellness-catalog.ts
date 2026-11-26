@@ -27,6 +27,8 @@ export type MassageV1Tariff = {
   priceCents: number;
   includedEquipment: readonly WellnessEquipmentId[];
   available: boolean;
+  /** Local presentation image for landing cards. */
+  image: string;
 };
 
 export type WellnessEquipment = {
@@ -67,6 +69,7 @@ export const MASSAGE_V1_TARIFFS: Record<MassageV1TariffId, MassageV1Tariff> = {
     priceCents: 7000,
     includedEquipment: [],
     available: true,
+    image: "/images/massage-relaxing.jpg",
   },
   "sports-60": {
     id: "sports-60",
@@ -75,6 +78,7 @@ export const MASSAGE_V1_TARIFFS: Record<MassageV1TariffId, MassageV1Tariff> = {
     priceCents: 8000,
     includedEquipment: [],
     available: true,
+    image: "/images/massage-back.jpg",
   },
   "targeted-30": {
     id: "targeted-30",
@@ -83,6 +87,7 @@ export const MASSAGE_V1_TARIFFS: Record<MassageV1TariffId, MassageV1Tariff> = {
     priceCents: 5500,
     includedEquipment: [],
     available: true,
+    image: "/images/massage-legs.jpg",
   },
   "targeted-60": {
     id: "targeted-60",
@@ -91,6 +96,7 @@ export const MASSAGE_V1_TARIFFS: Record<MassageV1TariffId, MassageV1Tariff> = {
     priceCents: 8500,
     includedEquipment: [],
     available: true,
+    image: "/images/massage-legs.jpg",
   },
   "premium-wellness-120": {
     id: "premium-wellness-120",
@@ -99,6 +105,7 @@ export const MASSAGE_V1_TARIFFS: Record<MassageV1TariffId, MassageV1Tariff> = {
     priceCents: 12000,
     includedEquipment: ["foot-system", "eye-system", "moxi", "top-relax"],
     available: true,
+    image: "/images/service-massage.jpg",
   },
 };
 

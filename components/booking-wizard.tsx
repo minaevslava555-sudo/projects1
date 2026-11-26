@@ -1797,7 +1797,11 @@ export default function BookingWizard({
                   {tMassage(`categories.${massageCategory.id}.title`)}
                 </p>
               ) : null}
-              <p className="mt-1 text-sm text-muted">{rateLabel}</p>
+              <p className="mt-1 text-sm text-muted">
+                {isMassageV1Booking
+                  ? t("massageV1HomeVisitIncluded")
+                  : rateLabel}
+              </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <LanguageSwitcher tone="onLight" />
@@ -1985,11 +1989,11 @@ export default function BookingWizard({
             ) : null}
 
             {step === "configure" && service === "massage" ? (
-              <div className="rounded-xl border border-mist bg-white px-5 py-6 text-center">
+              <div className="rounded-xl border border-mist bg-white px-4 py-3 text-center sm:px-5 sm:py-4">
                 <p className="text-xs font-medium tracking-[0.18em] text-muted uppercase">
                   {t("total")}
                 </p>
-                <p className="mt-2 font-display text-5xl font-bold tracking-tight text-olive sm:text-6xl">
+                <p className="mt-1 font-display text-3xl font-bold tracking-tight text-olive sm:text-4xl">
                   {formatEuro(total ?? 0)}
                 </p>
               </div>
@@ -2705,17 +2709,19 @@ export default function BookingWizard({
               isMassageV1Booking ? (
                 <div className="space-y-6">
                   {isMassageV1PreviewOnly ? (
-                    <p className="border border-gold/40 bg-gold/10 px-3 py-2 text-sm text-ink">
+                    <p className="rounded-[12px] border border-gold/40 bg-gold/10 px-3 py-2.5 text-sm text-ink">
                       {t("massageV1PreviewHint")}
                     </p>
                   ) : null}
                   <div>
-                    <p className="mb-3 text-sm font-medium text-ink">
+                    <p className="mb-3 text-sm font-medium tracking-wide text-ink">
                       {t("massageV1ChooseExperience")}
                     </p>
-                    <div className="grid gap-2">
+                    <div className="grid gap-2.5">
                       {MASSAGE_V1_PRIMARY_TARIFFS.map((tariffId) => {
                         const isTargetedCard = tariffId === "targeted-60";
+                        const isPremiumCard =
+                          tariffId === "premium-wellness-120";
                         const activeTargeted =
                           massageTariffId === "targeted-30" ||
                           massageTariffId === "targeted-60";
@@ -2738,10 +2744,12 @@ export default function BookingWizard({
                                     : tariffId,
                                 )
                               }
-                              className={`havenly-control w-full border px-4 py-3 text-left transition ${
-                                active
-                                  ? "border-olive bg-olive/10 text-ink"
-                                  : "border-mist bg-white text-ink hover:border-olive"
+                              className={`havenly-control w-full border px-4 py-3.5 text-left transition ${
+                                active && isPremiumCard
+                                  ? "border-olive bg-olive text-paper shadow-[0_10px_24px_rgba(52,72,61,0.22)]"
+                                  : active
+                                    ? "border-olive bg-olive/10 text-ink"
+                                    : "border-mist bg-white text-ink hover:border-olive/60"
                               }`}
                             >
                               <div className="flex items-start justify-between gap-3">
@@ -2749,29 +2757,44 @@ export default function BookingWizard({
                                   <p className="font-medium">
                                     {t(`massageV1Tariffs.${displayTariffId}`)}
                                   </p>
-                                  {tariffId === "premium-wellness-120" ? (
-                                    <p className="mt-1 text-xs text-muted">
-                                      {t("massageV1IncludedEquipment")}
-                                    </p>
-                                  ) : null}
+                                  <p
+                                    className={`mt-1 text-xs ${
+                                      active && isPremiumCard
+                                        ? "text-paper/70"
+                                        : "text-muted"
+                                    }`}
+                                  >
+                                    {MASSAGE_V1_TARIFFS[displayTariffId]
+                                      .durationMin}{" "}
+                                    min
+                                    {isPremiumCard
+                                      ? ` · ${t("massageV1IncludedEquipment")}`
+                                      : null}
+                                  </p>
                                 </div>
-                                <span className="font-display text-lg font-bold">
+                                <span
+                                  className={`font-display text-lg font-medium ${
+                                    active && isPremiumCard
+                                      ? "text-gold"
+                                      : "text-ink"
+                                  }`}
+                                >
                                   {formatEuro(centsToEuro(tariff.priceCents))}
                                 </span>
                               </div>
                             </button>
                             {isTargetedCard && activeTargeted ? (
-                              <div className="flex gap-2 pl-1">
+                              <div className="flex gap-2 pl-0.5">
                                 {(["targeted-30", "targeted-60"] as const).map(
                                   (id) => (
                                     <button
                                       key={id}
                                       type="button"
                                       onClick={() => selectMassageTariff(id)}
-                                      className={`havenly-control flex-1 border px-3 py-2 text-sm ${
+                                      className={`havenly-control flex-1 border px-3 py-2 text-sm font-medium transition ${
                                         massageTariffId === id
-                                          ? "border-olive bg-olive/10"
-                                          : "border-mist bg-white"
+                                          ? "border-olive bg-olive/10 text-ink"
+                                          : "border-mist bg-white text-ink hover:border-olive/50"
                                       }`}
                                     >
                                       {MASSAGE_V1_TARIFFS[id].durationMin} min
@@ -2787,7 +2810,7 @@ export default function BookingWizard({
                   </div>
 
                   <div>
-                    <p className="mb-3 text-sm font-medium text-ink">
+                    <p className="mb-3 text-sm font-medium tracking-wide text-ink">
                       {t("massageV1Enhance")}
                     </p>
                     {isPremiumTariff ? (
@@ -2795,30 +2818,36 @@ export default function BookingWizard({
                         {WELLNESS_EQUIPMENT_IDS.map((id) => (
                           <li
                             key={id}
-                            className="flex items-center justify-between border border-mist bg-white/70 px-3 py-2 text-sm"
+                            className="flex items-center justify-between rounded-[12px] border border-olive/20 bg-olive/[0.06] px-3.5 py-2.5 text-sm"
                           >
-                            <span>{t(`massageV1EquipmentNames.${id}`)}</span>
-                            <span className="text-olive">
+                            <span className="font-medium text-ink">
+                              {t(`massageV1EquipmentNames.${id}`)}
+                            </span>
+                            <span className="text-xs font-medium tracking-wide text-olive uppercase">
                               {tEquip("included")}
                             </span>
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <ul className="space-y-2">
+                      <ul className="space-y-2.5">
                         {WELLNESS_EQUIPMENT_IDS.map((id) => {
                           const item = WELLNESS_EQUIPMENT[id];
                           const checked = wellnessEquipmentIds.includes(id);
                           return (
                             <li
                               key={id}
-                              className="flex gap-3 border border-mist bg-white px-3 py-3"
+                              className={`flex gap-3 rounded-[12px] border px-3 py-3 transition ${
+                                checked
+                                  ? "border-olive/40 bg-olive/[0.06]"
+                                  : "border-mist bg-white"
+                              }`}
                             >
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={item.placeholderImage}
                                 alt=""
-                                className="h-14 w-14 shrink-0 object-cover"
+                                className="h-14 w-14 shrink-0 rounded-[10px] object-cover"
                               />
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-start justify-between gap-2">
@@ -2826,11 +2855,11 @@ export default function BookingWizard({
                                     <p className="text-sm font-medium text-ink">
                                       {t(`massageV1EquipmentNames.${id}`)}
                                     </p>
-                                    <p className="text-xs text-muted">
+                                    <p className="mt-0.5 text-xs leading-relaxed text-muted">
                                       {tEquip(`items.${id}.short`)}
                                     </p>
                                   </div>
-                                  <label className="flex items-center gap-2 text-sm">
+                                  <label className="flex items-center gap-2 pt-0.5 text-sm">
                                     <input
                                       type="checkbox"
                                       checked={checked}
@@ -2838,14 +2867,19 @@ export default function BookingWizard({
                                       onChange={() =>
                                         toggleWellnessEquipment(id)
                                       }
+                                      className="h-4 w-4 accent-olive"
                                     />
                                   </label>
                                 </div>
-                                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
+                                <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
                                   <span>
-                                    {t("massageV1ExtraTime", {
-                                      minutes: item.extraBookingMin,
-                                    })}
+                                    {item.extraBookingMin > 0
+                                      ? t("massageV1ExtraTime", {
+                                          minutes: item.extraBookingMin,
+                                        })
+                                      : t("massageV1ProcedureTime", {
+                                          minutes: item.procedureMin,
+                                        })}
                                   </span>
                                   <span>
                                     {t("massageV1ExtraPrice", {
@@ -2874,8 +2908,8 @@ export default function BookingWizard({
                   </div>
 
                   {massageV1Estimate ? (
-                    <div className="border border-mist bg-white/80 px-4 py-4">
-                      <p className="text-xs tracking-[0.14em] text-muted uppercase">
+                    <div className="rounded-[12px] border border-sand bg-sand/70 px-4 py-4 sm:px-5">
+                      <p className="text-xs tracking-[0.16em] text-gold uppercase">
                         {t("massageV1EstimateHeading")}
                       </p>
                       <p className="mt-2 font-medium text-ink">
@@ -2909,7 +2943,7 @@ export default function BookingWizard({
                       <p className="mt-1 text-sm text-olive">
                         {t("massageV1HomeVisitIncluded")}
                       </p>
-                      <p className="mt-3 font-display text-2xl font-bold text-ink">
+                      <p className="mt-3 font-display text-2xl font-medium tracking-tight text-ink">
                         {formatEuro(massageV1Estimate.priceEuro)}
                       </p>
                     </div>
@@ -3199,11 +3233,7 @@ export default function BookingWizard({
                     {t("summary")}
                   </p>
                   <p className="mt-2 font-display text-xl text-ink">{serviceTitle}</p>
-                  {isMassageV1Booking && massageTariffId ? (
-                    <p className="mt-1 text-olive">
-                      {t(`massageV1Tariffs.${massageTariffId}`)}
-                    </p>
-                  ) : massageCategory ? (
+                  {!isMassageV1Booking && massageCategory ? (
                     <p className="mt-1 text-olive">
                       {tMassage(`categories.${massageCategory.id}.title`)}
                     </p>
