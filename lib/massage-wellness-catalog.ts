@@ -19,6 +19,20 @@ export type WellnessEquipmentId =
   | "moxi"
   | "top-relax";
 
+/** Presentation feature keys — copy lives in WellnessEquipment.features.<id>. */
+export type WellnessFeatureId =
+  | "vibration-massage"
+  | "infrared-heat"
+  | "magnetic-field"
+  | "ionization"
+  | "stone-wellness"
+  | "ems"
+  | "blue-lllt"
+  | "red-lllt"
+  | "moxibustion"
+  | "acupressure"
+  | "health-music";
+
 export type MassageV1Tariff = {
   id: MassageV1TariffId;
   /** i18n key under MassageWellness.tariffs.<id> */
@@ -44,6 +58,11 @@ export type WellnessEquipment = {
   image: string;
   /** Studio device photo for booking thumbs and modal detail. */
   deviceImage: string;
+  /**
+   * Catalog-confirmed Methods of Impact (System 5/95).
+   * EyeSystem count must not be advertised in UI — owner model may differ.
+   */
+  featureIds: readonly WellnessFeatureId[];
 };
 
 export const MASSAGE_V1_TARIFF_IDS: readonly MassageV1TariffId[] = [
@@ -126,6 +145,18 @@ export const WELLNESS_EQUIPMENT: Record<
     available: true,
     image: "/images/wellness/foot-system.webp",
     deviceImage: "/images/wellness/foot-system-device.webp",
+    // BodyHealth catalog pages 22–25 — 9 methods of impact
+    featureIds: [
+      "vibration-massage",
+      "infrared-heat",
+      "ems",
+      "red-lllt",
+      "blue-lllt",
+      "stone-wellness",
+      "magnetic-field",
+      "ionization",
+      "moxibustion",
+    ],
   },
   "eye-system": {
     id: "eye-system",
@@ -137,6 +168,16 @@ export const WELLNESS_EQUIPMENT: Record<
     available: true,
     image: "/images/wellness/eye-system.webp",
     deviceImage: "/images/wellness/eye-system-device.webp",
+    // Catalog EyeSystem pages 10–14. Do not advertise a fixed function count —
+    // owner operates a newer NovuEye model pending confirmation.
+    featureIds: [
+      "acupressure",
+      "vibration-massage",
+      "infrared-heat",
+      "health-music",
+      "magnetic-field",
+      "ionization",
+    ],
   },
   moxi: {
     id: "moxi",
@@ -148,6 +189,16 @@ export const WELLNESS_EQUIPMENT: Record<
     available: true,
     image: "/images/wellness/moxi.webp",
     deviceImage: "/images/wellness/moxi-device.webp",
+    // Moxi catalog pages 34–37 — 7 methods of impact
+    featureIds: [
+      "infrared-heat",
+      "vibration-massage",
+      "moxibustion",
+      "stone-wellness",
+      "ionization",
+      "magnetic-field",
+      "red-lllt",
+    ],
   },
   "top-relax": {
     id: "top-relax",
@@ -159,6 +210,14 @@ export const WELLNESS_EQUIPMENT: Record<
     available: true,
     image: "/images/wellness/top-relax.webp",
     deviceImage: "/images/wellness/top-relax-device.webp",
+    // TopRelax catalog pages 28–33 — 5 main methods of impact
+    featureIds: [
+      "vibration-massage",
+      "infrared-heat",
+      "magnetic-field",
+      "ionization",
+      "red-lllt",
+    ],
   },
 };
 

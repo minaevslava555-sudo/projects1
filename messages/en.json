@@ -626,6 +626,7 @@
   "WellnessEquipment": {
     "eyebrow": "Wellness technology",
     "close": "Close",
+    "closeAria": "Close details",
     "duration": "Procedure duration",
     "extraPrice": "Extra price",
     "extraBookingTime": "Extra booking time",
@@ -635,11 +636,62 @@
     "included": "Included in Premium Wellness",
     "comingSoon": "Booking opens after safety review",
     "learnMore": "Learn more",
+    "technologiesHeading": "Technologies & Features",
+    "sessionHeading": "Session details",
+    "safetyHeading": "Safety & booking",
+    "features": {
+      "vibration-massage": {
+        "title": "Vibration massage",
+        "blurb": "Gentle rhythmic vibration for a soothing, relaxing feel."
+      },
+      "infrared-heat": {
+        "title": "Infrared heat",
+        "blurb": "Soft warming comfort that helps you settle into rest."
+      },
+      "magnetic-field": {
+        "title": "Magnetic field",
+        "blurb": "A complementary wellness modality included in the session profile."
+      },
+      "ionization": {
+        "title": "Ionization",
+        "blurb": "Air ionization support as part of the device’s wellness program."
+      },
+      "stone-wellness": {
+        "title": "Mineral elements (NanoTourmaline)",
+        "blurb": "Mineral alloy elements used within the device’s heat and wellness design."
+      },
+      "ems": {
+        "title": "Low-frequency EMS",
+        "blurb": "Light electrical stimulation as an optional wellness technique."
+      },
+      "blue-lllt": {
+        "title": "Blue LLLT light",
+        "blurb": "Low-level blue light as part of the curated wellness program."
+      },
+      "red-lllt": {
+        "title": "Red LLLT light",
+        "blurb": "Low-level red light used gently within the session."
+      },
+      "moxibustion": {
+        "title": "Localized thermal (Moxi mode)",
+        "blurb": "Focused warmth inspired by traditional thermal practices, delivered with modern control."
+      },
+      "acupressure": {
+        "title": "Acupressure",
+        "blurb": "Targeted pressure points for a calm, comforting eye-area ritual."
+      },
+      "health-music": {
+        "title": "Relaxing music",
+        "blurb": "Soothing audio to deepen the sense of quiet and unwind."
+      }
+    },
     "items": {
       "foot-system": {
         "name": "FootSystem",
-        "short": "Foot and lower-leg wellness support.",
-        "purpose": "Designed for comfortable foot and lower-leg care as an add-on to your massage.",
+        "short": "Complete care for feet and legs.",
+        "tagline": "Complete care for feet and legs.",
+        "description": "After an active day, long walks, or hours on your feet, give yourself time for a proper pause. FootSystem brings together massage, warmth and light technologies in the comfort of home.",
+        "purpose": "Comfortable foot and lower-leg wellness as an add-on to your massage.",
         "howItWorks": "Used as a complementary wellness procedure. Exact protocol is confirmed with you before the visit.",
         "limitations": "Not a medical treatment. Contraindications and suitability are reviewed before booking is enabled.",
         "imageAlt": "FootSystem in a bright home interior during a wellness session",
@@ -647,25 +699,31 @@
       },
       "eye-system": {
         "name": "EyeSystem",
-        "short": "Eye-area wellness support.",
+        "short": "Relaxation and comfort for the eye area.",
+        "tagline": "Relaxation and comfort for the eye area.",
+        "description": "Step away from screens, daily pace and digital load. EyeSystem turns a simple break into a comforting ritual of calm — in the privacy of your home.",
         "purpose": "A gentle wellness add-on focused on the eye area.",
         "howItWorks": "Scheduled around your massage session. Steps are explained before use.",
-        "limitations": "Not a medical treatment. Booking stays closed until instructions and contraindications are verified.",
+        "limitations": "Not a medical treatment. Booking stays closed until instructions and contraindications are verified. Feature details may vary by NovuEye model.",
         "imageAlt": "EyeSystem worn during a calm home wellness moment",
         "deviceImageAlt": "EyeSystem device on a white background"
       },
       "moxi": {
         "name": "Moxi",
-        "short": "Compact wellness support during massage.",
+        "short": "Localized warmth and focused massage.",
+        "tagline": "Localized warmth and focused massage.",
+        "description": "Inspired by traditional Eastern practices, Moxi combines localized thermal comfort with contemporary massage technologies for a brief, attentive add-on during your session.",
         "purpose": "A short wellness add-on planned for use during the massage.",
         "howItWorks": "Applied as part of the session timing without extending the visit clock.",
-        "limitations": "Preliminary scheduling rule only — not a confirmed medical protocol. Safety review required before booking.",
+        "limitations": "Not a medical treatment. Safety review is required before booking is enabled.",
         "imageAlt": "Moxi used during a home wellness session",
         "deviceImageAlt": "Moxi handheld device side view"
       },
       "top-relax": {
         "name": "TopRelax",
-        "short": "Relaxation support during massage.",
+        "short": "Warm comfort for neck, shoulders and back.",
+        "tagline": "Warm comfort for neck, shoulders and back.",
+        "description": "A blend of pleasant warmth and massage support in an ergonomic form — designed for a calm pause in the atmosphere of a home spa.",
         "purpose": "A brief wellness add-on planned alongside manual massage.",
         "howItWorks": "Fits within the massage window; no extra booking minutes in the current catalog.",
         "limitations": "Not a medical treatment. Real booking remains gated until compatibility and contraindications are cleared.",

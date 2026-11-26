@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600" role="img" aria-label="TopRelax placeholder">
-  <rect width="800" height="600" fill="#efe8dc"/>
-  <rect x="250" y="200" width="300" height="180" rx="28" fill="#d9cfc0" stroke="#8a9a7b" stroke-width="2"/>
-  <path d="M300 290h200" stroke="#8a9a7b" stroke-width="6" stroke-linecap="round"/>
-  <text x="400" y="520" text-anchor="middle" font-family="Georgia, serif" font-size="28" fill="#3d4a3a">TopRelax</text>
-</svg>

@@ -12,6 +12,7 @@ import {
 } from "@/lib/massage-wellness-catalog";
 import { useTranslations } from "next-intl";
 import { motion, useReducedMotion } from "motion/react";
+import Image from "next/image";
 import { useState } from "react";
 
 const MASSAGE_CARDS: Array<{
@@ -225,7 +226,7 @@ export default function MassageWellnessView({
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted sm:text-base">
             {t("discoverTechIntro")}
           </p>
-          <div className="mt-8 grid gap-5 sm:grid-cols-2 sm:gap-6">
+          <div className="mt-8 grid gap-5 sm:grid-cols-2 sm:gap-5 lg:gap-6">
             {WELLNESS_EQUIPMENT_IDS.map((id, index) => {
               const item = WELLNESS_EQUIPMENT[id];
               return (
@@ -241,32 +242,45 @@ export default function MassageWellnessView({
                   }}
                   className={`group overflow-hidden rounded-[12px] border border-mist/70 bg-white/55 shadow-[0_18px_40px_rgba(27,37,33,0.06)] ${motionClass} ${cardHoverClass}`}
                 >
-                  <div className="relative aspect-[5/4] overflow-hidden bg-sand">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                  <div className="relative aspect-[4/3] overflow-hidden bg-sand sm:aspect-[3/2]">
+                    <Image
                       src={item.image}
                       alt={tEquip(`items.${id}.imageAlt`)}
-                      className={`absolute inset-0 h-full w-full object-cover object-center ${imageHoverClass}`}
+                      fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 560px"
+                      className={`object-cover object-[center_30%] ${imageHoverClass}`}
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-ink/25 via-transparent to-transparent" />
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/25 via-transparent to-transparent" />
                   </div>
-                  <div className="px-5 py-5 sm:px-6 sm:py-6">
-                    <h4 className="font-display text-xl font-medium tracking-tight text-ink sm:text-2xl">
+                  <div className="px-5 py-4 sm:px-5 sm:py-5">
+                    <h4 className="font-display text-xl font-medium tracking-tight text-ink sm:text-[1.35rem]">
                       {tEquip(`items.${id}.name`)}
                     </h4>
-                    <p className="mt-2 text-sm leading-relaxed text-muted">
+                    <p className="mt-1.5 text-sm leading-relaxed text-muted">
                       {tEquip(`items.${id}.short`)}
                     </p>
-                    <p className="mt-4 text-sm font-medium text-ink">
+                    <p className="mt-3 text-sm font-medium text-ink">
                       {t("duration", { minutes: item.procedureMin })} · +
                       {formatEuro(centsToEuro(item.priceCents))}
                     </p>
                     <button
                       type="button"
                       onClick={() => setEquipmentModalId(id)}
-                      className="havenly-control mt-5 inline-flex border border-mist bg-white px-5 py-2.5 text-sm font-semibold text-ink transition hover:border-olive focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+                      className="havenly-control group/cta mt-4 inline-flex items-center gap-2 border border-transparent bg-transparent px-0 py-1.5 text-sm font-semibold text-olive transition hover:text-olive-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
                     >
-                      {tEquip("learnMore")}
+                      <span className="border-b border-olive/30 pb-0.5 transition group-hover/cta:border-olive">
+                        {tEquip("learnMore")}
+                      </span>
+                      <span
+                        aria-hidden="true"
+                        className={`inline-block text-gold transition ${
+                          reduceMotion
+                            ? ""
+                            : "group-hover/cta:translate-x-0.5"
+                        }`}
+                      >
+                        →
+                      </span>
                     </button>
                   </div>
                 </motion.article>

@@ -59,6 +59,7 @@ import {
 import { calculateMassageV1Price } from "@/lib/massage-wellness-pricing";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useTranslations } from "next-intl";
+import Image from "next/image";
 import {
   useEffect,
   useId,
@@ -2843,10 +2844,12 @@ export default function BookingWizard({
                                   : "border-mist bg-white"
                               }`}
                             >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
+                              <Image
                                 src={item.deviceImage}
                                 alt=""
+                                width={56}
+                                height={56}
+                                sizes="56px"
                                 className="h-14 w-14 shrink-0 rounded-[10px] border border-mist/60 bg-sand object-contain p-0.5"
                               />
                               <div className="min-w-0 flex-1">

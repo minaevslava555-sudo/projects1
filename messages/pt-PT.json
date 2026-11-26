@@ -626,6 +626,7 @@
   "WellnessEquipment": {
     "eyebrow": "Tecnologia wellness",
     "close": "Fechar",
+    "closeAria": "Fechar detalhes",
     "duration": "Duração do procedimento",
     "extraPrice": "Preço extra",
     "extraBookingTime": "Tempo extra de reserva",
@@ -635,11 +636,62 @@
     "included": "Incluído no Premium Wellness",
     "comingSoon": "Reservas abrem após revisão de segurança",
     "learnMore": "Saber mais",
+    "technologiesHeading": "Tecnologias e funcionalidades",
+    "sessionHeading": "Detalhes da sessão",
+    "safetyHeading": "Segurança e reserva",
+    "features": {
+      "vibration-massage": {
+        "title": "Massagem por vibração",
+        "blurb": "Vibração ritmada e suave para uma sensação de conforto e relaxamento."
+      },
+      "infrared-heat": {
+        "title": "Calor infravermelho",
+        "blurb": "Calor suave que ajuda a entrar num ritmo de descanso."
+      },
+      "magnetic-field": {
+        "title": "Campo magnético",
+        "blurb": "Modalidade wellness complementar incluída no programa do aparelho."
+      },
+      "ionization": {
+        "title": "Ionização",
+        "blurb": "Apoio de ionização do ar como parte do programa wellness."
+      },
+      "stone-wellness": {
+        "title": "Elementos minerais (NanoTourmaline)",
+        "blurb": "Elementos de liga mineral integrados no design térmico e wellness do aparelho."
+      },
+      "ems": {
+        "title": "EMS de baixa frequência",
+        "blurb": "Estimulação eléctrica ligeira como técnica wellness opcional."
+      },
+      "blue-lllt": {
+        "title": "Luz azul LLLT",
+        "blurb": "Luz azul de baixa intensidade no programa wellness seleccionado."
+      },
+      "red-lllt": {
+        "title": "Luz vermelha LLLT",
+        "blurb": "Luz vermelha de baixa intensidade usada com suavidade na sessão."
+      },
+      "moxibustion": {
+        "title": "Calor localizado (modo Moxi)",
+        "blurb": "Calor focado inspirado em práticas térmicas tradicionais, com controlo moderno."
+      },
+      "acupressure": {
+        "title": "Acupressão",
+        "blurb": "Pontos de pressão para um ritual calmo e confortável na zona dos olhos."
+      },
+      "health-music": {
+        "title": "Música relaxante",
+        "blurb": "Áudio suave para aprofundar a sensação de tranquilidade."
+      }
+    },
     "items": {
       "foot-system": {
         "name": "FootSystem",
-        "short": "Apoio wellness para pés e pernas.",
-        "purpose": "Pensado para cuidado confortável de pés e pernas como complemento à massagem.",
+        "short": "Cuidado completo para pés e pernas.",
+        "tagline": "Cuidado completo para pés e pernas.",
+        "description": "Depois de um dia activo, longas caminhadas ou trabalho em pé, ofereça a si mesmo um verdadeiro momento de pausa. O FootSystem reúne tecnologias de massagem, calor e luz no conforto de casa.",
+        "purpose": "Cuidado confortável de pés e pernas como complemento à massagem.",
         "howItWorks": "Usado como procedimento wellness complementar. O protocolo exacto é confirmado consigo antes da visita.",
         "limitations": "Não é um tratamento médico. Contra-indicações e adequação são revistas antes de activar reservas.",
         "imageAlt": "FootSystem num interior luminoso durante uma sessão wellness",
@@ -647,25 +699,31 @@
       },
       "eye-system": {
         "name": "EyeSystem",
-        "short": "Apoio wellness na zona dos olhos.",
+        "short": "Relaxamento e conforto para a zona dos olhos.",
+        "tagline": "Relaxamento e conforto para a zona dos olhos.",
+        "description": "Afaste-se dos ecrãs, do ritmo diário e da carga digital. O EyeSystem transforma uma pausa simples num ritual sereno de conforto — na privacidade da sua casa.",
         "purpose": "Complemento wellness suave focado na zona dos olhos.",
         "howItWorks": "Agendado em torno da sessão de massagem. Os passos são explicados antes da utilização.",
-        "limitations": "Não é um tratamento médico. A reserva permanece fechada até verificar instruções e contra-indicações.",
+        "limitations": "Não é um tratamento médico. A reserva permanece fechada até verificar instruções e contra-indicações. Os detalhes das funções podem variar conforme o modelo NovuEye.",
         "imageAlt": "EyeSystem num momento calmo de wellness em casa",
         "deviceImageAlt": "Aparelho EyeSystem sobre fundo branco"
       },
       "moxi": {
         "name": "Moxi",
-        "short": "Apoio wellness compacto durante a massagem.",
+        "short": "Calor localizado e massagem focada.",
+        "tagline": "Calor localizado e massagem focada.",
+        "description": "Inspirado em práticas orientais tradicionais, o Moxi une conforto térmico localizado a tecnologias modernas de massagem — um complemento breve e atento durante a sua sessão.",
         "purpose": "Complemento wellness breve planeado durante a massagem.",
         "howItWorks": "Aplicado no tempo da sessão sem alargar o relógio da visita.",
-        "limitations": "Regra de agendamento preliminar — não é um protocolo médico confirmado. Revisão de segurança necessária antes da reserva.",
+        "limitations": "Não é um tratamento médico. É necessária revisão de segurança antes de activar reservas.",
         "imageAlt": "Moxi utilizado durante uma sessão wellness em casa",
         "deviceImageAlt": "Aparelho Moxi visto de lado"
       },
       "top-relax": {
         "name": "TopRelax",
-        "short": "Apoio de relaxamento durante a massagem.",
+        "short": "Conforto térmico para pescoço, ombros e costas.",
+        "tagline": "Conforto térmico para pescoço, ombros e costas.",
+        "description": "Uma combinação de calor agradável e apoio de massagem numa forma ergonómica — pensado para uma pausa serena na atmosfera de um spa em casa.",
         "purpose": "Complemento wellness breve planeado junto com a massagem manual.",
         "howItWorks": "Encaixa na janela da massagem; sem minutos extra no catálogo actual.",
         "limitations": "Não é um tratamento médico. A reserva real permanece bloqueada até limpar compatibilidade e contra-indicações.",
