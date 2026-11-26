@@ -255,6 +255,16 @@ export function sortWellnessEquipmentIds(
   );
 }
 
+/** Pure toggle for wizard selection — one call must add or remove exactly once. */
+export function toggleWellnessEquipmentId(
+  selected: readonly WellnessEquipmentId[],
+  id: WellnessEquipmentId,
+): WellnessEquipmentId[] {
+  return selected.includes(id)
+    ? selected.filter((item) => item !== id)
+    : [...selected, id];
+}
+
 export function centsToEuro(cents: number): number {
   return cents / 100;
 }

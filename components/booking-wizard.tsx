@@ -53,6 +53,7 @@ import {
   WELLNESS_EQUIPMENT,
   WELLNESS_EQUIPMENT_IDS,
   centsToEuro,
+  toggleWellnessEquipmentId,
   type MassageV1TariffId,
   type WellnessEquipmentId,
 } from "@/lib/massage-wellness-catalog";
@@ -673,10 +674,8 @@ export default function BookingWizard({
   }
 
   function toggleWellnessEquipment(id: WellnessEquipmentId) {
-    if (isPremiumTariff) return;
-    setWellnessEquipmentIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
-    );
+    if (isPremiumTariff || !MASSAGE_V1_EQUIPMENT_UI_BOOKABLE) return;
+    setWellnessEquipmentIds((prev) => toggleWellnessEquipmentId(prev, id));
   }
 
   function setErrorCode(
@@ -2831,77 +2830,112 @@ export default function BookingWizard({
                         ))}
                       </ul>
                     ) : (
-                      <ul className="space-y-2.5">
+                      <ul className="space-y-2.5 [overflow-anchor:none]">
                         {WELLNESS_EQUIPMENT_IDS.map((id) => {
                           const item = WELLNESS_EQUIPMENT[id];
                           const checked = wellnessEquipmentIds.includes(id);
+                          const bookable = MASSAGE_V1_EQUIPMENT_UI_BOOKABLE;
                           return (
                             <li
                               key={id}
-                              className={`flex gap-3 rounded-[12px] border px-3 py-3 transition ${
+                              className={`rounded-[12px] border transition [overflow-anchor:none] ${
                                 checked
                                   ? "border-olive/40 bg-olive/[0.06]"
                                   : "border-mist bg-white"
-                              }`}
+                              } ${bookable ? "" : "opacity-95"}`}
                             >
-                              <Image
-                                src={item.deviceImage}
-                                alt=""
-                                width={56}
-                                height={56}
-                                sizes="56px"
-                                className="h-14 w-14 shrink-0 rounded-[10px] border border-mist/60 bg-sand object-contain p-0.5"
-                              />
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-start justify-between gap-2">
-                                  <div>
-                                    <p className="text-sm font-medium text-ink">
-                                      {t(`massageV1EquipmentNames.${id}`)}
-                                    </p>
-                                    <p className="mt-0.5 text-xs leading-relaxed text-muted">
-                                      {tEquip(`items.${id}.short`)}
-                                    </p>
+                              <div
+                                role="checkbox"
+                                aria-checked={checked}
+                                aria-disabled={!bookable}
+                                tabIndex={bookable ? 0 : -1}
+                                onMouseDown={(event) => {
+                                  // Prevent focus scroll-into-view inside the
+                                  // modal scroller from cancelling the first tap.
+                                  if (event.button === 0) event.preventDefault();
+                                }}
+                                onClick={() => {
+                                  if (!bookable) return;
+                                  toggleWellnessEquipment(id);
+                                }}
+                                onKeyDown={(event) => {
+                                  if (!bookable) return;
+                                  if (event.key === " " || event.key === "Enter") {
+                                    event.preventDefault();
+                                    toggleWellnessEquipment(id);
+                                  }
+                                }}
+                                className={`flex gap-3 px-3 py-3 outline-none focus-visible:ring-2 focus-visible:ring-gold/70 focus-visible:ring-offset-2 ${
+                                  bookable
+                                    ? "cursor-pointer"
+                                    : "cursor-not-allowed"
+                                }`}
+                              >
+                                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[10px] border border-mist/60 bg-sand">
+                                  <Image
+                                    src={item.deviceImage}
+                                    alt=""
+                                    width={56}
+                                    height={56}
+                                    sizes="56px"
+                                    className="pointer-events-none h-14 w-14 object-contain p-0.5"
+                                  />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                      <p className="text-sm font-medium text-ink">
+                                        {t(`massageV1EquipmentNames.${id}`)}
+                                      </p>
+                                      <p className="mt-0.5 text-xs leading-relaxed text-muted">
+                                        {tEquip(`items.${id}.short`)}
+                                      </p>
+                                    </div>
+                                    <span
+                                      aria-hidden="true"
+                                      className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border text-[0.7rem] font-semibold transition ${
+                                        checked
+                                          ? "border-olive bg-olive text-white"
+                                          : "border-mist bg-white text-transparent"
+                                      }`}
+                                    >
+                                      ✓
+                                    </span>
                                   </div>
-                                  <label className="flex items-center gap-2 pt-0.5 text-sm">
-                                    <input
-                                      type="checkbox"
-                                      checked={checked}
-                                      disabled={!MASSAGE_V1_EQUIPMENT_UI_BOOKABLE}
-                                      onChange={() =>
-                                        toggleWellnessEquipment(id)
-                                      }
-                                      className="h-4 w-4 accent-olive"
-                                    />
-                                  </label>
+                                  <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+                                    <span>
+                                      {item.extraBookingMin > 0
+                                        ? t("massageV1ExtraTime", {
+                                            minutes: item.extraBookingMin,
+                                          })
+                                        : t("massageV1ProcedureTime", {
+                                            minutes: item.procedureMin,
+                                          })}
+                                    </span>
+                                    <span>
+                                      {t("massageV1ExtraPrice", {
+                                        price: formatEuro(
+                                          centsToEuro(item.priceCents),
+                                        ),
+                                      })}
+                                    </span>
+                                    {!bookable ? (
+                                      <span>{t("massageV1ComingSoon")}</span>
+                                    ) : null}
+                                  </div>
                                 </div>
-                                <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
-                                  <span>
-                                    {item.extraBookingMin > 0
-                                      ? t("massageV1ExtraTime", {
-                                          minutes: item.extraBookingMin,
-                                        })
-                                      : t("massageV1ProcedureTime", {
-                                          minutes: item.procedureMin,
-                                        })}
-                                  </span>
-                                  <span>
-                                    {t("massageV1ExtraPrice", {
-                                      price: formatEuro(
-                                        centsToEuro(item.priceCents),
-                                      ),
-                                    })}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    className="font-semibold text-olive underline-offset-2 hover:underline"
-                                    onClick={() => setEquipmentModalId(id)}
-                                  >
-                                    {t("massageV1LearnMore")}
-                                  </button>
-                                  {!MASSAGE_V1_EQUIPMENT_UI_BOOKABLE ? (
-                                    <span>{t("massageV1ComingSoon")}</span>
-                                  ) : null}
-                                </div>
+                              </div>
+                              <div className="border-t border-mist/50 px-3 py-2">
+                                <button
+                                  type="button"
+                                  className="text-xs font-semibold text-olive underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setEquipmentModalId(id);
+                                  }}
+                                >
+                                  {t("massageV1LearnMore")}
+                                </button>
                               </div>
                             </li>
                           );
@@ -2911,7 +2945,7 @@ export default function BookingWizard({
                   </div>
 
                   {massageV1Estimate ? (
-                    <div className="rounded-[12px] border border-sand bg-sand/70 px-4 py-4 sm:px-5">
+                    <div className="rounded-[12px] border border-sand bg-sand/70 px-4 py-4 [overflow-anchor:none] sm:px-5">
                       <p className="text-xs tracking-[0.16em] text-gold uppercase">
                         {t("massageV1EstimateHeading")}
                       </p>
