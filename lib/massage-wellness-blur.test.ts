@@ -12,7 +12,7 @@ const REQUIRED = [
   "/images/massage-relaxing.webp",
   "/images/massage-back.webp",
   "/images/massage-legs.webp",
-  "/images/service-massage.jpg",
+  "/images/massage-premium.webp",
   "/images/wellness/foot-system.webp",
   "/images/wellness/foot-system-device.webp",
   "/images/wellness/eye-system.webp",
@@ -96,17 +96,17 @@ test("different source files must not reuse the same blurDataURL", () => {
   );
 });
 
-test("approved massage photos differ from retained Premium Wellness image", () => {
-  const relaxing = publicFileSha256("/images/massage-relaxing.webp");
-  const sports = publicFileSha256("/images/massage-back.webp");
-  const targeted = publicFileSha256("/images/massage-legs.webp");
-  const premium = publicFileSha256("/images/service-massage.jpg");
+test("four tariff photos are distinct assets with distinct blurs", () => {
+  const tariffs = [
+    "/images/massage-relaxing.webp",
+    "/images/massage-back.webp",
+    "/images/massage-legs.webp",
+    "/images/massage-premium.webp",
+  ] as const;
 
-  assert.notEqual(relaxing, premium);
-  assert.notEqual(sports, premium);
-  assert.notEqual(targeted, premium);
-  assert.notEqual(
-    massageWellnessBlur("/images/massage-relaxing.webp"),
-    massageWellnessBlur("/images/service-massage.jpg"),
-  );
+  const hashes = tariffs.map((src) => publicFileSha256(src));
+  const blurs = tariffs.map((src) => massageWellnessBlur(src));
+
+  assert.equal(new Set(hashes).size, 4);
+  assert.equal(new Set(blurs).size, 4);
 });

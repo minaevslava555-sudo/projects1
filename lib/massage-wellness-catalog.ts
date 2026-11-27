@@ -127,7 +127,7 @@ export const MASSAGE_V1_TARIFFS: Record<MassageV1TariffId, MassageV1Tariff> = {
     priceCents: 12000,
     includedEquipment: ["foot-system", "eye-system", "moxi", "top-relax"],
     available: true,
-    image: "/images/service-massage.jpg",
+    image: "/images/massage-premium.webp",
   },
 };
 

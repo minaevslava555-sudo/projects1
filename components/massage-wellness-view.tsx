@@ -125,7 +125,7 @@ export default function MassageWellnessView({
                       : "border-mist/70 bg-white/55"
                   }`}
                 >
-                  <div className="relative aspect-[5/4] overflow-hidden bg-sand">
+                  <div className="relative aspect-[3/2] overflow-hidden bg-sand">
                     <HavenlyMediaImage
                       src={tariff.image}
                       alt={t("imageAlt", { title })}
