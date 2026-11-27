@@ -143,7 +143,7 @@ export default function MassageWellnessView({
                       }`}
                     />
                     {isSignature ? (
-                      <p className="absolute top-4 left-4 text-[0.65rem] font-medium tracking-[0.22em] text-gold uppercase">
+                      <p className="absolute top-4 left-4 rounded-[6px] bg-olive-deep/60 px-2.5 py-1 text-[0.65rem] font-medium tracking-[0.22em] text-gold uppercase shadow-[0_1px_8px_rgba(27,37,33,0.28)]">
                         {t("signatureEyebrow")}
                       </p>
                     ) : null}

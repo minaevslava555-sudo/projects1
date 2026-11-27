@@ -59,6 +59,10 @@ import {
   type WellnessEquipmentId,
 } from "@/lib/massage-wellness-catalog";
 import { calculateMassageV1Price } from "@/lib/massage-wellness-pricing";
+import {
+  formatIncludedEquipmentItems,
+  isPremiumWellnessTariff,
+} from "@/lib/massage-wellness-presentation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useTranslations } from "next-intl";
 import {
@@ -2952,11 +2956,19 @@ export default function BookingWizard({
                       <p className="mt-2 font-medium text-ink">
                         {t(`massageV1Tariffs.${massageV1Estimate.tariffId}`)}
                       </p>
-                      <p className="mt-1 text-sm text-muted">
-                        {t("massageV1BaseDuration", {
-                          minutes: massageV1Estimate.baseDurationMin,
-                        })}
-                      </p>
+                      {isPremiumWellnessTariff(massageV1Estimate.tariffId) ? (
+                        <p className="mt-1 text-sm text-muted">
+                          {t("massageV1PremiumTotalDuration", {
+                            minutes: massageV1Estimate.totalSessionMinutes,
+                          })}
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-sm text-muted">
+                          {t("massageV1BaseDuration", {
+                            minutes: massageV1Estimate.baseDurationMin,
+                          })}
+                        </p>
+                      )}
                       {massageV1Estimate.equipment.length > 0 ? (
                         <p className="mt-1 text-sm text-muted">
                           {t("massageV1SelectedEquipment")}:{" "}
@@ -2969,14 +2981,21 @@ export default function BookingWizard({
                       ) : null}
                       {massageV1Estimate.includedEquipment.length > 0 ? (
                         <p className="mt-1 text-sm text-muted">
-                          {t("massageV1IncludedEquipment")}
+                          {t("massageV1IncludedEquipmentInPrice", {
+                            items: formatIncludedEquipmentItems(
+                              massageV1Estimate.includedEquipment,
+                              (id) => t(`massageV1EquipmentNames.${id}`),
+                            ),
+                          })}
                         </p>
                       ) : null}
-                      <p className="mt-1 text-sm text-muted">
-                        {t("massageV1TotalDuration", {
-                          minutes: massageV1Estimate.totalSessionMinutes,
-                        })}
-                      </p>
+                      {isPremiumWellnessTariff(massageV1Estimate.tariffId) ? null : (
+                        <p className="mt-1 text-sm text-muted">
+                          {t("massageV1TotalDuration", {
+                            minutes: massageV1Estimate.totalSessionMinutes,
+                          })}
+                        </p>
+                      )}
                       <p className="mt-1 text-sm text-olive">
                         {t("massageV1HomeVisitIncluded")}
                       </p>
@@ -3405,13 +3424,25 @@ export default function BookingWizard({
                         </p>
                       ) : null}
                       {massageV1Estimate.includedEquipment.length > 0 ? (
-                        <p>{t("massageV1IncludedEquipment")}</p>
+                        <p>
+                          {t("massageV1IncludedEquipmentInPrice", {
+                            items: formatIncludedEquipmentItems(
+                              massageV1Estimate.includedEquipment,
+                              (id) => t(`massageV1EquipmentNames.${id}`),
+                            ),
+                          })}
+                        </p>
                       ) : null}
                       <p>
-                        {t("massageV1SummaryVisit", {
-                          minutes: massageV1Estimate.totalSessionMinutes,
-                          total: formatEuro(massageV1Estimate.priceEuro),
-                        })}
+                        {isPremiumWellnessTariff(massageV1Estimate.tariffId)
+                          ? t("massageV1PremiumSummaryVisit", {
+                              minutes: massageV1Estimate.totalSessionMinutes,
+                              total: formatEuro(massageV1Estimate.priceEuro),
+                            })
+                          : t("massageV1SummaryVisit", {
+                              minutes: massageV1Estimate.totalSessionMinutes,
+                              total: formatEuro(massageV1Estimate.priceEuro),
+                            })}
                       </p>
                       <p className="text-olive">
                         {t("massageV1HomeVisitIncluded")}
