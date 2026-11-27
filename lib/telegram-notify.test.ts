@@ -173,3 +173,33 @@ test("repair quote telegram format unchanged", () => {
   assert.match(text, /📷 Фото ремонта: 2/);
   assert.doesNotMatch(text, /Тариф:/);
 });
+
+test("TELEGRAM_NOTIFY_DISABLED=1 skips notifyAdminAboutOrder without Telegram HTTP", async () => {
+  const { notifyAdminAboutOrder } = await import("./telegram-notify");
+  const previous = process.env.TELEGRAM_NOTIFY_DISABLED;
+  const originalFetch = globalThis.fetch;
+  let fetchCalls = 0;
+  globalThis.fetch = (async () => {
+    fetchCalls += 1;
+    throw new Error("Telegram API must not be called when notify is disabled");
+  }) as typeof fetch;
+
+  process.env.TELEGRAM_NOTIFY_DISABLED = "1";
+  try {
+    await notifyAdminAboutOrder({
+      ...baseOrder,
+      service: "Cleaning / Уборка",
+      pricingMode: "fixed",
+      priceEuro: 40,
+      orderRef: "HV-CL-DRY",
+    });
+    assert.equal(fetchCalls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (previous === undefined) {
+      delete process.env.TELEGRAM_NOTIFY_DISABLED;
+    } else {
+      process.env.TELEGRAM_NOTIFY_DISABLED = previous;
+    }
+  }
+});

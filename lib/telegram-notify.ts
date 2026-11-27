@@ -1,5 +1,6 @@
 import type { PricingMode } from "@/lib/booking-pricing";
 import { getSupabaseServer } from "@/lib/supabase/server";
+import { isTelegramNotifyDisabled } from "@/lib/telegram-runtime";
 
 const REPAIR_PHOTOS_BUCKET = "repair-order-photos";
 const MAX_REPAIR_PHOTOS = 5;
@@ -319,7 +320,7 @@ async function sendMediaGroup(
 
 /** Лёгкая отправка без импорта bot/ — безопаснее для Vercel serverless. */
 export async function notifyAdminAboutOrder(order: OrderNotification) {
-  if (process.env.TELEGRAM_NOTIFY_DISABLED === "1") {
+  if (isTelegramNotifyDisabled()) {
     return;
   }
 

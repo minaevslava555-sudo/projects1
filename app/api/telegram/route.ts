@@ -1,4 +1,5 @@
 import { createTelegramBot, registerTelegramWebhook, telegramWebhookSecret } from "@/bot/telegram";
+import { shouldHandleTelegramUpdates } from "@/lib/telegram-runtime";
 import { webhookCallback } from "grammy";
 
 export const runtime = "nodejs";
@@ -31,6 +32,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  // Refuse before createTelegramBot / webhookCallback — no commands, history, or Bot API.
+  if (!shouldHandleTelegramUpdates()) {
+    return Response.json({ error: "Telegram webhook отключён" }, { status: 503 });
+  }
+
   const handler = telegramHandler();
   if (!handler) {
     return Response.json({ error: "Не задан TOKEN_TELEGRAM" }, { status: 500 });

@@ -8,6 +8,11 @@ import {
 } from "../lib/agent-store";
 import { askAgent } from "../lib/openai-agent";
 import {
+  shouldHandleTelegramUpdates,
+  shouldRegisterTelegramWebhook,
+  shouldStartTelegramPolling,
+} from "../lib/telegram-runtime";
+import {
   clearEphemeralMessages,
   showAskMenu,
   showHomeMenu,
@@ -20,6 +25,25 @@ const TELEGRAM_LIMIT = 4000;
 type GlobalPoll = typeof globalThis & {
   __telegramPolling?: Promise<void>;
 };
+
+type TelegramFetch = (
+  input: RequestInfo | URL,
+  init?: RequestInit,
+) => Promise<Response>;
+
+/** Test-only seam: grammy uses a Node fetch shim, not globalThis.fetch. */
+let telegramFetchOverride: TelegramFetch | undefined;
+
+export function setTelegramFetchForTests(fetchImpl?: TelegramFetch) {
+  telegramFetchOverride = fetchImpl;
+}
+
+function createBot(token: string) {
+  if (telegramFetchOverride) {
+    return new Bot(token, { client: { fetch: telegramFetchOverride } });
+  }
+  return new Bot(token);
+}
 
 export function telegramWebhookSecret(token = process.env.TOKEN_TELEGRAM ?? "") {
   return createHash("sha256").update(`telegram-webhook:${token}`).digest("hex").slice(0, 32);
@@ -44,9 +68,11 @@ export function adminChatIdsFromEnv() {
 
 /** Отправка текста через того же бота (TOKEN_TELEGRAM → bot.api.sendMessage). */
 export async function sendTelegramMessage(chatId: number | string, text: string) {
+  if (!shouldHandleTelegramUpdates()) return;
+
   const token = process.env.TOKEN_TELEGRAM?.trim();
   if (!token) throw new Error("Не задан TOKEN_TELEGRAM");
-  const bot = new Bot(token);
+  const bot = createBot(token);
   await bot.api.sendMessage(chatId, text, {
     link_preview_options: { is_disabled: true },
   });
@@ -55,7 +81,7 @@ export async function sendTelegramMessage(chatId: number | string, text: string)
 export function createTelegramBot(token = process.env.TOKEN_TELEGRAM) {
   if (!token) throw new Error("Не задан TOKEN_TELEGRAM");
 
-  const bot = new Bot(token);
+  const bot = createBot(token);
 
   async function sendEphemeral(chatId: number, text: string) {
     const ids: number[] = [];
@@ -165,11 +191,14 @@ export function createTelegramBot(token = process.env.TOKEN_TELEGRAM) {
 }
 
 export async function registerTelegramWebhook() {
+  // Defense in depth: refuse Preview / disabled notify even if called directly.
+  if (!shouldRegisterTelegramWebhook()) return null;
+
   const token = process.env.TOKEN_TELEGRAM;
   const origin = publicAppUrl();
   if (!token || !origin) return null;
 
-  const bot = new Bot(token);
+  const bot = createBot(token);
   const url = `${origin}/api/telegram`;
   await bot.api.setWebhook(url, {
     secret_token: telegramWebhookSecret(token),
@@ -178,8 +207,23 @@ export async function registerTelegramWebhook() {
   return url;
 }
 
-export async function startTelegramPolling() {
+export type TelegramPollingOptions = {
+  /**
+   * Optional seam for tests: replaces deleteWebhook + bot.start so suites never
+   * open a real long-poll against Telegram.
+   */
+  runBot?: (bot: Bot) => Promise<void>;
+};
+
+export async function startTelegramPolling(options?: TelegramPollingOptions) {
+  if (!shouldStartTelegramPolling()) return;
+
   const bot = createTelegramBot();
+  if (options?.runBot) {
+    await options.runBot(bot);
+    return;
+  }
+
   await bot.api.deleteWebhook({ drop_pending_updates: false });
   console.log("Telegram bot: long polling");
   await bot.start({
@@ -189,17 +233,17 @@ export async function startTelegramPolling() {
   });
 }
 
-export async function startTelegramChannel() {
-  if (!process.env.TOKEN_TELEGRAM) return;
-
-  if (process.env.VERCEL) {
+export async function startTelegramChannel(options?: TelegramPollingOptions) {
+  if (shouldRegisterTelegramWebhook()) {
     await registerTelegramWebhook();
     return;
   }
 
+  if (!shouldStartTelegramPolling()) return;
+
   const state = globalThis as GlobalPoll;
   if (!state.__telegramPolling) {
-    state.__telegramPolling = startTelegramPolling().catch((error: unknown) => {
+    state.__telegramPolling = startTelegramPolling(options).catch((error: unknown) => {
       console.error(error);
     });
   }
