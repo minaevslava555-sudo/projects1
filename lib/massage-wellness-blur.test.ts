@@ -9,9 +9,9 @@ import {
 } from "@/lib/massage-wellness-blur";
 
 const REQUIRED = [
-  "/images/massage-relaxing.jpg",
-  "/images/massage-back.jpg",
-  "/images/massage-legs.jpg",
+  "/images/massage-relaxing.webp",
+  "/images/massage-back.webp",
+  "/images/massage-legs.webp",
   "/images/service-massage.jpg",
   "/images/wellness/foot-system.webp",
   "/images/wellness/foot-system-device.webp",
@@ -96,16 +96,17 @@ test("different source files must not reuse the same blurDataURL", () => {
   );
 });
 
-test("massage-relaxing and service-massage currently share identical source bytes", () => {
-  const relaxing = publicFileSha256("/images/massage-relaxing.jpg");
-  const service = publicFileSha256("/images/service-massage.jpg");
-  assert.equal(
-    relaxing,
-    service,
-    "expected identical assets; if they diverge, regenerate distinct blurs",
-  );
-  assert.equal(
-    massageWellnessBlur("/images/massage-relaxing.jpg"),
+test("approved massage photos differ from retained Premium Wellness image", () => {
+  const relaxing = publicFileSha256("/images/massage-relaxing.webp");
+  const sports = publicFileSha256("/images/massage-back.webp");
+  const targeted = publicFileSha256("/images/massage-legs.webp");
+  const premium = publicFileSha256("/images/service-massage.jpg");
+
+  assert.notEqual(relaxing, premium);
+  assert.notEqual(sports, premium);
+  assert.notEqual(targeted, premium);
+  assert.notEqual(
+    massageWellnessBlur("/images/massage-relaxing.webp"),
     massageWellnessBlur("/images/service-massage.jpg"),
   );
 });

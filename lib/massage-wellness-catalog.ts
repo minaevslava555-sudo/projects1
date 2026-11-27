@@ -91,7 +91,7 @@ export const MASSAGE_V1_TARIFFS: Record<MassageV1TariffId, MassageV1Tariff> = {
     priceCents: 7000,
     includedEquipment: [],
     available: true,
-    image: "/images/massage-relaxing.jpg",
+    image: "/images/massage-relaxing.webp",
   },
   "sports-60": {
     id: "sports-60",
@@ -100,7 +100,7 @@ export const MASSAGE_V1_TARIFFS: Record<MassageV1TariffId, MassageV1Tariff> = {
     priceCents: 8000,
     includedEquipment: [],
     available: true,
-    image: "/images/massage-back.jpg",
+    image: "/images/massage-back.webp",
   },
   "targeted-30": {
     id: "targeted-30",
@@ -109,7 +109,7 @@ export const MASSAGE_V1_TARIFFS: Record<MassageV1TariffId, MassageV1Tariff> = {
     priceCents: 5500,
     includedEquipment: [],
     available: true,
-    image: "/images/massage-legs.jpg",
+    image: "/images/massage-legs.webp",
   },
   "targeted-60": {
     id: "targeted-60",
@@ -118,7 +118,7 @@ export const MASSAGE_V1_TARIFFS: Record<MassageV1TariffId, MassageV1Tariff> = {
     priceCents: 8500,
     includedEquipment: [],
     available: true,
-    image: "/images/massage-legs.jpg",
+    image: "/images/massage-legs.webp",
   },
   "premium-wellness-120": {
     id: "premium-wellness-120",

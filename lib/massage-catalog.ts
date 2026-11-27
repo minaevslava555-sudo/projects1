@@ -21,12 +21,12 @@ export const MASSAGE_CATEGORIES: MassageCategory[] = [
   {
     id: "relaxing",
     title: "Relaxing Massage",
-    image: "/images/massage-relaxing.jpg",
+    image: "/images/massage-relaxing.webp",
   },
   {
     id: "back-neck",
     title: "Back & Neck Massage",
-    image: "/images/massage-back.jpg",
+    image: "/images/massage-back.webp",
   },
   {
     id: "face-head",
@@ -36,7 +36,7 @@ export const MASSAGE_CATEGORIES: MassageCategory[] = [
   {
     id: "legs-feet",
     title: "Legs & Feet Massage",
-    image: "/images/massage-legs.jpg",
+    image: "/images/massage-legs.webp",
   },
 ];
 
