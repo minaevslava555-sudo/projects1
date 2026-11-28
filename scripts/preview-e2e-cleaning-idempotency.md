@@ -1,8 +1,12 @@
 # Preview E2E — Cleaning v1 idempotency harness
 
 Opt-in script: `scripts/preview-e2e-cleaning-idempotency.mjs`
+Shared infra: `scripts/lib/preview-e2e-shared.mjs`, `scripts/lib/preview-e2e-pins.mjs`
+(Massage harness reuses the same shared module.)
 
-Pinned target (fail-closed):
+Pinned target lives in `preview-e2e-pins.mjs`. While `REPIN_PENDING === true`, **live** runs exit before orders (safe gate after SHA/URL drift). Offline `--self-check` still runs.
+
+Legacy Cleaning-validated pin (reference only until repin):
 
 | Pin | Value |
 |-----|--------|
@@ -19,14 +23,16 @@ Does **not** modify application runtime, Production, main, or env from this scri
 Live execution requires **all** of:
 
 1. `ALLOW_PREVIEW_E2E_IDEMPOTENCY=1`
-2. `PREVIEW_TELEGRAM_NOTIFY_DISABLED_ATTESTED=1` — operator attests Preview has `TELEGRAM_NOTIFY_DISABLED=1`
-3. `PREVIEW_BASE_URL` equal to the pinned Preview origin (or omit to use the pin)
-4. `EXPECTED_GIT_SHA` = **full 40-char** SHA (or omit to use the pin). Prefix match is rejected.
-5. `VERCEL_TOKEN` — independent deployment Git SHA lookup via Vercel API
-6. Optional `VERCEL_TEAM_ID` if the token is team-scoped
-7. Optional `VERCEL_PROTECTION_BYPASS` — Vercel **Protection Bypass for Automation** secret (local only). Required in practice when Deployment Protection / SSO is enabled on the pinned Preview.
-8. `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` for the **test** project only (host must match pin)
-9. Successful `GET /api/preview/supabase-ping` and `GET /api/preview/redis-ping` on the Preview host
+2. `REPIN_PENDING=false` with `EXPECTED_BASE_URL` + `EXPECTED_GIT_SHA` updated together for the target Preview
+3. `PREVIEW_TELEGRAM_NOTIFY_DISABLED_ATTESTED=1` — operator attests Preview has `TELEGRAM_NOTIFY_DISABLED=1`
+4. `PREVIEW_BASE_URL` equal to the pinned Preview origin (or omit to use the pin)
+5. `EXPECTED_GIT_SHA` = **full 40-char** SHA (or omit to use the pin). Prefix match is rejected.
+6. `VERCEL_TOKEN` — independent deployment Git SHA lookup via Vercel API
+7. Optional `VERCEL_TEAM_ID` if the token is team-scoped
+8. Optional `VERCEL_PROTECTION_BYPASS` — Vercel **Protection Bypass for Automation** secret (local only). Required in practice when Deployment Protection / SSO is enabled on the pinned Preview.
+9. `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` for the **test** project only (host must match pin)
+10. Successful `GET /api/preview/supabase-ping` and `GET /api/preview/redis-ping` on the Preview host
+11. Preview `CLEANING_V1_ORDERS_ENABLED=true` (server) for Cleaning v1 orders
 
 On any gate failure the script exits before placing orders.
 
@@ -117,21 +123,22 @@ No secrets, Turnstile/draft tokens, Authorization headers, protection-bypass val
 ### Local syntax + self-check (no network)
 
 ```powershell
+node --check scripts/lib/preview-e2e-pins.mjs
+node --check scripts/lib/preview-e2e-shared.mjs
 node --check scripts/preview-e2e-cleaning-idempotency.mjs
 node scripts/preview-e2e-cleaning-idempotency.mjs --self-check
 ```
 
-Self-check covers: redirect/allowlist policy, wrong origin, Production URL, exact SHA (rejects prefix), secret/dummy-token/bypass redaction, `error.cause` redirect diagnostics, Preview-only bypass header binding (stripped for Vercel API / Supabase / foreign hosts), missing required env, Supabase host pin, and origin-bound Supabase fetch rejecting foreign hosts.
+Self-check covers shared allowlist/bypass/redaction/REPIN gate plus Cleaning T2 fixture.
 
-### Live Preview E2E (only when explicitly approved)
+### Live Preview E2E (only when explicitly approved + repinned)
 
 ```powershell
 $env:ALLOW_PREVIEW_E2E_IDEMPOTENCY = "1"
 $env:PREVIEW_TELEGRAM_NOTIFY_DISABLED_ATTESTED = "1"
-$env:PREVIEW_BASE_URL = "https://projects1-ett84hjty-slava-7f85.vercel.app"
-$env:EXPECTED_GIT_SHA = "377dafa28cc2a0dd26912ac89e19365ec9987578"
+$env:PREVIEW_BASE_URL = "<repinned-preview-url>"
+$env:EXPECTED_GIT_SHA = "<full-40-char-sha>"
 $env:VERCEL_TOKEN = "<vercel-token>"
-# From Vercel → Project → Deployment Protection → Protection Bypass for Automation
 $env:VERCEL_PROTECTION_BYPASS = "<protection-bypass-secret>"
 $env:NEXT_PUBLIC_SUPABASE_URL = "<test-supabase-url>"
 $env:SUPABASE_SERVICE_ROLE_KEY = "<test-service-role>"
