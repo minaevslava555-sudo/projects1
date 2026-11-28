@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { CleaningV1RoomCounts } from "@/lib/booking-pricing";
+import {
+  CLEANING_V1_BILLABLE_STEP_MINUTES,
+  CLEANING_V1_HOURLY_RATE_EURO,
+  CLEANING_V1_MIN_PRICE_EURO,
+  type CleaningV1RoomCounts,
+} from "@/lib/booking-pricing";
 import type { ActivePricingBook } from "@/lib/pricing-book-validation";
 import { resolveOrderPricing } from "@/lib/order-pricing";
 
@@ -316,9 +321,23 @@ test("resolveOrderPricing Cleaning v1 matches all 9 approved prices without load
     assert.equal(result.priced.hours, undefined);
     assert.equal(result.priced.workers, undefined);
     assert.equal(result.pricingConfigId, undefined);
+    assert.equal(result.pricingVersion, undefined);
+    assert.equal(result.hourlyRateSnapshot, CLEANING_V1_HOURLY_RATE_EURO);
     assert.equal(result.pricingSnapshot?.cleaningPricingVersion, "v1");
     assert.equal(result.pricingSnapshot?.customerPriceEuro, row.price);
     assert.equal(result.pricingSnapshot?.adminReviewRequired, false);
+    assert.equal(
+      result.pricingSnapshot?.hourlyRateEuro,
+      CLEANING_V1_HOURLY_RATE_EURO,
+    );
+    assert.equal(
+      result.pricingSnapshot?.minPriceEuro,
+      CLEANING_V1_MIN_PRICE_EURO,
+    );
+    assert.equal(
+      result.pricingSnapshot?.roundingStepMinutes,
+      CLEANING_V1_BILLABLE_STEP_MINUTES,
+    );
     assert.deepEqual(result.pricingSnapshot?.roomCounts, row.rooms);
     assert.equal("areaM2" in (result.pricingSnapshot ?? {}), false);
     assert.equal(
@@ -337,6 +356,51 @@ test("resolveOrderPricing Cleaning v1 matches all 9 approved prices without load
     assert.equal(typeof result.pricingSnapshot?.minimumPriceApplied, "boolean");
     assert.equal("addons" in (result.pricingSnapshot ?? {}), false);
   }
+});
+
+test("resolveOrderPricing Cleaning v1 snapshots rate constants when minimum price applies", async () => {
+  // One separate WC (25 min) → billable 30 min → raw €10 → floor €40.
+  const tinyRooms: CleaningV1RoomCounts = {
+    ...emptyV1Rooms,
+    separateWc: 1,
+  };
+  const result = await resolveOrderPricing(
+    {
+      service: "cleaning",
+      cleaningPricingVersion: "v1",
+      cleaningV1: {
+        roomCounts: tinyRooms,
+        cleaningType: "standard",
+      },
+    },
+    async () => {
+      throw new Error("Pricing book must not load for Cleaning v1");
+    },
+  );
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.priced.mode, "fixed");
+  if (result.priced.mode !== "fixed") return;
+  assert.equal(result.priced.priceEuro, CLEANING_V1_MIN_PRICE_EURO);
+  assert.equal(result.hourlyRateSnapshot, CLEANING_V1_HOURLY_RATE_EURO);
+  assert.equal(result.pricingVersion, undefined);
+  assert.equal(result.pricingConfigId, undefined);
+  assert.equal(result.pricingSnapshot?.minimumPriceApplied, true);
+  assert.equal(
+    result.pricingSnapshot?.customerPriceEuro,
+    CLEANING_V1_MIN_PRICE_EURO,
+  );
+  assert.equal(
+    result.pricingSnapshot?.hourlyRateEuro,
+    CLEANING_V1_HOURLY_RATE_EURO,
+  );
+  assert.equal(result.pricingSnapshot?.minPriceEuro, CLEANING_V1_MIN_PRICE_EURO);
+  assert.equal(
+    result.pricingSnapshot?.roundingStepMinutes,
+    CLEANING_V1_BILLABLE_STEP_MINUTES,
+  );
+  assert.equal(result.pricingSnapshot?.cleaningPricingVersion, "v1");
 });
 
 test("resolveOrderPricing Cleaning v1 snapshots non-zero addons", async () => {

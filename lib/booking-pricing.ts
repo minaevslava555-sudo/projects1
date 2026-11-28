@@ -213,7 +213,8 @@ export const CLEANING_V1_HOURLY_RATE_EURO = 20;
  * without altering server order fingerprints or idempotency keys.
  */
 export const CLEANING_V1_QUOTE_REVISION = "2026-11-24-norms-crew";
-const CLEANING_V1_BILLABLE_STEP_MINUTES = 30;
+/** Billable person-minute rounding step used by Cleaning v1 price math. */
+export const CLEANING_V1_BILLABLE_STEP_MINUTES = 30;
 const CLEANING_V1_VISIT_STEP_MINUTES = 15;
 /**
  * Subtract before ceil so IEEE-754 noise slightly above an exact 30-minute

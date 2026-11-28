@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import {
+  CLEANING_V1_BILLABLE_STEP_MINUTES,
+  CLEANING_V1_HOURLY_RATE_EURO,
+  CLEANING_V1_MIN_PRICE_EURO,
+} from "./booking-pricing";
 import { buildOrderRequestFingerprint } from "./order-request-fingerprint";
 import { resolveOrderPricing } from "./order-pricing";
 import { MASSAGE_V1_QUOTE_REVISION } from "./massage-wellness-catalog";
@@ -2636,18 +2641,36 @@ test("enabled Cleaning v1 fixed-price booking saves snapshot without legacy room
       details?: string;
       priceEuro?: number | null;
       pricingMode?: string;
+      pricingVersion?: number;
+      pricingConfigId?: string;
+      hourlyRateSnapshot?: number;
     };
     assert.equal(saved.rooms, undefined);
     assert.equal(saved.hours, undefined);
     assert.equal(saved.workers, undefined);
     assert.equal(saved.pricingMode, "fixed");
     assert.equal(saved.priceEuro, 70);
+    assert.equal(saved.pricingVersion, undefined);
+    assert.equal(saved.pricingConfigId, undefined);
+    assert.equal(saved.hourlyRateSnapshot, CLEANING_V1_HOURLY_RATE_EURO);
     assert.equal(saved.pricingSnapshot?.cleaningPricingVersion, "v1");
     assert.equal(saved.pricingSnapshot?.adminReviewRequired, false);
     assert.equal(saved.pricingSnapshot?.customerPriceEuro, 70);
     assert.equal(saved.pricingSnapshot?.recommendedCleaners, 1);
     assert.equal(saved.pricingSnapshot?.estimatedVisitMinutes, 210);
     assert.equal(saved.pricingSnapshot?.minimumPriceApplied, false);
+    assert.equal(
+      saved.pricingSnapshot?.hourlyRateEuro,
+      CLEANING_V1_HOURLY_RATE_EURO,
+    );
+    assert.equal(
+      saved.pricingSnapshot?.minPriceEuro,
+      CLEANING_V1_MIN_PRICE_EURO,
+    );
+    assert.equal(
+      saved.pricingSnapshot?.roundingStepMinutes,
+      CLEANING_V1_BILLABLE_STEP_MINUTES,
+    );
     assert.match(String(saved.details), /Cleaning v1/);
     assert.match(String(saved.details), /Rooms:/);
     assert.match(String(saved.details), /Team: 1 cleaner/);
@@ -2832,10 +2855,72 @@ test("enabled Cleaning v1 identical replay returns 200 without duplicate save or
     assert.equal(body.ok, true);
     assert.equal(body.id, "ord-v1-1");
     assert.equal(body.orderRef, "HV-V1-OK");
+    // Historical price from completed idempotency cache — no reprice/resave.
     assert.equal(body.priceEuro, 70);
     assert.equal(counters().saveCalls, 0);
     assert.equal(counters().notifyCalls, 0);
     assert.equal(counters().claimCalls, 0);
+  });
+});
+
+test("enabled Cleaning v1 minimum-price order snapshots rate floor and step", async () => {
+  await withCleaningV1Enabled(async () => {
+    const tinyRooms = {
+      bedroom: 0,
+      livingRoom: 0,
+      kitchen: 0,
+      bathroom: 0,
+      separateWc: 1,
+      hallway: 0,
+      otherRoom: 0,
+    };
+    const { fakeDeps, counters } = createCleaningV1EnabledDeps();
+    const response = await handleOrderPost(
+      new Request("http://localhost/api/order", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(
+          cleaningV1OrderBody("idem-v1-min-price", {
+            roomCounts: tinyRooms,
+          }),
+        ),
+      }),
+      fakeDeps,
+    );
+    const body = (await response.json()) as {
+      ok: boolean;
+      priceEuro?: number | null;
+    };
+    assert.equal(response.status, 200);
+    assert.equal(body.ok, true);
+    assert.equal(body.priceEuro, CLEANING_V1_MIN_PRICE_EURO);
+    const saved = counters().saveArgs[0] as {
+      hourlyRateSnapshot?: number;
+      pricingVersion?: number;
+      pricingConfigId?: string;
+      pricingSnapshot?: Record<string, unknown>;
+    };
+    assert.equal(saved.hourlyRateSnapshot, CLEANING_V1_HOURLY_RATE_EURO);
+    assert.equal(saved.pricingVersion, undefined);
+    assert.equal(saved.pricingConfigId, undefined);
+    assert.equal(saved.pricingSnapshot?.minimumPriceApplied, true);
+    assert.equal(
+      saved.pricingSnapshot?.customerPriceEuro,
+      CLEANING_V1_MIN_PRICE_EURO,
+    );
+    assert.equal(
+      saved.pricingSnapshot?.hourlyRateEuro,
+      CLEANING_V1_HOURLY_RATE_EURO,
+    );
+    assert.equal(
+      saved.pricingSnapshot?.minPriceEuro,
+      CLEANING_V1_MIN_PRICE_EURO,
+    );
+    assert.equal(
+      saved.pricingSnapshot?.roundingStepMinutes,
+      CLEANING_V1_BILLABLE_STEP_MINUTES,
+    );
+    assert.equal(saved.pricingSnapshot?.cleaningPricingVersion, "v1");
   });
 });
 

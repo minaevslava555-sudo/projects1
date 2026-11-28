@@ -4,6 +4,9 @@
  */
 
 import {
+  CLEANING_V1_BILLABLE_STEP_MINUTES,
+  CLEANING_V1_HOURLY_RATE_EURO,
+  CLEANING_V1_MIN_PRICE_EURO,
   calculateCleaningV1Price,
   cleaningV1AddonsHaveWork,
   isMassageMinutes,
@@ -150,6 +153,10 @@ function resolveCleaningV1Pricing(
     minimumPriceApplied,
     recommendedCleaners,
     estimatedVisitMinutes,
+    // Historical rate/floor/step — same constants as calculateCleaningV1Price.
+    hourlyRateEuro: CLEANING_V1_HOURLY_RATE_EURO,
+    minPriceEuro: CLEANING_V1_MIN_PRICE_EURO,
+    roundingStepMinutes: CLEANING_V1_BILLABLE_STEP_MINUTES,
   };
   if (addons != null && cleaningV1AddonsHaveWork(addons)) {
     pricingSnapshot.addons = addons;
@@ -159,6 +166,7 @@ function resolveCleaningV1Pricing(
     return {
       ok: true,
       priced: { mode: "quote", priceEuro: null },
+      hourlyRateSnapshot: CLEANING_V1_HOURLY_RATE_EURO,
       pricingSnapshot,
     };
   }
@@ -174,6 +182,7 @@ function resolveCleaningV1Pricing(
   return {
     ok: true,
     priced: { mode: "fixed", priceEuro: customerPriceEuro },
+    hourlyRateSnapshot: CLEANING_V1_HOURLY_RATE_EURO,
     pricingSnapshot,
   };
 }
